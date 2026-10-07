@@ -11,12 +11,13 @@ class ExecutionQueue {
     this.subscribers = new Map(); // id -> callback functions
   }
 
-  enqueue({ type, teamName, problemId, lang, code, stdin = '' }) {
+  enqueue({ type, teamName, memberId, problemId, lang, code, stdin = '' }) {
     const id = uuidv4();
     const job = {
       id,
       type, // 'run' or 'submit'
       teamName,
+      memberId: memberId || 'UNKNOWN',
       problemId,
       lang,
       code,
@@ -99,24 +100,22 @@ class ExecutionQueue {
           job.status = 'COMPLETED';
 
           // Update team stats in database
-          const team = db.getOrCreateTeam(job.teamName);
+          const team = db.getTeam(job.teamName);
           if (team) {
             team.attempts.push({
               problemId: job.problemId,
+              memberId: job.memberId || 'UNKNOWN',
               timestamp: Date.now(),
               verdict: grade.verdict,
               passed: grade.passed
             });
 
             if (grade.passed) {
-              if (!team.solved.includes(job.problemId)) {
-                team.solved.push(job.problemId);
-                team.score += Number(problem.pts) || 0;
-              }
+              db.recordSolve(job.teamName, job.memberId, job.problemId, Number(problem.pts) || 100);
             } else {
               team.wrong++;
+              db.updateTeam(team);
             }
-            db.updateTeam(team);
           }
         }
       }

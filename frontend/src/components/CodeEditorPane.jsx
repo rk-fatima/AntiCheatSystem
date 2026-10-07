@@ -29,6 +29,8 @@ export function CodeEditorPane({
   onCodeChange,
   onRunCode,
   onSubmitCode,
+  currentMember,
+  problemStatus,
   reportViolation,
   internalClipboardRef
 }) {
@@ -173,7 +175,7 @@ export function CodeEditorPane({
     setIsRunning(true);
     setOutputResult({ status: 'QUEUED', message: 'Job enqueued on runner worker pool...' });
     try {
-      const res = await onRunCode({ lang, code, stdin });
+      const res = await onRunCode({ lang, code, stdin, memberId: currentMember?.memberId });
       setOutputResult({
         status: res.status,
         type: 'run',
@@ -194,7 +196,7 @@ export function CodeEditorPane({
     setIsSubmitting(true);
     setOutputResult({ status: 'QUEUED', message: 'Submission queued for server-side evaluation...' });
     try {
-      const res = await onSubmitCode({ problemId: problem.id, lang, code });
+      const res = await onSubmitCode({ problemId: problem.id, lang, code, memberId: currentMember?.memberId });
       setOutputResult({
         status: res.status,
         type: 'submit',
@@ -230,6 +232,45 @@ export function CodeEditorPane({
             {problem.pts} pts
           </span>
         </div>
+
+        {/* Shared Team Workspace Status Banner */}
+        {problemStatus?.status === 'SOLVED' && (
+          <div style={{
+            padding: '8px 12px',
+            background: 'rgba(0, 255, 157, 0.15)',
+            border: '1px solid var(--neon)',
+            borderRadius: '6px',
+            color: 'var(--neon)',
+            fontSize: '12px',
+            fontWeight: 700,
+            marginBottom: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <CheckCircle size={16} />
+            <span>SOLVED by {problemStatus.solvedBy} {problemStatus.solvedByName ? `(${problemStatus.solvedByName})` : ''}</span>
+          </div>
+        )}
+
+        {problemStatus?.status === 'IN_PROGRESS' && problemStatus.workingBy !== currentMember?.memberId && (
+          <div style={{
+            padding: '8px 12px',
+            background: 'rgba(255, 196, 61, 0.15)',
+            border: '1px solid var(--amber)',
+            borderRadius: '6px',
+            color: 'var(--amber)',
+            fontSize: '12px',
+            fontWeight: 700,
+            marginBottom: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <AlertTriangle size={16} />
+            <span>🟡 Teammate {problemStatus.workingBy} is currently working on this problem</span>
+          </div>
+        )}
 
         <div style={specSectionStyle}>
           <div className="lbl" style={labelStyle}>Category</div>

@@ -91,15 +91,52 @@ The original single-file prototype (`qubit-auctioneer (2).html`) suffered from c
 
 ---
 
-## 💰 Auction Economy & Problem Hierarchy
+## 👥 Shared Team Workspace & Collaboration Model
 
-Each team starts with an auction balance to unlock problems:
-* **Initial Team Budget**: **1,000 points**
-* **Problem Tiers & Costs**:
-  * 🟢 **Easy (`E1` – `E71`)**: **100 points**
-  * 🟡 **Medium (`M1` – `M21`)**: **150 points**
-  * 🔴 **Hard (`H1`)**: **200 points**
-* **Dynamic Deduction**: Unlocking any problem deducts its cost from the team balance in real time. Unlocked problems appear immediately in the **Active Workspace** sidebar.
+```text
+                   TEAM (e.g. SYNORA)
+                    │
+         ┌──────────┴──────────┐
+         │                     │
+  SHARED WORKSPACE        TEAM MEMBERS
+         │               ┌─────┼─────┐
+         │               ↓     ↓     ↓
+         │            SYNORA-01  SYNORA-02  SYNORA-03
+         │           (Member A) (Member B) (Member C)
+    ┌────┼────┬────┐
+    ↓    ↓    ↓    ↓
+   E1   E2   M1   M2
+```
+
+1. **One Team = One Shared Workspace**:
+   * Teams register with **1 to 3 members**, nominating a **Team Captain**.
+   * Unique Member IDs are generated automatically (e.g., `SYNORA-01`, `SYNORA-02`, `SYNORA-03`).
+   * When any member purchases a problem, it immediately unlocks in the shared workspace for all teammates via WebSockets.
+   * If a member solves a problem, all members see: `E1 — Two Sum ✅ SOLVED (Solved by SYNORA-01)`.
+   * If a member works on a problem, teammates see: `E2 — Palindrome Number 🟡 IN PROGRESS (Worked on by SYNORA-02)`.
+   * Individual member actions (submissions, runs, integrity flags) remain strictly attributed to their specific Member ID.
+
+---
+
+## 💰 Dynamic Problem Pricing & Auction Economy
+
+1. **Dynamic Pricing (No Hardcoded Prices)**:
+   * Problem prices are **NOT hardcoded**. The organizer/admin manually sets or updates the price of any problem at any time before purchase.
+   * Admin Pricing Control Screen:
+     ```text
+     Problem: E1 — Two Sum
+     Set Price: [ ₹150 ]
+     [ Publish / Update Price ]
+     ```
+   * Live price changes are broadcast over WebSockets to all connected teams in real time without refreshing.
+2. **Team-Level Purchases & Transactions**:
+   * Each team starts with an initial budget of **₹1,000**.
+   * Problems are purchased from the team's balance:
+     $$\text{New Balance} = \text{Old Balance} - \text{Current Problem Price}$$
+   * The purchase belongs to the entire team. Money is deducted from the team, not individual members.
+   * Every purchase records an immutable audit transaction:
+     `{ Txn ID, Team ID, Problem ID, Price at Purchase, Purchased By (Member ID), Timestamp }`.
+   * Changing a problem's price later does not alter historical transaction records.
 
 ---
 

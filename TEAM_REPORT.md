@@ -66,15 +66,56 @@ Our new architecture introduces:
 
 ---
 
-## 💰 3. Auction Economy & Problem Hierarchy
+## 👥 3. Shared Team Workspace & Dynamic Problem Pricing
 
-* **Initial Team Budget**: **1,000 points**.
-* **Problem Tiers & Costs**:
-  * 🟢 **Easy (`E1` – `E71`)**: **100 points** to unlock (71 problems).
-  * 🟡 **Medium (`M1` – `M21`)**: **150 points** to unlock (21 problems).
-  * 🔴 **Hard (`H1`)**: **200 points** to unlock (1 problem: Median of Two Sorted Arrays).
-* **Dynamic Deduction**: Unlocking a problem deducts points from the team's balance in real time. If a team has fewer points than the unlock cost, the transaction is rejected.
-* **Active Workspace**: Successfully unlocked problems are immediately displayed in the contestant's **Active Workspace** sidebar for coding.
+### A. Team Collaboration Architecture
+```text
+                   TEAM (e.g. SYNORA)
+                    │
+         ┌──────────┴──────────┐
+         │                     │
+  SHARED WORKSPACE        TEAM MEMBERS
+         │               ┌─────┼─────┐
+         │               ↓     ↓     ↓
+         │            SYNORA-01  SYNORA-02  SYNORA-03
+         │           (Member A) (Member B) (Member C)
+    ┌────┼────┬────┐
+    ↓    ↓    ↓    ↓
+   E1   E2   M1   M2
+```
+* **Team Registration**: Teams register with **1 to 3 members**, nominating a **Captain**. Each member provides Full Name, Roll Number, Phone, Email, and College.
+* **Member IDs**: Formatted automatically (e.g., `SYNORA-01`, `SYNORA-02`, `SYNORA-03`).
+* **Shared Active Workspace**: All members of `SYNORA` see the same active problems in real time:
+  * When Member A unlocks `E3`, `E3` immediately appears in the workspace of Member B and Member C.
+  * When Member A solves `E1`, the workspace updates in real time for everyone to:
+    ```text
+    E1 — Two Sum
+    ✅ SOLVED
+    Solved by SYNORA-01
+    ```
+  * When Member B starts working on `E2`, teammates see:
+    ```text
+    E2 — Palindrome Number
+    🟡 IN PROGRESS
+    Being worked on by SYNORA-02
+    ```
+
+### B. Dynamic Problem Pricing (Organizer Controlled)
+* **No Hardcoded Prices**: Problem prices are manually entered and updated by the organizer.
+* **Organizer Price Control Screen**:
+  ```text
+  Problem: E1 — Two Sum
+  Set Price: [ ₹150 ]
+  [ Publish / Update Price ]
+  ```
+* **Dynamic Team Purchase**:
+  * Team begins with a starting budget of **₹1,000**.
+  * When any member purchases a problem, the current configured price is deducted from the team balance (e.g., ₹1,000 - ₹150 = ₹850).
+  * The purchase belongs to the team; any member can solve it.
+* **Immutable Transaction Records**:
+  * Every purchase is recorded permanently:
+    `{ Txn ID, Team ID, Problem ID, Price at Purchase, Purchased By (Member ID), Time }`.
+  * Changing prices later does not affect past purchase records.
 
 ---
 

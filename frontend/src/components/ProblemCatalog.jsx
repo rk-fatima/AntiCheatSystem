@@ -1,36 +1,36 @@
 import React, { useState } from 'react';
-import { Lock, Unlock, KeyRound, CheckCircle2, Search, Coins, Sparkles } from 'lucide-react';
+import { Lock, Unlock, KeyRound, CheckCircle2, Search, Coins, Sparkles, User, Clock, AlertCircle } from 'lucide-react';
 
 export function ProblemCatalog({
   problems,
-  unlockedIds,
-  solvedIds,
-  teamBalance,
-  currentProblemId,
+  problemPrices = {},
+  unlockedIds = [],
+  solvedIds = [],
+  problemStatuses = {},
+  teamBalance = 1000,
+  currentMember,
   onSelectProblem,
-  onUnlockKey
+  onPurchaseProblem
 }) {
-  const [keyInput, setKeyInput] = useState('');
-  const [unlockMessage, setUnlockMessage] = useState(null);
-  const [loadingId, setLoadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [diffFilter, setDiffFilter] = useState('ALL');
+  const [loadingId, setLoadingId] = useState(null);
+  const [purchaseMessage, setPurchaseMessage] = useState(null);
 
-  const handleUnlockWithKey = async (keyToUse) => {
-    const key = (keyToUse || keyInput).trim();
-    if (!key) return;
-
-    setLoadingId(key);
-    setUnlockMessage(null);
+  const handlePurchase = async (problemId) => {
+    setLoadingId(problemId);
+    setPurchaseMessage(null);
     try {
-      const res = await onUnlockKey(key);
-      setUnlockMessage({
+      const res = await onPurchaseProblem(problemId);
+      setPurchaseMessage({
         success: true,
-        text: `✅ Unlocked: ${res.title || res.unlockedId} (-${res.costDeducted || 100} pts · Remaining: ${res.balance} pts)`
+        text: `✅ Purchased "${res.problem?.title || problemId}" for ₹${res.transaction?.price}! Deducted from Team Balance. Unlocked for all members.`
       });
-      if (!keyToUse) setKeyInput('');
     } catch (err) {
-      setUnlockMessage({ success: false, text: `❌ ${err.message || 'Unlock failed'}` });
+      setPurchaseMessage({
+        success: false,
+        text: `❌ ${err.message || 'Purchase failed'}`
+      });
     } finally {
       setLoadingId(null);
     }
@@ -56,82 +56,68 @@ export function ProblemCatalog({
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto' }}>
         {/* Banner with Auction Balance */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
-          padding: '16px 20px',
+          padding: '18px 24px',
           borderRadius: '10px',
           border: '1px solid var(--bd)',
           marginBottom: '20px',
           flexWrap: 'wrap',
-          gap: '12px'
+          gap: '14px'
         }}>
           <div>
             <h2 style={{ color: 'var(--teal)', margin: '0 0 4px', fontSize: '22px' }}>
-              Problem Auction Catalog
+              Team Problem Auction Catalog
             </h2>
-            <div style={{ color: 'var(--mut)', fontSize: '13px' }}>
-              Unlock problem specifications to solve them in your workspace. Points are deducted per tier:
-              <span style={{ color: 'var(--neon)', marginLeft: '6px' }}>Easy (100)</span> ·
-              <span style={{ color: 'var(--amber)', marginLeft: '4px' }}>Medium (150)</span> ·
-              <span style={{ color: 'var(--red)', marginLeft: '4px' }}>Hard (200)</span>
+            <div style={{ color: 'var(--mut)', fontSize: '13px', lineHeight: 1.5 }}>
+              Prices are set dynamically by the examination organizer.
+              Purchasing unlocks the problem for the <b>entire team</b> and deducts from your <b>shared team balance</b>.
             </div>
+            {currentMember && (
+              <div style={{ color: 'var(--txt)', fontSize: '12px', marginTop: '6px' }}>
+                Active Purchaser: <b style={{ color: 'var(--teal)' }}>{currentMember.memberId}</b> ({currentMember.name})
+              </div>
+            )}
           </div>
 
           <div style={{
             background: 'var(--bg4)',
             border: '1px solid var(--neon)',
             borderRadius: '8px',
-            padding: '8px 16px',
+            padding: '10px 20px',
             textAlign: 'right',
             boxShadow: '0 0 12px var(--neon-dim)'
           }}>
-            <small style={{ color: 'var(--mut)', fontSize: '11px', textTransform: 'uppercase' }}>
-              Your Balance
+            <small style={{ color: 'var(--mut)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>
+              Team Balance
             </small>
-            <div style={{ color: 'var(--neon)', fontSize: '20px', fontWeight: 800 }}>
-              {teamBalance ?? 1000} pts
+            <div style={{ color: 'var(--neon)', fontSize: '24px', fontWeight: 800 }}>
+              ₹{teamBalance ?? 1000}
             </div>
           </div>
         </div>
 
-        {/* Unlock Input Bar */}
-        <div style={{
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'center',
-          marginBottom: '16px',
-          background: 'var(--bg2)',
-          padding: '12px',
-          borderRadius: '8px',
-          border: '1px solid var(--bd)'
-        }}>
-          <KeyRound size={20} color="var(--teal)" />
-          <input
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleUnlockWithKey()}
-            placeholder="Type Problem #, ID, or Key (e.g. 1, LC20, TWOSUM, P1)..."
-            style={{ maxWidth: '340px' }}
-          />
-          <button className="pri" onClick={() => handleUnlockWithKey()} disabled={!!loadingId}>
-            {loadingId ? 'Unlocking...' : 'Unlock by Key / ID'}
-          </button>
-          {unlockMessage && (
-            <span style={{
-              fontWeight: 600,
-              fontSize: '13px',
-              color: unlockMessage.success ? 'var(--neon)' : 'var(--red)',
-              marginLeft: '8px'
-            }}>
-              {unlockMessage.text}
-            </span>
-          )}
-        </div>
+        {/* Purchase Status Notification */}
+        {purchaseMessage && (
+          <div style={{
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            background: purchaseMessage.success ? 'rgba(0,255,157,0.1)' : 'var(--red-dim)',
+            border: '1px solid',
+            borderColor: purchaseMessage.success ? 'var(--neon)' : 'var(--red)',
+            color: purchaseMessage.success ? 'var(--neon)' : 'var(--red)',
+            fontWeight: 600,
+            fontSize: '13px'
+          }}>
+            {purchaseMessage.text}
+          </div>
+        )}
 
         {/* Search & Filter Bar */}
         <div style={{
@@ -144,7 +130,7 @@ export function ProblemCatalog({
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search size={16} color="var(--mut)" style={{ position: 'absolute', left: '10px', top: '10px' }} />
             <input
-              placeholder="Search by title, number, or category..."
+              placeholder="Search problems by title, ID (e.g. E1, M2), or topic..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '32px' }}
@@ -190,8 +176,12 @@ export function ProblemCatalog({
           {filteredProblems.map((prob) => {
             const isUnlocked = unlockedIds.includes(prob.id);
             const isSolved = solvedIds.includes(prob.id);
-            const cost = prob.pts || (prob.diff === 'Hard' ? 200 : (prob.diff === 'Medium' ? 150 : 100));
-            const canAfford = (teamBalance ?? 1000) >= cost;
+            const statusInfo = problemStatuses[prob.id];
+
+            // Dynamic price configured by organizer
+            const dynamicPrice = problemPrices[prob.id] ?? prob.price;
+            const hasPrice = dynamicPrice !== null && dynamicPrice !== undefined;
+            const canAfford = hasPrice && (teamBalance ?? 1000) >= dynamicPrice;
 
             return (
               <div
@@ -200,21 +190,24 @@ export function ProblemCatalog({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px 18px',
+                  padding: '14px 20px',
                   borderRadius: '8px',
                   border: '1px solid',
-                  borderColor: isUnlocked ? 'var(--teal)' : 'var(--bd)',
+                  borderColor: isSolved ? 'var(--neon)' : (isUnlocked ? 'var(--teal)' : 'var(--bd)'),
                   background: isUnlocked ? 'var(--bg3)' : 'var(--bg2)',
-                  boxShadow: isUnlocked ? '0 0 10px #14d9c422' : 'none',
+                  boxShadow: isSolved ? '0 0 10px #00ff9d22' : (isUnlocked ? '0 0 8px #14d9c422' : 'none'),
                   transition: 'all 0.15s ease'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
-                  {isUnlocked ? (
-                    <Unlock size={20} color="var(--teal)" style={{ flexShrink: 0 }} />
+                  {isSolved ? (
+                    <CheckCircle2 size={22} color="var(--neon)" style={{ flexShrink: 0 }} />
+                  ) : isUnlocked ? (
+                    <Unlock size={22} color="var(--teal)" style={{ flexShrink: 0 }} />
                   ) : (
-                    <Lock size={20} color="var(--mut)" style={{ flexShrink: 0 }} />
+                    <Lock size={22} color="var(--mut)" style={{ flexShrink: 0 }} />
                   )}
+
                   <div style={{ minWidth: 0 }}>
                     <div style={{
                       fontWeight: 700,
@@ -227,56 +220,106 @@ export function ProblemCatalog({
                     }}>
                       <span>{prob.id} — {prob.title}</span>
                       <span className={`badge ${prob.diff}`}>{prob.diff}</span>
+
+                      {/* Solved attribution */}
                       {isSolved && (
                         <span style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '3px',
+                          gap: '4px',
+                          background: 'rgba(0, 255, 157, 0.15)',
                           color: 'var(--neon)',
-                          fontSize: '12px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
                           fontWeight: 700
                         }}>
-                          <CheckCircle2 size={15} /> SOLVED
+                          ✅ SOLVED {statusInfo?.solvedBy ? `by ${statusInfo.solvedBy}` : ''}
+                        </span>
+                      )}
+
+                      {/* In-progress attribution */}
+                      {!isSolved && statusInfo?.status === 'IN_PROGRESS' && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'rgba(255, 196, 61, 0.15)',
+                          color: 'var(--amber)',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 700
+                        }}>
+                          🟡 IN PROGRESS (Worked on by {statusInfo.workingBy})
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--mut)', marginTop: '2px' }}>
+
+                    <div style={{ fontSize: '12px', color: 'var(--mut)', marginTop: '3px' }}>
                       {prob.cat || 'Algorithms'}
+                      {isUnlocked && statusInfo?.unlockedBy && (
+                        <span style={{ marginLeft: '10px', color: 'var(--teal)' }}>
+                          • Purchased by {statusInfo.unlockedBy}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                {/* Right Action & Dynamic Price display */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{
-                      color: isUnlocked ? 'var(--neon)' : 'var(--mut)',
-                      fontWeight: 700,
-                      fontSize: '14px'
-                    }}>
-                      {cost} pts
-                    </div>
-                    <small style={{ color: 'var(--mut)', fontSize: '10px', textTransform: 'uppercase' }}>
-                      {isUnlocked ? 'Unlocked' : 'Auction Cost'}
-                    </small>
+                    {hasPrice ? (
+                      <div>
+                        <div style={{
+                          color: isUnlocked ? 'var(--neon)' : 'var(--txt)',
+                          fontWeight: 800,
+                          fontSize: '16px'
+                        }}>
+                          ₹{dynamicPrice}
+                        </div>
+                        <small style={{ color: 'var(--mut)', fontSize: '10px', textTransform: 'uppercase' }}>
+                          {isUnlocked ? 'Unlocked' : 'Current Price'}
+                        </small>
+                      </div>
+                    ) : (
+                      <div>
+                        <span style={{ color: 'var(--mut)', fontSize: '12px', fontStyle: 'italic' }}>
+                          Price Pending
+                        </span>
+                        <small style={{ display: 'block', color: 'var(--mut)', fontSize: '10px' }}>
+                          Organizer review
+                        </small>
+                      </div>
+                    )}
                   </div>
 
                   {isUnlocked ? (
                     <button
                       className="pri"
                       onClick={() => onSelectProblem(prob.id)}
-                      style={{ padding: '6px 14px' }}
+                      style={{ padding: '7px 16px', fontWeight: 700 }}
                     >
-                      Open Code
+                      Open in Workspace
                     </button>
-                  ) : (
+                  ) : hasPrice ? (
                     <button
                       className={canAfford ? "ok" : ""}
                       disabled={!canAfford || !!loadingId}
-                      onClick={() => handleUnlockWithKey(prob.id)}
-                      style={{ padding: '6px 14px' }}
-                      title={canAfford ? `Deduct ${cost} pts to unlock` : 'Not enough points'}
+                      onClick={() => handlePurchase(prob.id)}
+                      style={{ padding: '7px 16px', fontWeight: 700 }}
+                      title={canAfford ? `Deduct ₹${dynamicPrice} from team budget` : 'Insufficient team balance'}
                     >
-                      {loadingId === prob.id ? 'Unlocking...' : (canAfford ? `Unlock (${cost} pts)` : 'Low Balance')}
+                      {loadingId === prob.id ? 'Purchasing...' : (canAfford ? `Purchase (₹${dynamicPrice})` : 'Low Balance')}
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      style={{ padding: '7px 14px', opacity: 0.6 }}
+                      title="Organizer has not set a price for this problem yet"
+                    >
+                      Not for Sale
                     </button>
                   )}
                 </div>

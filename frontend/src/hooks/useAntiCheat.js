@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { sendTelemetry } from '../services/api';
 
-export function useAntiCheat({ teamName, isStarted, isLocked, onLockStatusChange, onViolationLogged }) {
+export function useAntiCheat({ teamName, memberId, isStarted, isLocked, onLockStatusChange, onViolationLogged }) {
   const lastFlagTimeRef = useRef(0);
   const internalClipboardRef = useRef('');
 
@@ -14,14 +14,14 @@ export function useAntiCheat({ teamName, isStarted, isLocked, onLockStatusChange
     lastFlagTimeRef.current = now;
 
     if (onViolationLogged) {
-      onViolationLogged({ event, details, timestamp: now });
+      onViolationLogged({ event, details, memberId, timestamp: now });
     }
 
-    const res = await sendTelemetry(teamName, event, details);
+    const res = await sendTelemetry(teamName, memberId, event, details);
     if (res && res.isLocked && onLockStatusChange) {
       onLockStatusChange(true, res.lockReason);
     }
-  }, [teamName, isStarted, isLocked, onLockStatusChange, onViolationLogged]);
+  }, [teamName, memberId, isStarted, isLocked, onLockStatusChange, onViolationLogged]);
 
   useEffect(() => {
     if (!isStarted || isLocked) return;

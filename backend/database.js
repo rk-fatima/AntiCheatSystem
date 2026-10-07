@@ -11,30 +11,42 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const DEFAULT_PROBLEMS = [];
-
 class Database {
   constructor() {
     this.state = {
       problems: [],
-      teams: {},
+      problemPrices: {}, // problemId -> number (dynamically set by organizer)
+      teams: {},         // Clean start: populated ONLY via actual registration
+      transactions: [],  // Immutable audit log of problem purchases
       submissions: [],
       telemetry: [],
       config: {
         adminPin: "qubit",
         maxFlags: 3,
-        executionTimeoutMs: 3000
+        executionTimeoutMs: 3000,
+        initialTeamBalance: 1000
       }
     };
     this.load();
     this.seedProblems();
+    // Ensure clean state: remove dummy/test data
+    this.cleanDummyData();
   }
 
   load() {
     try {
       if (fs.existsSync(STORE_PATH)) {
         const raw = fs.readFileSync(STORE_PATH, 'utf-8');
-        this.state = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        this.state = {
+          ...this.state,
+          ...parsed,
+          problemPrices: parsed.problemPrices || {},
+          transactions: parsed.transactions || [],
+          teams: parsed.teams || {},
+          submissions: parsed.submissions || [],
+          telemetry: parsed.telemetry || []
+        };
       }
     } catch (err) {
       console.error('Failed to load store, using fresh state:', err);
@@ -47,6 +59,37 @@ class Database {
     } catch (err) {
       console.error('Failed to persist store:', err);
     }
+  }
+
+  cleanDummyData() {
+    // Explicit requirement: "Do not create any default users, teams, or dummy data during initial setup.
+    // The system must start with an empty database."
+    // Clear out any old test teams, telemetry, and submissions
+    let modified = false;
+    if (Object.keys(this.state.teams).length > 0) {
+      // Check if all existing teams are dummy/test teams
+      const dummyNames = ['testteam', 'qubit', 'abcd', 'demoteam', 'abcde', 'testunlock', 'qwerty', 'abcdef', 'visionx', 'synora'];
+      const teamKeys = Object.keys(this.state.teams);
+      const isAllDummy = teamKeys.every(k => dummyNames.includes(k.toLowerCase()));
+      if (isAllDummy) {
+        this.state.teams = {};
+        this.state.transactions = [];
+        this.state.telemetry = [];
+        this.state.submissions = [];
+        modified = true;
+      }
+    }
+    if (modified) {
+      this.save();
+    }
+  }
+
+  resetAllData() {
+    this.state.teams = {};
+    this.state.transactions = [];
+    this.state.telemetry = [];
+    this.state.submissions = [];
+    this.save();
   }
 
   seedProblems() {
@@ -63,11 +106,6 @@ class Database {
           for (const prob of parsed.problems) {
             problemMap.set(prob.id, prob);
           }
-          for (const prob of DEFAULT_PROBLEMS) {
-            if (!problemMap.has(prob.id)) {
-              problemMap.set(prob.id, prob);
-            }
-          }
           this.state.problems = Array.from(problemMap.values());
           this.save();
           return;
@@ -76,14 +114,9 @@ class Database {
     } catch (e) {
       console.error('Problem seed error:', e);
     }
-
-    if (this.state.problems.length === 0) {
-      this.state.problems = [...DEFAULT_PROBLEMS];
-      this.save();
-    }
   }
 
-  // --- PROBLEM ACCESS (Strict Security: Hide hidden tests from clients) ---
+  // --- PROBLEM ACCESS & DYNAMIC PRICING ---
   getPublicProblems() {
     if (!this.state.problems || this.state.problems.length < 20) {
       this.seedProblems();
@@ -92,13 +125,13 @@ class Database {
       id: p.id,
       title: p.title,
       diff: p.diff,
-      pts: p.pts,
       cat: p.cat,
       desc: p.desc,
       con: p.con,
       si: p.si,
-      so: p.so
-      // NEVER return 'ht' (hidden tests), 'eo' (expected full output), or 'key' to participants!
+      so: p.so,
+      // Dynamic price configured by organizer:
+      price: this.getProblemPrice(p.id)
     }));
   }
 
@@ -117,32 +150,128 @@ class Database {
     );
   }
 
-  // --- TEAM & SESSION MANAGEMENT ---
-  getOrCreateTeam(teamName) {
-    const normalized = (teamName || '').trim();
-    if (!normalized) return null;
-
-    if (!this.state.teams[normalized]) {
-      this.state.teams[normalized] = {
-        name: normalized,
-        balance: 1000,
-        unlocked: [],
-        solved: [],
-        score: 0,
-        wrong: 0,
-        violations: [],
-        isLocked: false,
-        lockReason: "",
-        attempts: [],
-        createdAt: new Date().toISOString()
-      };
-      this.save();
+  // Dynamic organizer pricing
+  getProblemPrice(problemId) {
+    if (!this.state.problemPrices) this.state.problemPrices = {};
+    const price = this.state.problemPrices[problemId];
+    if (price !== undefined && price !== null) {
+      return Number(price);
     }
-    return this.state.teams[normalized];
+    return null; // Not set yet by organizer
+  }
+
+  setProblemPrice(problemId, price) {
+    if (!this.state.problemPrices) this.state.problemPrices = {};
+    const numPrice = Math.max(0, parseInt(price, 10) || 0);
+    this.state.problemPrices[problemId] = numPrice;
+    this.save();
+    return numPrice;
+  }
+
+  batchSetTierPrices(easyPrice = 100, mediumPrice = 150, hardPrice = 200) {
+    if (!this.state.problemPrices) this.state.problemPrices = {};
+    for (const prob of this.state.problems) {
+      if (prob.diff === 'Hard') {
+        this.state.problemPrices[prob.id] = Number(hardPrice);
+      } else if (prob.diff === 'Medium') {
+        this.state.problemPrices[prob.id] = Number(mediumPrice);
+      } else {
+        this.state.problemPrices[prob.id] = Number(easyPrice);
+      }
+    }
+    this.save();
+    return this.state.problemPrices;
+  }
+
+  getAllPrices() {
+    return this.state.problemPrices || {};
+  }
+
+  // --- TEAM REGISTRATION & SESSION MANAGEMENT ---
+  registerTeam({ name, size, captainIdx = 0, members = [] }) {
+    const normalized = (name || '').trim();
+    if (!normalized) {
+      throw new Error('Team name cannot be blank.');
+    }
+
+    // Check if team already exists
+    const existing = Object.keys(this.state.teams).find(
+      k => k.toLowerCase() === normalized.toLowerCase()
+    );
+    if (existing) {
+      throw new Error(`Team "${normalized}" is already registered. Please choose a different name or log in.`);
+    }
+
+    const teamSize = Math.max(1, Math.min(3, parseInt(size, 10) || 1));
+    if (members.length < teamSize) {
+      throw new Error(`Please provide information for all ${teamSize} team members.`);
+    }
+
+    const formattedMembers = [];
+    for (let i = 0; i < teamSize; i++) {
+      const m = members[i] || {};
+      const memberIndexStr = String(i + 1).padStart(2, '0');
+      const memberId = `${normalized}-${memberIndexStr}`;
+      const isCaptain = (i === parseInt(captainIdx, 10));
+
+      if (!m.name || !m.name.trim()) {
+        throw new Error(`Member ${i + 1} name is required.`);
+      }
+
+      formattedMembers.push({
+        memberId,
+        name: m.name.trim(),
+        rollNo: (m.rollNo || '').trim(),
+        phone: (m.phone || '').trim(),
+        email: (m.email || '').trim(),
+        college: (m.college || '').trim(),
+        isCaptain
+      });
+    }
+
+    const captain = formattedMembers.find(m => m.isCaptain) || formattedMembers[0];
+
+    const newTeam = {
+      id: normalized,
+      name: normalized,
+      size: teamSize,
+      captainId: captain.memberId,
+      captainName: captain.name,
+      members: formattedMembers,
+      balance: this.state.config.initialTeamBalance || 1000,
+      unlocked: [],
+      solved: [],
+      problemStatuses: {}, // problemId -> { status, workingBy, solvedBy, ... }
+      transactions: [],
+      score: 0,
+      wrong: 0,
+      violations: [],
+      isLocked: false,
+      lockReason: "",
+      attempts: [],
+      createdAt: new Date().toISOString()
+    };
+
+    this.state.teams[normalized] = newTeam;
+    this.save();
+    return newTeam;
   }
 
   getTeam(teamName) {
-    return this.state.teams[(teamName || '').trim()] || null;
+    const k = (teamName || '').trim();
+    return this.state.teams[k] || Object.values(this.state.teams).find(t => t.name.toLowerCase() === k.toLowerCase()) || null;
+  }
+
+  getOrCreateTeam(teamName) {
+    let team = this.getTeam(teamName);
+    if (!team && teamName) {
+      try {
+        team = this.registerTeam({ name: teamName, size: 1, members: [{ name: teamName }] });
+      } catch (e) {
+        team = this.getTeam(teamName);
+      }
+    }
+    return team;
   }
 
   getAllTeams() {
@@ -156,12 +285,137 @@ class Database {
     }
   }
 
+  // --- DYNAMIC TEAM-LEVEL PROBLEM PURCHASE ---
+  purchaseProblem(teamName, memberId, problemId) {
+    const team = this.getTeam(teamName);
+    if (!team) {
+      throw new Error('Team not found.');
+    }
+    if (team.isLocked) {
+      throw new Error('Your team session is locked by proctors.');
+    }
+
+    const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
+    if (!problem) {
+      throw new Error(`Problem "${problemId}" not found in catalog.`);
+    }
+
+    if (team.unlocked.includes(problem.id)) {
+      throw new Error(`Problem "${problem.id} — ${problem.title}" is already unlocked for your team!`);
+    }
+
+    const currentPrice = this.getProblemPrice(problem.id);
+    if (currentPrice === null || currentPrice === undefined) {
+      throw new Error(`Problem "${problem.id} — ${problem.title}" does not have a price set by the organizer yet.`);
+    }
+
+    if (team.balance < currentPrice) {
+      throw new Error(`Insufficient balance! Current price is ₹${currentPrice}, but team balance is ₹${team.balance}.`);
+    }
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId || `${team.name}-01`,
+      name: memberId || 'Team Member'
+    };
+
+    // Deduct at the TEAM level
+    team.balance -= currentPrice;
+    team.unlocked.push(problem.id);
+
+    // Initialize problem status in shared workspace
+    if (!team.problemStatuses) team.problemStatuses = {};
+    team.problemStatuses[problem.id] = {
+      status: 'UNLOCKED',
+      unlockedBy: member.memberId,
+      unlockedByName: member.name,
+      unlockedAt: new Date().toISOString()
+    };
+
+    // Maintain immutable transaction record
+    const now = new Date();
+    const txn = {
+      id: `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      teamId: team.name,
+      teamName: team.name,
+      problemId: problem.id,
+      problemTitle: problem.title,
+      price: currentPrice,
+      purchasedBy: member.memberId,
+      purchasedByName: member.name,
+      purchaseTime: now.toISOString(),
+      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    this.state.transactions.unshift(txn);
+
+    this.updateTeam(team);
+    this.save();
+
+    return { team, txn, problem };
+  }
+
+  // --- SHARED WORKSPACE ACTIVITY TRACKING ---
+  setMemberWorking(teamName, memberId, problemId) {
+    const team = this.getTeam(teamName);
+    if (!team) return null;
+    if (!team.problemStatuses) team.problemStatuses = {};
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId,
+      name: memberId
+    };
+
+    // Don't overwrite if problem is already solved
+    if (team.problemStatuses[problemId]?.status === 'SOLVED') {
+      return team;
+    }
+
+    team.problemStatuses[problemId] = {
+      status: 'IN_PROGRESS',
+      workingBy: member.memberId,
+      workingByName: member.name,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.updateTeam(team);
+    return team;
+  }
+
+  recordSolve(teamName, memberId, problemId, pts = 100) {
+    const team = this.getTeam(teamName);
+    if (!team) return null;
+    if (!team.problemStatuses) team.problemStatuses = {};
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId,
+      name: memberId
+    };
+
+    if (!team.solved.includes(problemId)) {
+      team.solved.push(problemId);
+      team.score += Number(pts) || 0;
+    }
+
+    team.problemStatuses[problemId] = {
+      status: 'SOLVED',
+      solvedBy: member.memberId,
+      solvedByName: member.name,
+      solvedAt: new Date().toISOString()
+    };
+
+    this.updateTeam(team);
+    return team;
+  }
+
   // --- TELEMETRY & AUDIT LOGS ---
-  addTelemetry(teamName, event, details) {
-    const team = this.getOrCreateTeam(teamName);
+  addTelemetry(teamName, memberId, event, details) {
+    const team = this.getTeam(teamName);
     const entry = {
       id: Date.now() + '-' + Math.random().toString(36).substr(2, 6),
       teamName,
+      memberId: memberId || 'UNKNOWN',
       event,
       details,
       timestamp: Date.now(),
@@ -169,17 +423,16 @@ class Database {
     };
 
     this.state.telemetry.unshift(entry);
-    // Keep max 2000 telemetry entries in memory
     if (this.state.telemetry.length > 2000) {
       this.state.telemetry.pop();
     }
 
     if (team) {
+      if (!team.violations) team.violations = [];
       team.violations.push(entry);
-      // Auto lock if violations exceed max threshold
       if (team.violations.length >= this.state.config.maxFlags) {
         team.isLocked = true;
-        team.lockReason = `Flag threshold exceeded (${team.violations.length} violations detected). Organiser review required.`;
+        team.lockReason = `Flag threshold exceeded (${team.violations.length} violations detected; latest by ${entry.memberId}). Organiser review required.`;
       }
       this.updateTeam(team);
     }
@@ -205,9 +458,11 @@ class Database {
     const team = this.getTeam(teamName);
     if (!team) return { success: false, message: 'Team not found' };
 
-    team.balance = 1000;
+    team.balance = this.state.config.initialTeamBalance || 1000;
     team.unlocked = [];
     team.solved = [];
+    team.problemStatuses = {};
+    team.transactions = [];
     team.score = 0;
     team.wrong = 0;
     team.violations = [];
@@ -229,6 +484,10 @@ class Database {
 
   getSubmission(id) {
     return this.state.submissions.find(s => s.id === id);
+  }
+
+  getAllTransactions() {
+    return this.state.transactions || [];
   }
 }
 

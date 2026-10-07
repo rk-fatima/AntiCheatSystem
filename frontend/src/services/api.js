@@ -6,17 +6,32 @@ export async function fetchProblems() {
   return res.json();
 }
 
-export async function loginTeam(teamName) {
+export async function fetchTeamsList() {
+  const res = await fetch(`${API_BASE}/teams`);
+  if (!res.ok) return { teams: [] };
+  return res.json();
+}
+
+export async function registerTeam({ name, size, captainIdx, members }) {
+  const res = await fetch(`${API_BASE}/team/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, size, captainIdx, members })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to register team');
+  return data;
+}
+
+export async function loginTeam({ teamName, memberId }) {
   const res = await fetch(`${API_BASE}/team/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teamName })
+    body: JSON.stringify({ teamName, memberId })
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Failed to login team');
-  }
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to login');
+  return data;
 }
 
 export async function getTeamStatus(teamName) {
@@ -25,23 +40,47 @@ export async function getTeamStatus(teamName) {
   return res.json();
 }
 
-export async function unlockProblemKey(teamName, key) {
+export async function purchaseProblem({ teamName, memberId, problemId }) {
+  const res = await fetch(`${API_BASE}/problems/purchase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamName, memberId, problemId })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to purchase problem');
+  return data;
+}
+
+export async function notifyMemberWorking({ teamName, memberId, problemId }) {
+  try {
+    const res = await fetch(`${API_BASE}/problems/working`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, memberId, problemId })
+    });
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function unlockProblemKey(teamName, key, memberId) {
   const res = await fetch(`${API_BASE}/problems/unlock`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teamName, key })
+    body: JSON.stringify({ teamName, key, memberId })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to unlock problem');
   return data;
 }
 
-export async function sendTelemetry(teamName, event, details) {
+export async function sendTelemetry(teamName, memberId, event, details) {
   try {
     const res = await fetch(`${API_BASE}/telemetry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, event, details })
+      body: JSON.stringify({ teamName, memberId, event, details })
     });
     return res.json();
   } catch (e) {
@@ -60,16 +99,16 @@ export async function pollJobStatus(jobId, timeoutMs = 25000) {
         return job;
       }
     }
-    await new Promise(r => setTimeout(r, 400)); // Poll every 400ms
+    await new Promise(r => setTimeout(r, 400));
   }
   throw new Error('Execution timed out waiting for server queue.');
 }
 
-export async function runCodeAsync({ teamName, lang, code, stdin }) {
+export async function runCodeAsync({ teamName, memberId, lang, code, stdin }) {
   const res = await fetch(`${API_BASE}/submissions/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teamName, lang, code, stdin })
+    body: JSON.stringify({ teamName, memberId, lang, code, stdin })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Run request failed');
@@ -77,11 +116,11 @@ export async function runCodeAsync({ teamName, lang, code, stdin }) {
   return await pollJobStatus(data.jobId);
 }
 
-export async function submitCodeAsync({ teamName, problemId, lang, code }) {
+export async function submitCodeAsync({ teamName, memberId, problemId, lang, code }) {
   const res = await fetch(`${API_BASE}/submissions/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teamName, problemId, lang, code })
+    body: JSON.stringify({ teamName, memberId, problemId, lang, code })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Submission request failed');
@@ -121,4 +160,50 @@ export async function proctorResetTeam(teamName) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to reset');
   return data;
+}
+
+export async function proctorResetAll(pin) {
+  const res = await fetch(`${API_BASE}/proctor/reset-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to reset all');
+  return data;
+}
+
+// Organizer Dynamic Pricing APIs
+export async function updateProblemPrice({ problemId, price, pin }) {
+  const res = await fetch(`${API_BASE}/admin/problems/price`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId, price, pin })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update price');
+  return data;
+}
+
+export async function batchSetProblemPrices({ easyPrice, mediumPrice, hardPrice, pin }) {
+  const res = await fetch(`${API_BASE}/admin/problems/batch-prices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ easyPrice, mediumPrice, hardPrice, pin })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to set batch prices');
+  return data;
+}
+
+export async function fetchProblemPrices() {
+  const res = await fetch(`${API_BASE}/admin/problems/prices`);
+  if (!res.ok) return { prices: {} };
+  return res.json();
+}
+
+export async function fetchTransactions() {
+  const res = await fetch(`${API_BASE}/admin/transactions`);
+  if (!res.ok) return { transactions: [] };
+  return res.json();
 }

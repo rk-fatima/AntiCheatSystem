@@ -16,7 +16,7 @@ const app = express();
 const PORT = process.env.PORT || 8765;
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '2mb' }));
 
 if (fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
@@ -25,23 +25,76 @@ if (fs.existsSync(FRONTEND_DIST)) {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Track connected proctor / judge websockets
+// Track connected sockets:
+// Proctors: Set<WebSocket>
 const proctorClients = new Set();
+// Teams: Map<teamNameLower, Set<WebSocket>>
+const teamClients = new Map();
+
+function getTeamSocketSet(teamName) {
+  const key = (teamName || '').trim().toLowerCase();
+  if (!teamClients.has(key)) {
+    teamClients.set(key, new Set());
+  }
+  return teamClients.get(key);
+}
 
 wss.on('connection', (ws, req) => {
   const url = req.url || '';
+  let joinedTeamKey = null;
+
   if (url.includes('/proctor')) {
     proctorClients.add(ws);
     // Send initial snapshot
     ws.send(JSON.stringify({
-      type: 'INIT',
+      type: 'INIT_PROCTOR',
       teams: db.getAllTeams(),
+      prices: db.getAllPrices(),
+      transactions: db.getAllTransactions().slice(0, 50),
       telemetry: db.state.telemetry.slice(0, 50)
     }));
   }
 
+  ws.on('message', (msgRaw) => {
+    try {
+      const data = JSON.parse(msgRaw.toString());
+      if (data.type === 'JOIN_TEAM') {
+        const teamKey = (data.teamName || '').trim().toLowerCase();
+        joinedTeamKey = teamKey;
+        const set = getTeamSocketSet(teamKey);
+        set.add(ws);
+
+        const currentTeam = db.getTeam(data.teamName);
+        if (currentTeam) {
+          ws.send(JSON.stringify({
+            type: 'TEAM_WORKSPACE_UPDATED',
+            team: currentTeam
+          }));
+        }
+      } else if (data.type === 'MEMBER_WORKING') {
+        const { teamName, memberId, problemId } = data;
+        const updatedTeam = db.setMemberWorking(teamName, memberId, problemId);
+        if (updatedTeam) {
+          broadcastToTeam(teamName, {
+            type: 'TEAM_WORKSPACE_UPDATED',
+            team: updatedTeam
+          });
+          broadcastToProctors({
+            type: 'TEAM_UPDATED',
+            team: updatedTeam
+          });
+        }
+      }
+    } catch (e) {
+      console.error('WS message error:', e);
+    }
+  });
+
   ws.on('close', () => {
     proctorClients.delete(ws);
+    if (joinedTeamKey && teamClients.has(joinedTeamKey)) {
+      teamClients.get(joinedTeamKey).delete(ws);
+    }
   });
 });
 
@@ -54,71 +107,222 @@ function broadcastToProctors(payload) {
   }
 }
 
+function broadcastToTeam(teamName, payload) {
+  const key = (teamName || '').trim().toLowerCase();
+  const set = teamClients.get(key);
+  if (!set) return;
+  const msg = JSON.stringify(payload);
+  for (const client of set) {
+    if (client.readyState === WebSocket.OPEN) {
+      try { client.send(msg); } catch (e) {}
+    }
+  }
+}
+
+function broadcastToAll(payload) {
+  const msg = JSON.stringify(payload);
+  // Send to all team clients and proctor clients
+  for (const set of teamClients.values()) {
+    for (const client of set) {
+      if (client.readyState === WebSocket.OPEN) {
+        try { client.send(msg); } catch (e) {}
+      }
+    }
+  }
+  for (const client of proctorClients) {
+    if (client.readyState === WebSocket.OPEN) {
+      try { client.send(msg); } catch (e) {}
+    }
+  }
+}
+
 // --- HEALTH CHECK ---
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', serverTime: Date.now() });
 });
 
-// --- PROBLEMS API ---
+// --- PROBLEMS & DYNAMIC PRICING API ---
 app.get('/api/problems', (req, res) => {
   // STRICT SECURITY: Hidden tests and expected outputs are never exposed!
-  res.json({ problems: db.getPublicProblems() });
+  res.json({
+    problems: db.getPublicProblems(),
+    prices: db.getAllPrices()
+  });
 });
 
+// Dynamic Problem Purchase (Team-level purchase at current organizer price)
+app.post('/api/problems/purchase', (req, res) => {
+  const { teamName, memberId, problemId } = req.body;
+  if (!teamName || !problemId) {
+    return res.status(400).json({ error: 'Team name and problem ID are required.' });
+  }
+
+  try {
+    const { team, txn, problem } = db.purchaseProblem(teamName, memberId, problemId);
+
+    // Real-time broadcast to all members of this team
+    broadcastToTeam(teamName, {
+      type: 'TEAM_WORKSPACE_UPDATED',
+      team,
+      transaction: txn
+    });
+
+    // Real-time broadcast to proctors
+    broadcastToProctors({
+      type: 'TEAM_UPDATED',
+      team
+    });
+    broadcastToProctors({
+      type: 'TRANSACTION_LOGGED',
+      transaction: txn
+    });
+
+    res.json({
+      success: true,
+      team,
+      transaction: txn,
+      problem
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// Notify that a member is actively working on a problem
+app.post('/api/problems/working', (req, res) => {
+  const { teamName, memberId, problemId } = req.body;
+  if (!teamName || !problemId) {
+    return res.status(400).json({ error: 'Missing teamName or problemId' });
+  }
+
+  const updatedTeam = db.setMemberWorking(teamName, memberId, problemId);
+  if (!updatedTeam) {
+    return res.status(404).json({ error: 'Team not found' });
+  }
+
+  broadcastToTeam(teamName, {
+    type: 'TEAM_WORKSPACE_UPDATED',
+    team: updatedTeam
+  });
+  broadcastToProctors({
+    type: 'TEAM_UPDATED',
+    team: updatedTeam
+  });
+
+  res.json({ success: true, team: updatedTeam });
+});
+
+// Legacy key unlock fallback (maps to purchase)
 app.post('/api/problems/unlock', (req, res) => {
-  const { teamName, key } = req.body;
+  const { teamName, key, memberId } = req.body;
   if (!teamName || !key) {
     return res.status(400).json({ error: 'Team name and unlock key are required.' });
   }
 
-  const team = db.getOrCreateTeam(teamName);
-  if (!team) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
-
   const problem = db.findProblemByKey(key);
   if (!problem) {
-    db.addTelemetry(teamName, 'INVALID_KEY_ATTEMPT', `Attempted invalid key: ${String(key).slice(0, 30)}`);
+    db.addTelemetry(teamName, memberId || 'UNKNOWN', 'INVALID_KEY_ATTEMPT', `Attempted invalid key: ${String(key).slice(0, 30)}`);
     broadcastToProctors({ type: 'TEAM_UPDATED', team: db.getTeam(teamName) });
-    return res.status(400).json({ error: 'Invalid unlock key' });
+    return res.status(400).json({ error: 'Invalid problem key or ID.' });
   }
 
-  if (team.unlocked.includes(problem.id)) {
-    return res.status(400).json({ error: `Problem "${problem.id} — ${problem.title}" is already unlocked!` });
-  }
+  try {
+    const { team, txn } = db.purchaseProblem(teamName, memberId, problem.id);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team, transaction: txn });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team });
+    broadcastToProctors({ type: 'TRANSACTION_LOGGED', transaction: txn });
 
-  const cost = Number(problem.pts) || (problem.diff === 'Hard' ? 200 : (problem.diff === 'Medium' ? 150 : 100));
-
-  if (team.balance < cost) {
-    return res.status(400).json({
-      error: `Insufficient balance! "${problem.title}" costs ${cost} pts, but you only have ${team.balance} pts remaining.`
+    res.json({
+      success: true,
+      unlockedId: problem.id,
+      title: problem.title,
+      costDeducted: txn.price,
+      balance: team.balance,
+      unlocked: team.unlocked
     });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
-
-  // Deduct cost from team balance
-  team.balance -= cost;
-  team.unlocked.push(problem.id);
-  db.updateTeam(team);
-  broadcastToProctors({ type: 'TEAM_UPDATED', team });
-
-  res.json({
-    success: true,
-    unlockedId: problem.id,
-    title: problem.title,
-    costDeducted: cost,
-    balance: team.balance,
-    unlocked: team.unlocked
-  });
 });
 
-// --- TEAM SESSIONS ---
+// --- ADMIN / ORGANIZER PRICING CONFIGURATION ---
+app.post('/api/admin/problems/price', (req, res) => {
+  const { problemId, price, pin } = req.body;
+  if (pin !== db.state.config.adminPin) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid Organiser PIN' });
+  }
+  if (!problemId) {
+    return res.status(400).json({ error: 'Problem ID is required' });
+  }
+
+  const setPrice = db.setProblemPrice(problemId, price);
+
+  // Broadcast price change to ALL connected contestants and proctors in real time
+  broadcastToAll({
+    type: 'PRICE_UPDATED',
+    problemId,
+    price: setPrice
+  });
+
+  res.json({ success: true, problemId, price: setPrice });
+});
+
+app.post('/api/admin/problems/batch-prices', (req, res) => {
+  const { easyPrice, mediumPrice, hardPrice, pin } = req.body;
+  if (pin !== db.state.config.adminPin) {
+    return res.status(403).json({ error: 'Unauthorized: Invalid Organiser PIN' });
+  }
+
+  const allPrices = db.batchSetTierPrices(easyPrice, mediumPrice, hardPrice);
+
+  broadcastToAll({
+    type: 'PRICES_UPDATED',
+    prices: allPrices
+  });
+
+  res.json({ success: true, prices: allPrices });
+});
+
+app.get('/api/admin/problems/prices', (req, res) => {
+  res.json({ prices: db.getAllPrices() });
+});
+
+app.get('/api/admin/transactions', (req, res) => {
+  res.json({ transactions: db.getAllTransactions() });
+});
+
+// --- TEAM REGISTRATION & SESSION MANAGEMENT ---
+app.post('/api/team/register', (req, res) => {
+  const { name, size, captainIdx, members } = req.body;
+  try {
+    const team = db.registerTeam({ name, size, captainIdx, members });
+    broadcastToProctors({ type: 'TEAM_REGISTERED', team });
+    res.json({ success: true, team });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/team/login', (req, res) => {
-  const { teamName } = req.body;
+  const { teamName, memberId } = req.body;
   if (!teamName || !teamName.trim()) {
     return res.status(400).json({ error: 'Team name cannot be blank.' });
   }
-  const team = db.getOrCreateTeam(teamName);
-  res.json({ team });
+
+  const team = db.getTeam(teamName);
+  if (!team) {
+    return res.status(404).json({ error: `Team "${teamName}" is not registered. Please register your team first.` });
+  }
+
+  let selectedMember = null;
+  if (memberId && team.members) {
+    selectedMember = team.members.find(m => m.memberId === memberId) || null;
+  }
+  if (!selectedMember && team.members && team.members.length > 0) {
+    selectedMember = team.members[0];
+  }
+
+  res.json({ team, member: selectedMember });
 });
 
 app.get('/api/team/:name', (req, res) => {
@@ -127,33 +331,51 @@ app.get('/api/team/:name', (req, res) => {
   res.json({ team });
 });
 
+app.get('/api/teams', (req, res) => {
+  const teams = db.getAllTeams().map(t => ({
+    name: t.name,
+    size: t.size,
+    members: t.members,
+    captainId: t.captainId,
+    captainName: t.captainName
+  }));
+  res.json({ teams });
+});
+
 // --- TELEMETRY & ANTI-CHEAT API ---
 app.post('/api/telemetry', (req, res) => {
-  const { teamName, event, details } = req.body;
+  const { teamName, memberId, event, details } = req.body;
   if (!teamName || !event) {
     return res.status(400).json({ error: 'Missing teamName or event' });
   }
 
-  const { entry, team } = db.addTelemetry(teamName, event, details);
+  const { entry, team } = db.addTelemetry(teamName, memberId, event, details);
 
-  // Real-time broadcast to proctors
+  // Real-time broadcast to proctors and team members
   broadcastToProctors({
     type: 'TELEMETRY_EVENT',
     entry,
     team
   });
 
+  if (team && team.isLocked) {
+    broadcastToTeam(teamName, {
+      type: 'TEAM_LOCKED',
+      team
+    });
+  }
+
   res.json({
     success: true,
-    isLocked: team.isLocked,
-    violationsCount: team.violations.length,
-    lockReason: team.lockReason
+    isLocked: team?.isLocked || false,
+    violationsCount: team?.violations?.length || 0,
+    lockReason: team?.lockReason || ''
   });
 });
 
 // --- SUBMISSIONS & RUNNER QUEUE ---
 app.post('/api/submissions/run', (req, res) => {
-  const { teamName, lang, code, stdin } = req.body;
+  const { teamName, memberId, lang, code, stdin } = req.body;
   if (!lang || !code) {
     return res.status(400).json({ error: 'Language and code are required.' });
   }
@@ -166,6 +388,7 @@ app.post('/api/submissions/run', (req, res) => {
   const jobId = executionQueue.enqueue({
     type: 'run',
     teamName,
+    memberId: memberId || 'UNKNOWN',
     problemId: null,
     lang,
     code,
@@ -176,7 +399,7 @@ app.post('/api/submissions/run', (req, res) => {
 });
 
 app.post('/api/submissions/submit', (req, res) => {
-  const { teamName, problemId, lang, code } = req.body;
+  const { teamName, memberId, problemId, lang, code } = req.body;
   if (!teamName || !problemId || !lang || !code) {
     return res.status(400).json({ error: 'Missing submission parameters.' });
   }
@@ -189,16 +412,26 @@ app.post('/api/submissions/submit', (req, res) => {
   const jobId = executionQueue.enqueue({
     type: 'submit',
     teamName,
+    memberId: memberId || 'UNKNOWN',
     problemId,
     lang,
     code
   });
 
-  // When job completes, broadcast update to proctors
+  // When job completes, broadcast update to team workspace and proctors
   executionQueue.subscribe(jobId, (job) => {
     if (job.status === 'COMPLETED') {
       const updatedTeam = db.getTeam(teamName);
-      broadcastToProctors({ type: 'TEAM_UPDATED', team: updatedTeam });
+      if (updatedTeam) {
+        broadcastToTeam(teamName, {
+          type: 'TEAM_WORKSPACE_UPDATED',
+          team: updatedTeam
+        });
+        broadcastToProctors({
+          type: 'TEAM_UPDATED',
+          team: updatedTeam
+        });
+      }
     }
   });
 
@@ -237,6 +470,7 @@ app.post('/api/proctor/unlock', (req, res) => {
   const { teamName, pin } = req.body;
   const result = db.unlockTeam(teamName, pin || db.state.config.adminPin);
   if (result.success) {
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
     broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
     return res.json({ success: true, team: result.team });
   }
@@ -247,10 +481,21 @@ app.post('/api/proctor/reset', (req, res) => {
   const { teamName } = req.body;
   const result = db.resetTeamProgress(teamName);
   if (result.success) {
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
     broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
     return res.json({ success: true, team: result.team });
   }
   res.status(400).json({ error: result.message });
+});
+
+app.post('/api/proctor/reset-all', (req, res) => {
+  const { pin } = req.body;
+  if (pin !== db.state.config.adminPin) {
+    return res.status(403).json({ error: 'Invalid Organiser PIN' });
+  }
+  db.resetAllData();
+  broadcastToAll({ type: 'RESET_ALL' });
+  res.json({ success: true, message: 'All teams, submissions, and telemetry reset.' });
 });
 
 // --- LEADERBOARD ---
@@ -258,10 +503,12 @@ app.get('/api/leaderboard', (req, res) => {
   const teams = db.getAllTeams()
     .map(t => ({
       name: t.name,
+      captainName: t.captainName,
+      size: t.size,
       score: t.score,
       solvedCount: t.solved.length,
       wrongAttempts: t.wrong,
-      violationsCount: t.violations.length,
+      violationsCount: (t.violations || []).length,
       isLocked: t.isLocked
     }))
     .sort((a, b) => b.score - a.score || a.wrongAttempts - b.wrongAttempts);
