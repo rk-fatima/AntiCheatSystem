@@ -36,8 +36,20 @@ export async function loginTeam({ teamName, memberId }) {
 
 export async function getTeamStatus(teamName) {
   const res = await fetch(`${API_BASE}/team/${encodeURIComponent(teamName)}`);
-  if (!res.ok) throw new Error('Failed to fetch team state');
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Team not found in registration database.');
+  return data;
+}
+
+export async function syncTeamsFromSheet(payload) {
+  const res = await fetch(`${API_BASE}/teams/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to sync teams');
+  return data;
 }
 
 export async function purchaseProblem({ teamName, memberId, problemId, bidAmount }) {

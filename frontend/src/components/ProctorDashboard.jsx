@@ -8,7 +8,8 @@ import {
   batchSetProblemPrices,
   fetchProblemPrices,
   fetchTransactions,
-  fetchProblems
+  fetchProblems,
+  syncTeamsFromSheet
 } from '../services/api';
 
 export function ProctorDashboard({ onClose }) {
@@ -22,6 +23,12 @@ export function ProctorDashboard({ onClose }) {
   const [selectedTeamMembers, setSelectedTeamMembers] = useState(null);
   const [loading, setLoading] = useState(false);
   const [pin, setPin] = useState('qubit');
+
+  // Google Sheet sync state
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncInput, setSyncInput] = useState('');
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncMessage, setSyncMessage] = useState(null);
 
   // Dynamic pricing state
   const [editingPrices, setEditingPrices] = useState({});
@@ -113,6 +120,34 @@ export function ProctorDashboard({ onClose }) {
       } catch (e) {
         alert('Batch update failed: ' + e.message);
       }
+    }
+  };
+
+  const handleSyncSubmit = async () => {
+    if (!syncInput.trim()) return;
+    setSyncLoading(true);
+    setSyncMessage(null);
+    try {
+      let payload;
+      const trimmed = syncInput.trim();
+      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+        const parsed = JSON.parse(trimmed);
+        payload = Array.isArray(parsed) ? { teams: parsed } : parsed;
+      } else {
+        payload = { csv: trimmed };
+      }
+      const res = await syncTeamsFromSheet(payload);
+      setSyncMessage({ type: 'success', text: `Successfully synced ${res.count} team(s)!` });
+      loadData();
+      setTimeout(() => {
+        setShowSyncModal(false);
+        setSyncInput('');
+        setSyncMessage(null);
+      }, 1500);
+    } catch (err) {
+      setSyncMessage({ type: 'error', text: err.message || 'Sync failed.' });
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -210,15 +245,26 @@ export function ProctorDashboard({ onClose }) {
               </div>
             </div>
 
-            {/* Search */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
-              <Search size={16} color="var(--mut)" />
-              <input
-                placeholder="Search teams by name..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ maxWidth: '320px' }}
-              />
+            {/* Search & Actions */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <Search size={16} color="var(--mut)" />
+                <input
+                  placeholder="Search teams by name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ maxWidth: '300px' }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSyncModal(true)}
+                className="pri"
+                style={{ fontSize: '12px', padding: '6px 14px', gap: '6px' }}
+              >
+                <Sparkles size={14} /> Sync / Import Teams from Google Sheets
+              </button>
             </div>
 
             {/* Table */}
@@ -587,6 +633,87 @@ export function ProctorDashboard({ onClose }) {
                   ✅ No integrity violations or suspicious behavior logged for this team.
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Google Sheet Sync Modal */}
+        {showSyncModal && (
+          <div className="ov" style={{ zIndex: 1000 }}>
+            <div className="box" style={{ maxWidth: '600px', width: '92%', padding: '20px', background: 'var(--bg2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={20} color="var(--teal)" />
+                  <h3 style={{ margin: 0, color: 'var(--teal)', fontSize: '16px' }}>
+                    Google Sheets & Form Team Roster Sync
+                  </h3>
+                </div>
+                <button onClick={() => setShowSyncModal(false)} style={{ padding: '4px' }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5, marginBottom: '12px' }}>
+                Paste CSV or JSON rows exported from your Google Forms Responses Sheet. Each team gets an initial <b>₹1,000</b> budget and unique Member IDs.
+              </p>
+
+              {syncMessage && (
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: syncMessage.type === 'success' ? 'rgba(57, 255, 20, 0.1)' : 'var(--red-dim)',
+                  border: `1px solid ${syncMessage.type === 'success' ? 'var(--neon)' : 'var(--red)'}`,
+                  color: syncMessage.type === 'success' ? 'var(--neon)' : 'var(--red)',
+                  fontSize: '12px',
+                  marginBottom: '12px'
+                }}>
+                  {syncMessage.text}
+                </div>
+              )}
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={labelStyle}>Paste CSV or JSON Data</label>
+                <textarea
+                  rows={8}
+                  placeholder={`Team Name,Team Size,Captain Name,Member 2 Name,Member 3 Name\nSYNORA,3,Mohammed Salman,Abdul Rahman,Ahmed\nNEXUS,2,Sara Khan,Zayd Ali`}
+                  value={syncInput}
+                  onChange={(e) => setSyncInput(e.target.value)}
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11px',
+                    lineHeight: 1.4,
+                    padding: '8px',
+                    background: 'var(--bg4)',
+                    color: 'var(--txt)'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                background: 'var(--bg3)',
+                border: '1px solid var(--bd)',
+                borderRadius: '6px',
+                padding: '8px 10px',
+                fontSize: '11px',
+                color: 'var(--mut)',
+                marginBottom: '14px'
+              }}>
+                💡 <b>Live Google Form Webhook:</b> In Google Sheets, you can also use Apps Script to POST automatically to <code>/api/teams/sync</code> on form submit.
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowSyncModal(false)} disabled={syncLoading}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pri"
+                  onClick={handleSyncSubmit}
+                  disabled={syncLoading || !syncInput.trim()}
+                >
+                  {syncLoading ? 'Syncing Teams...' : 'Sync & Update Roster'}
+                </button>
+              </div>
             </div>
           </div>
         )}

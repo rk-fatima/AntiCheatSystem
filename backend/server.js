@@ -320,9 +320,81 @@ app.post('/api/team/login', (req, res) => {
 
 app.get('/api/team/:name', (req, res) => {
   const team = db.getTeam(req.params.name);
-  if (!team) return res.status(404).json({ error: 'Team not found' });
-  res.json({ team });
+  if (!team) return res.status(404).json({ error: `Team "${req.params.name}" not found in registration database.` });
+  res.json({
+    team: {
+      id: team.id,
+      name: team.name,
+      size: team.size,
+      balance: team.balance,
+      captainId: team.captainId,
+      captainName: team.captainName,
+      members: (team.members || []).map(m => ({
+        memberId: m.memberId,
+        name: m.name,
+        isCaptain: Boolean(m.isCaptain),
+        rollNo: m.rollNo,
+        email: m.email,
+        college: m.college
+      })),
+      unlocked: team.unlocked || [],
+      solved: team.solved || []
+    }
+  });
 });
+
+app.post('/api/teams/sync', (req, res) => {
+  try {
+    const { teams, rows, csv } = req.body;
+    let teamsList = [];
+    if (Array.isArray(teams)) {
+      teamsList = teams;
+    } else if (Array.isArray(rows)) {
+      teamsList = parseSheetRows(rows);
+    } else if (typeof csv === 'string') {
+      teamsList = parseCsvToTeams(csv);
+    }
+
+    if (!teamsList.length) {
+      return res.status(400).json({ error: 'No valid team records found in sync payload.' });
+    }
+
+    const result = db.syncTeams(teamsList);
+    broadcastToProctors({ type: 'TEAMS_SYNCED', count: result.count });
+    res.json({ success: true, count: result.count });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+function parseSheetRows(rows) {
+  return rows.map(r => {
+    const teamName = r['Team Name'] || r['teamName'] || r['Team'] || r['team'] || '';
+    if (!teamName) return null;
+    const members = [];
+    const m1Name = r['Member 1 Name'] || r['Captain Name'] || r['member1'] || r['captain'] || '';
+    if (m1Name) members.push({ name: m1Name, isCaptain: true, rollNo: r['Member 1 Roll No'] || '', email: r['Member 1 Email'] || '' });
+    const m2Name = r['Member 2 Name'] || r['member2'] || '';
+    if (m2Name) members.push({ name: m2Name, isCaptain: false, rollNo: r['Member 2 Roll No'] || '', email: r['Member 2 Email'] || '' });
+    const m3Name = r['Member 3 Name'] || r['member3'] || '';
+    if (m3Name) members.push({ name: m3Name, isCaptain: false, rollNo: r['Member 3 Roll No'] || '', email: r['Member 3 Email'] || '' });
+    return { name: teamName, size: members.length, members };
+  }).filter(Boolean);
+}
+
+function parseCsvToTeams(csvText) {
+  const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
+    rows.push(obj);
+  }
+  return parseSheetRows(rows);
+}
 
 app.get('/api/teams', (req, res) => {
   const teams = db.getAllTeams().map(t => ({

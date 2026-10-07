@@ -211,7 +211,7 @@ class Database {
     for (let i = 0; i < teamSize; i++) {
       const m = members[i] || {};
       const memberIndexStr = String(i + 1).padStart(2, '0');
-      const memberId = `${normalized}-${memberIndexStr}`;
+      const memberId = (m.memberId || `${normalized}-001-M${memberIndexStr}`).trim();
       const isCaptain = (i === parseInt(captainIdx, 10));
 
       if (!m.name || !m.name.trim()) {
@@ -270,36 +270,7 @@ class Database {
 
     let team = this.getTeam(normalized);
     if (!team) {
-      // Auto-initialize team from Google Forms identity
-      const defaultMembers = [
-        { memberId: `${normalized}-01`, name: 'Member 1', isCaptain: true },
-        { memberId: `${normalized}-02`, name: 'Member 2', isCaptain: false },
-        { memberId: `${normalized}-03`, name: 'Member 3', isCaptain: false }
-      ];
-
-      team = {
-        id: normalized,
-        name: normalized,
-        size: 3,
-        captainId: `${normalized}-01`,
-        captainName: 'Member 1',
-        members: defaultMembers,
-        balance: this.state.config.initialTeamBalance || 1000,
-        unlocked: [],
-        solved: [],
-        problemStatuses: {},
-        transactions: [],
-        score: 0,
-        wrong: 0,
-        violations: [],
-        isLocked: false,
-        lockReason: "",
-        attempts: [],
-        createdAt: new Date().toISOString()
-      };
-
-      this.state.teams[normalized] = team;
-      this.save();
+      throw new Error(`Team "${normalized}" was not found in the registration database. Please verify your team name.`);
     }
 
     // Determine the active member
@@ -307,15 +278,83 @@ class Database {
     const targetId = (memberId || '').trim().toLowerCase();
     if (targetId && team.members) {
       member = team.members.find(m => m.memberId.toLowerCase() === targetId);
-    }
-    if (!member && targetId) {
-      member = team.members.find(m => m.memberId.toLowerCase().endsWith(targetId));
+      if (!member) {
+        member = team.members.find(m => m.memberId.toLowerCase().endsWith(targetId));
+      }
+      if (!member) {
+        member = team.members.find(m => m.name.toLowerCase() === targetId);
+      }
     }
     if (!member) {
-      member = team.members[0] || { memberId: `${normalized}-01`, name: 'Member 1' };
+      throw new Error(`Selected member identity was not found for team "${team.name}".`);
     }
 
     return { team, member };
+  }
+
+  syncTeams(teamsList) {
+    if (!Array.isArray(teamsList)) {
+      throw new Error('teamsList must be an array');
+    }
+    let count = 0;
+    for (const item of teamsList) {
+      if (!item || !item.name) continue;
+      const normalized = item.name.trim();
+      const existing = this.getTeam(normalized);
+      const teamSize = Math.max(1, Math.min(3, parseInt(item.size, 10) || (item.members ? item.members.length : 1)));
+      const rawMembers = Array.isArray(item.members) ? item.members : [];
+      const formattedMembers = [];
+
+      for (let i = 0; i < teamSize; i++) {
+        const m = rawMembers[i] || {};
+        const memberIndexStr = String(i + 1).padStart(2, '0');
+        const defaultMemberId = `${normalized}-001-M${memberIndexStr}`;
+        formattedMembers.push({
+          memberId: (m.memberId || defaultMemberId).trim(),
+          name: (m.name || `Member ${i + 1}`).trim(),
+          rollNo: (m.rollNo || '').trim(),
+          phone: (m.phone || '').trim(),
+          email: (m.email || '').trim(),
+          college: (m.college || '').trim(),
+          isCaptain: m.isCaptain !== undefined ? Boolean(m.isCaptain) : (i === 0)
+        });
+      }
+
+      const captain = formattedMembers.find(m => m.isCaptain) || formattedMembers[0];
+
+      if (existing) {
+        existing.members = formattedMembers;
+        existing.size = formattedMembers.length;
+        existing.captainId = captain.memberId;
+        existing.captainName = captain.name;
+        this.state.teams[existing.name] = existing;
+      } else {
+        const newTeam = {
+          id: normalized,
+          name: normalized,
+          size: formattedMembers.length,
+          captainId: captain.memberId,
+          captainName: captain.name,
+          members: formattedMembers,
+          balance: this.state.config.initialTeamBalance || 1000,
+          unlocked: [],
+          solved: [],
+          problemStatuses: {},
+          transactions: [],
+          score: 0,
+          wrong: 0,
+          violations: [],
+          isLocked: false,
+          lockReason: "",
+          attempts: [],
+          createdAt: new Date().toISOString()
+        };
+        this.state.teams[normalized] = newTeam;
+      }
+      count++;
+    }
+    this.save();
+    return { count, teams: this.getAllTeams() };
   }
 
   getOrCreateTeam(teamName) {
