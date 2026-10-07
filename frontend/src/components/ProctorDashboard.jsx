@@ -452,8 +452,9 @@ export function ProctorDashboard({ onClose }) {
                     <th style={{ padding: '10px 14px' }}>Txn ID</th>
                     <th style={{ padding: '10px 14px' }}>Team ID</th>
                     <th style={{ padding: '10px 14px' }}>Problem</th>
-                    <th style={{ padding: '10px 14px' }}>Purchase Price</th>
-                    <th style={{ padding: '10px 14px' }}>Purchased By (Member ID)</th>
+                    <th style={{ padding: '10px 14px' }}>Winning Bid</th>
+                    <th style={{ padding: '10px 14px' }}>Bidder (Member ID)</th>
+                    <th style={{ padding: '10px 14px' }}>Remaining Balance</th>
                     <th style={{ padding: '10px 14px', textAlign: 'right' }}>Time</th>
                   </tr>
                 </thead>
@@ -470,13 +471,16 @@ export function ProctorDashboard({ onClose }) {
                         <b>{txn.problemId}</b> — {txn.problemTitle}
                       </td>
                       <td style={{ padding: '10px 14px', color: 'var(--neon)', fontWeight: 800 }}>
-                        ₹{txn.price}
+                        ₹{txn.bidAmount || txn.price}
                       </td>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ color: 'var(--txt)', fontWeight: 600 }}>{txn.purchasedBy}</span>
                         {txn.purchasedByName && (
                           <small style={{ color: 'var(--mut)', marginLeft: '6px' }}>({txn.purchasedByName})</small>
                         )}
+                      </td>
+                      <td style={{ padding: '10px 14px', color: 'var(--txt)' }}>
+                        ₹{txn.remainingBalance !== undefined ? txn.remainingBalance : '-'}
                       </td>
                       <td style={{ padding: '10px 14px', textAlign: 'right', color: 'var(--mut)', fontSize: '12px' }}>
                         {txn.displayTime || new Date(txn.purchaseTime).toLocaleTimeString()}

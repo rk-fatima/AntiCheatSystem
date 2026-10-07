@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, Unlock, KeyRound, CheckCircle2, Search, Coins, Sparkles, User, Clock, AlertCircle } from 'lucide-react';
+import { Lock, Unlock, KeyRound, CheckCircle2, Search, Coins, Sparkles, User, Clock, AlertCircle, Gavel, X, Info } from 'lucide-react';
 
 export function ProblemCatalog({
   problems,
-  problemPrices = {},
   unlockedIds = [],
   solvedIds = [],
   problemStatuses = {},
@@ -14,25 +13,82 @@ export function ProblemCatalog({
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [diffFilter, setDiffFilter] = useState('ALL');
-  const [loadingId, setLoadingId] = useState(null);
-  const [purchaseMessage, setPurchaseMessage] = useState(null);
+  const [selectedBidProblem, setSelectedBidProblem] = useState(null);
+  const [bidAmountInput, setBidAmountInput] = useState('');
+  const [quickProblemId, setQuickProblemId] = useState('');
+  const [quickBidAmount, setQuickBidAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState(null);
 
-  const handlePurchase = async (problemId) => {
-    setLoadingId(problemId);
-    setPurchaseMessage(null);
-    try {
-      const res = await onPurchaseProblem(problemId);
-      setPurchaseMessage({
-        success: true,
-        text: `✅ Purchased "${res.problem?.title || problemId}" for ₹${res.transaction?.price}! Deducted from Team Balance. Unlocked for all members.`
-      });
-    } catch (err) {
-      setPurchaseMessage({
+  const handleOpenBidModal = (prob) => {
+    setSelectedBidProblem(prob);
+    setBidAmountInput('');
+    setNotification(null);
+  };
+
+  const handleConfirmBid = async () => {
+    if (!selectedBidProblem) return;
+
+    const amount = parseInt(bidAmountInput, 10);
+    if (isNaN(amount) || amount < 0) {
+      setNotification({ success: false, text: 'Please enter a valid bid amount (≥ ₹0).' });
+      return;
+    }
+
+    if (amount > (teamBalance ?? 1000)) {
+      setNotification({
         success: false,
-        text: `❌ ${err.message || 'Purchase failed'}`
+        text: `Insufficient team budget! Your bid is ₹${amount}, but team only has ₹${teamBalance ?? 1000} remaining.`
+      });
+      return;
+    }
+
+    setLoading(true);
+    setNotification(null);
+    try {
+      const res = await onPurchaseProblem(selectedBidProblem.id, amount);
+      setNotification({
+        success: true,
+        text: `✅ Won & Unlocked "${selectedBidProblem.id} — ${selectedBidProblem.title}" for ₹${amount}! Remaining Team Balance: ₹${res.team?.balance}. Unlocked for all members.`
+      });
+      setSelectedBidProblem(null);
+      setBidAmountInput('');
+    } catch (err) {
+      setNotification({
+        success: false,
+        text: `❌ ${err.message || 'Unlock failed'}`
       });
     } finally {
-      setLoadingId(null);
+      setLoading(false);
+    }
+  };
+
+  const handleQuickUnlock = async () => {
+    const pId = quickProblemId.trim().toUpperCase();
+    if (!pId) {
+      setNotification({ success: false, text: 'Please enter a Problem ID (e.g. E1, M2, H1).' });
+      return;
+    }
+    const amount = parseInt(quickBidAmount, 10);
+    if (isNaN(amount) || amount < 0) {
+      setNotification({ success: false, text: 'Please enter a valid winning bid amount.' });
+      return;
+    }
+
+    setLoading(true);
+    setNotification(null);
+    try {
+      const res = await onPurchaseProblem(pId, amount);
+      setNotification({
+        success: true,
+        text: `✅ Won & Unlocked "${res.problem?.id || pId}" for ₹${amount}! Remaining Team Balance: ₹${res.team?.balance}. Unlocked for all members.`
+      });
+      setQuickProblemId('');
+      setQuickBidAmount('');
+    } catch (err) {
+      setNotification({ success: false, text: `❌ ${err.message || 'Unlock failed'}` });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,70 +110,149 @@ export function ProblemCatalog({
   const medCount = problems.filter(p => p.diff === 'Medium').length;
   const hardCount = problems.filter(p => p.diff === 'Hard').length;
 
+  const currentBidNum = parseInt(bidAmountInput, 10) || 0;
+  const projectedRemaining = (teamBalance ?? 1000) - currentBidNum;
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-      <div style={{ maxWidth: '960px', margin: '0 auto' }}>
-        {/* Banner with Auction Balance */}
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+      <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+        {/* Banner with Rules & Real-time Shared Team Balance */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
-          padding: '18px 24px',
+          padding: '20px',
           borderRadius: '10px',
           border: '1px solid var(--bd)',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '14px'
+          marginBottom: '20px'
         }}>
-          <div>
-            <h2 style={{ color: 'var(--teal)', margin: '0 0 4px', fontSize: '22px' }}>
-              Team Problem Auction Catalog
-            </h2>
-            <div style={{ color: 'var(--mut)', fontSize: '13px', lineHeight: 1.5 }}>
-              Prices are set dynamically by the examination organizer.
-              Purchasing unlocks the problem for the <b>entire team</b> and deducts from your <b>shared team balance</b>.
-            </div>
-            {currentMember && (
-              <div style={{ color: 'var(--txt)', fontSize: '12px', marginTop: '6px' }}>
-                Active Purchaser: <b style={{ color: 'var(--teal)' }}>{currentMember.memberId}</b> ({currentMember.name})
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Gavel size={22} color="var(--teal)" />
+                <h2 style={{ color: 'var(--teal)', margin: 0, fontSize: '22px' }}>
+                  Offline Auction Problem Catalog
+                </h2>
               </div>
-            )}
+              <div style={{ color: 'var(--mut)', fontSize: '13px', marginTop: '6px' }}>
+                Offline bidding is conducted manually by the organizer. Once your team wins a problem bid, enter the final bid amount to unlock it.
+              </div>
+            </div>
+
+            <div style={{
+              background: 'var(--bg4)',
+              border: '1px solid var(--neon)',
+              borderRadius: '8px',
+              padding: '10px 20px',
+              textAlign: 'right',
+              boxShadow: '0 0 12px var(--neon-dim)'
+            }}>
+              <small style={{ color: 'var(--mut)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                Shared Team Budget
+              </small>
+              <div style={{ color: 'var(--neon)', fontSize: '24px', fontWeight: 800 }}>
+                ₹{teamBalance ?? 1000}
+              </div>
+              {currentMember && (
+                <div style={{ fontSize: '11px', color: 'var(--teal)', marginTop: '2px' }}>
+                  Bidder: {currentMember.memberId}
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* Official Contest Rules Accordion / Cards */}
           <div style={{
-            background: 'var(--bg4)',
-            border: '1px solid var(--neon)',
-            borderRadius: '8px',
-            padding: '10px 20px',
-            textAlign: 'right',
-            boxShadow: '0 0 12px var(--neon-dim)'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '12px',
+            marginTop: '16px',
+            borderTop: '1px solid var(--bd)',
+            paddingTop: '14px'
           }}>
-            <small style={{ color: 'var(--mut)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>
-              Team Balance
-            </small>
-            <div style={{ color: 'var(--neon)', fontSize: '24px', fontWeight: 800 }}>
-              ₹{teamBalance ?? 1000}
+            <div style={ruleBoxStyle}>
+              <b style={{ color: 'var(--neon)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                💰 Shared Team Budget (₹1,000)
+              </b>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5 }}>
+                The balance is shared across all 3 members. If Member 3 spends ₹300, only ₹700 remains for the whole team. Coordinate on your team chat before unlocking.
+              </p>
+            </div>
+
+            <div style={ruleBoxStyle}>
+              <b style={{ color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                📊 Catalog Distribution
+              </b>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5 }}>
+                There are <b>71 Easy</b>, <b>21 Medium</b>, and <b>1 Hard</b> problem. Do not blow your entire ₹1,000 on low-point Easy problems if Medium/Hard problems give significantly higher points on the leaderboard.
+              </p>
+            </div>
+
+            <div style={ruleBoxStyle}>
+              <b style={{ color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                📢 What to do right now
+              </b>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5 }}>
+                Wait for the organizer to make an announcement in the hall/Discord/portal. Refresh the page once the bidding/purchase round is announced to see the updated buttons and prices.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Purchase Status Notification */}
-        {purchaseMessage && (
+        {/* Global Notification Banner */}
+        {notification && (
           <div style={{
             padding: '12px 16px',
             borderRadius: '8px',
             marginBottom: '16px',
-            background: purchaseMessage.success ? 'rgba(0,255,157,0.1)' : 'var(--red-dim)',
+            background: notification.success ? 'rgba(0,255,157,0.1)' : 'var(--red-dim)',
             border: '1px solid',
-            borderColor: purchaseMessage.success ? 'var(--neon)' : 'var(--red)',
-            color: purchaseMessage.success ? 'var(--neon)' : 'var(--red)',
+            borderColor: notification.success ? 'var(--neon)' : 'var(--red)',
+            color: notification.success ? 'var(--neon)' : 'var(--red)',
             fontWeight: 600,
             fontSize: '13px'
           }}>
-            {purchaseMessage.text}
+            {notification.text}
           </div>
         )}
+
+        {/* Quick Winning Bid Input Bar */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'center',
+          marginBottom: '16px',
+          background: 'var(--bg2)',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          border: '1px solid var(--bd)',
+          flexWrap: 'wrap'
+        }}>
+          <Gavel size={18} color="var(--teal)" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--txt)' }}>Quick Unlock:</span>
+          <input
+            placeholder="Problem ID (e.g. E1, M2, H1)..."
+            value={quickProblemId}
+            onChange={(e) => setQuickProblemId(e.target.value)}
+            style={{ width: '180px' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ color: 'var(--mut)', fontSize: '13px' }}>₹</span>
+            <input
+              type="number"
+              placeholder="Winning Bid"
+              value={quickBidAmount}
+              onChange={(e) => setQuickBidAmount(e.target.value)}
+              style={{ width: '130px' }}
+            />
+          </div>
+          <button
+            className="pri"
+            onClick={handleQuickUnlock}
+            disabled={loading}
+            style={{ padding: '8px 16px', fontWeight: 700 }}
+          >
+            {loading ? 'Unlocking...' : 'Unlock via Winning Bid'}
+          </button>
+        </div>
 
         {/* Search & Filter Bar */}
         <div style={{
@@ -130,7 +265,7 @@ export function ProblemCatalog({
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search size={16} color="var(--mut)" style={{ position: 'absolute', left: '10px', top: '10px' }} />
             <input
-              placeholder="Search problems by title, ID (e.g. E1, M2), or topic..."
+              placeholder="Search problems by title, ID, or topic..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '32px' }}
@@ -177,11 +312,6 @@ export function ProblemCatalog({
             const isUnlocked = unlockedIds.includes(prob.id);
             const isSolved = solvedIds.includes(prob.id);
             const statusInfo = problemStatuses[prob.id];
-
-            // Dynamic price configured by organizer
-            const dynamicPrice = problemPrices[prob.id] ?? prob.price;
-            const hasPrice = dynamicPrice !== null && dynamicPrice !== undefined;
-            const canAfford = hasPrice && (teamBalance ?? 1000) >= dynamicPrice;
 
             return (
               <div
@@ -251,7 +381,7 @@ export function ProblemCatalog({
                           fontSize: '11px',
                           fontWeight: 700
                         }}>
-                          🟡 IN PROGRESS (Worked on by {statusInfo.workingBy})
+                          🟡 IN PROGRESS ({statusInfo.workingBy})
                         </span>
                       )}
                     </div>
@@ -260,41 +390,15 @@ export function ProblemCatalog({
                       {prob.cat || 'Algorithms'}
                       {isUnlocked && statusInfo?.unlockedBy && (
                         <span style={{ marginLeft: '10px', color: 'var(--teal)' }}>
-                          • Purchased by {statusInfo.unlockedBy}
+                          • Won by {statusInfo.unlockedBy} {statusInfo.bidAmount ? `(Bid: ₹${statusInfo.bidAmount})` : ''}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right Action & Dynamic Price display */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
-                  <div style={{ textAlign: 'right' }}>
-                    {hasPrice ? (
-                      <div>
-                        <div style={{
-                          color: isUnlocked ? 'var(--neon)' : 'var(--txt)',
-                          fontWeight: 800,
-                          fontSize: '16px'
-                        }}>
-                          ₹{dynamicPrice}
-                        </div>
-                        <small style={{ color: 'var(--mut)', fontSize: '10px', textTransform: 'uppercase' }}>
-                          {isUnlocked ? 'Unlocked' : 'Current Price'}
-                        </small>
-                      </div>
-                    ) : (
-                      <div>
-                        <span style={{ color: 'var(--mut)', fontSize: '12px', fontStyle: 'italic' }}>
-                          Price Pending
-                        </span>
-                        <small style={{ display: 'block', color: 'var(--mut)', fontSize: '10px' }}>
-                          Organizer review
-                        </small>
-                      </div>
-                    )}
-                  </div>
-
+                {/* Right Action */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                   {isUnlocked ? (
                     <button
                       className="pri"
@@ -303,23 +407,14 @@ export function ProblemCatalog({
                     >
                       Open in Workspace
                     </button>
-                  ) : hasPrice ? (
-                    <button
-                      className={canAfford ? "ok" : ""}
-                      disabled={!canAfford || !!loadingId}
-                      onClick={() => handlePurchase(prob.id)}
-                      style={{ padding: '7px 16px', fontWeight: 700 }}
-                      title={canAfford ? `Deduct ₹${dynamicPrice} from team budget` : 'Insufficient team balance'}
-                    >
-                      {loadingId === prob.id ? 'Purchasing...' : (canAfford ? `Purchase (₹${dynamicPrice})` : 'Low Balance')}
-                    </button>
                   ) : (
                     <button
-                      disabled
-                      style={{ padding: '7px 14px', opacity: 0.6 }}
-                      title="Organizer has not set a price for this problem yet"
+                      className="ok"
+                      onClick={() => handleOpenBidModal(prob)}
+                      style={{ padding: '7px 16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                      title="Enter the winning bid amount from offline auction"
                     >
-                      Not for Sale
+                      <Gavel size={14} /> Enter Winning Bid
                     </button>
                   )}
                 </div>
@@ -340,7 +435,127 @@ export function ProblemCatalog({
             </div>
           )}
         </div>
+
+        {/* Modal: Enter Winning Bid Amount */}
+        {selectedBidProblem && (
+          <div className="ov" style={{ zIndex: 1100 }}>
+            <div className="box" style={{ maxWidth: '480px', width: '92%', padding: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Gavel size={22} color="var(--teal)" />
+                  <h3 style={{ margin: 0, color: 'var(--teal)', fontSize: '18px' }}>
+                    Offline Bid Unlock
+                  </h3>
+                </div>
+                <button onClick={() => setSelectedBidProblem(null)}><X size={16} /></button>
+              </div>
+
+              <div style={{
+                background: 'var(--bg3)',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--bd)',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--txt)' }}>
+                  {selectedBidProblem.id} — {selectedBidProblem.title}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                  <span className={`badge ${selectedBidProblem.diff}`}>{selectedBidProblem.diff}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--mut)' }}>{selectedBidProblem.cat}</span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--teal)', fontWeight: 700, marginBottom: '6px' }}>
+                  ENTER FINAL WINNING BID AMOUNT (₹)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '18px', color: 'var(--neon)', fontWeight: 700 }}>₹</span>
+                  <input
+                    type="number"
+                    placeholder="e.g. 250"
+                    value={bidAmountInput}
+                    onChange={(e) => setBidAmountInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmBid()}
+                    autoFocus
+                    style={{ fontSize: '16px', fontWeight: 700, padding: '8px 12px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Budget impact preview */}
+              <div style={{
+                background: 'var(--bg4)',
+                border: '1px solid var(--bd)',
+                borderRadius: '6px',
+                padding: '10px 14px',
+                fontSize: '12px',
+                marginBottom: '18px',
+                lineHeight: 1.6
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--mut)' }}>
+                  <span>Current Team Balance:</span>
+                  <b style={{ color: 'var(--txt)' }}>₹{teamBalance ?? 1000}</b>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--mut)' }}>
+                  <span>Bid Amount Deducted:</span>
+                  <b style={{ color: 'var(--red)' }}>- ₹{currentBidNum}</b>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderTop: '1px solid var(--bd)',
+                  marginTop: '6px',
+                  paddingTop: '6px'
+                }}>
+                  <span style={{ fontWeight: 700, color: projectedRemaining >= 0 ? 'var(--neon)' : 'var(--red)' }}>
+                    Remaining Team Budget:
+                  </span>
+                  <b style={{
+                    fontSize: '14px',
+                    color: projectedRemaining >= 0 ? 'var(--neon)' : 'var(--red)'
+                  }}>
+                    ₹{projectedRemaining}
+                  </b>
+                </div>
+                {currentMember && (
+                  <div style={{ fontSize: '11px', color: 'var(--teal)', marginTop: '4px' }}>
+                    Purchaser Identity: <b>{currentMember.memberId}</b> ({currentMember.name})
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBidProblem(null)}
+                  style={{ flex: 1, padding: '10px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pri"
+                  onClick={handleConfirmBid}
+                  disabled={loading || projectedRemaining < 0}
+                  style={{ flex: 2, padding: '10px', fontWeight: 700 }}
+                >
+                  {loading ? 'Unlocking...' : 'Confirm & Unlock for Team'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+const ruleBoxStyle = {
+  background: 'var(--bg4)',
+  border: '1px solid var(--bd)',
+  borderRadius: '8px',
+  padding: '12px 14px'
+};

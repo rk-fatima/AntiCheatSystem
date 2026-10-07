@@ -157,12 +157,13 @@ export function App() {
   };
 
   // 6. Dynamic Team-Level Problem Purchase
-  const handlePurchaseProblem = async (problemId) => {
+  const handlePurchaseProblem = async (problemId, bidAmount) => {
     if (!team?.name) return;
     const res = await purchaseProblem({
       teamName: team.name,
       memberId: currentMember?.memberId,
-      problemId
+      problemId,
+      bidAmount
     });
 
     if (res.team) {

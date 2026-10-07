@@ -100,22 +100,21 @@ Our new architecture introduces:
     Being worked on by SYNORA-02
     ```
 
-### B. Dynamic Problem Pricing (Organizer Controlled)
-* **No Hardcoded Prices**: Problem prices are manually entered and updated by the organizer.
-* **Organizer Price Control Screen**:
-  ```text
-  Problem: E1 — Two Sum
-  Set Price: [ ₹150 ]
-  [ Publish / Update Price ]
-  ```
-* **Dynamic Team Purchase**:
-  * Team begins with a starting budget of **₹1,000**.
-  * When any member purchases a problem, the current configured price is deducted from the team balance (e.g., ₹1,000 - ₹150 = ₹850).
-  * The purchase belongs to the team; any member can solve it.
-* **Immutable Transaction Records**:
-  * Every purchase is recorded permanently:
-    `{ Txn ID, Team ID, Problem ID, Price at Purchase, Purchased By (Member ID), Time }`.
-  * Changing prices later does not affect past purchase records.
+### B. Offline Auction Bidding & Winning Bid Unlock
+* **Offline Bidding**: The bidding is conducted manually/offline by the organizer (in the hall or Discord).
+* **Winning Bid Amount**: When the auction concludes, the winning team member enters the final agreed bid amount (₹) in the system.
+* **Shared Budget Deduction**:
+  * Each team starts with a fixed shared budget of **₹1,000**.
+  * The entered bid amount is deducted from the team balance:
+    $$\text{Remaining Budget} = \text{Current Balance} - \text{Winning Bid}$$
+  * Example: Team balance is ₹1,000 $\rightarrow$ Member 3 enters bid ₹300 for `E1` $\rightarrow$ Remaining balance becomes ₹700 for the entire team.
+* **Instant Shared Unlock**: The problem becomes available immediately to all members of that team in their shared workspace.
+* **Immutable Transaction History**:
+  * Every transaction permanently records:
+    `{ Team ID, Problem ID, Winning Bid Amount, Bidder Member ID, Remaining Balance, Timestamp }`.
+* **Catalog Distribution**:
+  * **71 Easy**, **21 Medium**, and **1 Hard** problem.
+  * Teams must coordinate so as not to exhaust their ₹1,000 budget on low-point Easy questions when Medium/Hard questions yield higher leaderboard scores.
 
 ---
 

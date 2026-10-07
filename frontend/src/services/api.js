@@ -40,11 +40,11 @@ export async function getTeamStatus(teamName) {
   return res.json();
 }
 
-export async function purchaseProblem({ teamName, memberId, problemId }) {
+export async function purchaseProblem({ teamName, memberId, problemId, bidAmount }) {
   const res = await fetch(`${API_BASE}/problems/purchase`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teamName, memberId, problemId })
+    body: JSON.stringify({ teamName, memberId, problemId, bidAmount })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to purchase problem');
@@ -64,11 +64,11 @@ export async function notifyMemberWorking({ teamName, memberId, problemId }) {
   }
 }
 
-export async function unlockProblemKey(teamName, key, memberId) {
+export async function unlockProblemKey(teamName, key, memberId, bidAmount) {
   const res = await fetch(`${API_BASE}/problems/unlock`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teamName, key, memberId })
+    body: JSON.stringify({ teamName, key, memberId, bidAmount })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to unlock problem');

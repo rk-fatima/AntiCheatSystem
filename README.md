@@ -118,25 +118,28 @@ The original single-file prototype (`qubit-auctioneer (2).html`) suffered from c
 
 ---
 
-## 💰 Dynamic Problem Pricing & Auction Economy
+## 🔨 Offline Auction Bidding & Budget Deduction Model
 
-1. **Dynamic Pricing (No Hardcoded Prices)**:
-   * Problem prices are **NOT hardcoded**. The organizer/admin manually sets or updates the price of any problem at any time before purchase.
-   * Admin Pricing Control Screen:
-     ```text
-     Problem: E1 — Two Sum
-     Set Price: [ ₹150 ]
-     [ Publish / Update Price ]
-     ```
-   * Live price changes are broadcast over WebSockets to all connected teams in real time without refreshing.
-2. **Team-Level Purchases & Transactions**:
-   * Each team starts with an initial budget of **₹1,000**.
-   * Problems are purchased from the team's balance:
-     $$\text{New Balance} = \text{Old Balance} - \text{Current Problem Price}$$
-   * The purchase belongs to the entire team. Money is deducted from the team, not individual members.
-   * Every purchase records an immutable audit transaction:
-     `{ Txn ID, Team ID, Problem ID, Price at Purchase, Purchased By (Member ID), Timestamp }`.
-   * Changing a problem's price later does not alter historical transaction records.
+1. **Offline Bidding Protocol**:
+   * Problem bidding is conducted manually/offline by the organizer in the hall or Discord portal.
+   * When a problem auction concludes, the organizer determines the **winning team** and the **final bid amount** (e.g., ₹300).
+2. **Winning Bid Unlock**:
+   * A member of the winning team clicks **"Enter Winning Bid"** on the problem (or uses Quick Unlock).
+   * They enter the agreed winning bid price (₹).
+   * The system verifies the team's available balance and deducts the bid amount from their shared ₹1,000 budget:
+     $$\text{Remaining Balance} = \text{Current Balance} - \text{Winning Bid Amount}$$
+   * The problem is immediately unlocked for all 3 members of the winning team in real time via WebSockets.
+3. **Transaction History & Audit**:
+   * Every winning bid unlock permanently records:
+     * **Team ID**
+     * **Problem ID & Title**
+     * **Winning Bid Amount (₹)**
+     * **Bidder Member ID** (who submitted the bid)
+     * **Remaining Balance (₹)**
+     * **Timestamp**
+4. **Catalog Strategy**:
+   * **Distribution**: **71 Easy**, **21 Medium**, and **1 Hard** (total 93 problems).
+   * Teams coordinate strategy so as not to exhaust their ₹1,000 budget on Easy problems when Medium and Hard problems carry significantly higher leaderboard value.
 
 ---
 

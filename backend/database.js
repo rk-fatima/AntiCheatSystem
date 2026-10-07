@@ -333,8 +333,8 @@ class Database {
     }
   }
 
-  // --- DYNAMIC TEAM-LEVEL PROBLEM PURCHASE ---
-  purchaseProblem(teamName, memberId, problemId) {
+  // --- OFFLINE BIDDING: TEAM-LEVEL PROBLEM UNLOCK & BID AMOUNT DEDUCTION ---
+  purchaseProblem(teamName, memberId, problemId, bidAmount) {
     const team = this.getTeam(teamName);
     if (!team) {
       throw new Error('Team not found.');
@@ -352,13 +352,21 @@ class Database {
       throw new Error(`Problem "${problem.id} — ${problem.title}" is already unlocked for your team!`);
     }
 
-    const currentPrice = this.getProblemPrice(problem.id);
-    if (currentPrice === null || currentPrice === undefined) {
-      throw new Error(`Problem "${problem.id} — ${problem.title}" does not have a price set by the organizer yet.`);
+    // Determine bid amount: use entered winning bid amount or configured price
+    let finalBidAmount;
+    if (bidAmount !== undefined && bidAmount !== null && String(bidAmount).trim() !== '' && !isNaN(Number(bidAmount))) {
+      finalBidAmount = Math.max(0, parseInt(bidAmount, 10));
+    } else {
+      const configuredPrice = this.getProblemPrice(problem.id);
+      if (configuredPrice !== null && configuredPrice !== undefined) {
+        finalBidAmount = configuredPrice;
+      } else {
+        throw new Error('Please enter the winning bid amount agreed in the offline auction.');
+      }
     }
 
-    if (team.balance < currentPrice) {
-      throw new Error(`Insufficient balance! Current price is ₹${currentPrice}, but team balance is ₹${team.balance}.`);
+    if (team.balance < finalBidAmount) {
+      throw new Error(`Insufficient budget! Your winning bid is ₹${finalBidAmount}, but team only has ₹${team.balance} remaining.`);
     }
 
     const member = (team.members || []).find(m => m.memberId === memberId) || {
@@ -366,8 +374,8 @@ class Database {
       name: memberId || 'Team Member'
     };
 
-    // Deduct at the TEAM level
-    team.balance -= currentPrice;
+    // Deduct bid amount at the TEAM level
+    team.balance -= finalBidAmount;
     team.unlocked.push(problem.id);
 
     // Initialize problem status in shared workspace
@@ -376,6 +384,7 @@ class Database {
       status: 'UNLOCKED',
       unlockedBy: member.memberId,
       unlockedByName: member.name,
+      bidAmount: finalBidAmount,
       unlockedAt: new Date().toISOString()
     };
 
@@ -387,9 +396,11 @@ class Database {
       teamName: team.name,
       problemId: problem.id,
       problemTitle: problem.title,
-      price: currentPrice,
+      bidAmount: finalBidAmount,
+      price: finalBidAmount, // compatibility alias
       purchasedBy: member.memberId,
       purchasedByName: member.name,
+      remainingBalance: team.balance,
       purchaseTime: now.toISOString(),
       displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     };

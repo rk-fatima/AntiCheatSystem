@@ -150,15 +150,15 @@ app.get('/api/problems', (req, res) => {
   });
 });
 
-// Dynamic Problem Purchase (Team-level purchase at current organizer price)
+// Dynamic Problem Purchase (Team-level purchase with winning bid amount deduction)
 app.post('/api/problems/purchase', (req, res) => {
-  const { teamName, memberId, problemId } = req.body;
+  const { teamName, memberId, problemId, bidAmount } = req.body;
   if (!teamName || !problemId) {
     return res.status(400).json({ error: 'Team name and problem ID are required.' });
   }
 
   try {
-    const { team, txn, problem } = db.purchaseProblem(teamName, memberId, problemId);
+    const { team, txn, problem } = db.purchaseProblem(teamName, memberId, problemId, bidAmount);
 
     // Real-time broadcast to all members of this team
     broadcastToTeam(teamName, {
@@ -212,9 +212,9 @@ app.post('/api/problems/working', (req, res) => {
   res.json({ success: true, team: updatedTeam });
 });
 
-// Legacy key unlock fallback (maps to purchase)
+// Legacy key/direct unlock fallback (maps to purchase)
 app.post('/api/problems/unlock', (req, res) => {
-  const { teamName, key, memberId } = req.body;
+  const { teamName, key, memberId, bidAmount } = req.body;
   if (!teamName || !key) {
     return res.status(400).json({ error: 'Team name and unlock key are required.' });
   }
@@ -227,7 +227,7 @@ app.post('/api/problems/unlock', (req, res) => {
   }
 
   try {
-    const { team, txn } = db.purchaseProblem(teamName, memberId, problem.id);
+    const { team, txn } = db.purchaseProblem(teamName, memberId, problem.id, bidAmount);
     broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team, transaction: txn });
     broadcastToProctors({ type: 'TEAM_UPDATED', team });
     broadcastToProctors({ type: 'TRANSACTION_LOGGED', transaction: txn });
