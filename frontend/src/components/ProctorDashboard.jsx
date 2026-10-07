@@ -273,7 +273,7 @@ export function ProctorDashboard({ onClose }) {
                 <thead>
                   <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--bd)', color: 'var(--mut)', position: 'sticky', top: 0 }}>
                     <th style={{ padding: '10px 14px' }}>Team Name & Size</th>
-                    <th style={{ padding: '10px 14px' }}>Captain</th>
+                    <th style={{ padding: '10px 14px' }}>Leader</th>
                     <th style={{ padding: '10px 14px' }}>Balance</th>
                     <th style={{ padding: '10px 14px' }}>Score / Solved</th>
                     <th style={{ padding: '10px 14px' }}>Violations</th>
@@ -576,7 +576,7 @@ export function ProctorDashboard({ onClose }) {
                       </div>
                       {m.isCaptain && (
                         <span style={{ color: 'var(--neon)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                          <Crown size={13} /> Team Captain
+                          <Crown size={13} /> Team Leader
                         </span>
                       )}
                     </div>
@@ -675,7 +675,7 @@ export function ProctorDashboard({ onClose }) {
                 <label style={labelStyle}>Paste CSV or JSON Data</label>
                 <textarea
                   rows={8}
-                  placeholder={`Team Name,Team Size,Captain Name,Member 2 Name,Member 3 Name\nSYNORA,3,Mohammed Salman,Abdul Rahman,Ahmed\nNEXUS,2,Sara Khan,Zayd Ali`}
+                  placeholder={`Team Name,Team Size,Leader Name,Member 2 Name,Member 3 Name\nSYNORA,3,Mohammed Salman,Abdul Rahman,Ahmed\nNEXUS,2,Sara Khan,Zayd Ali`}
                   value={syncInput}
                   onChange={(e) => setSyncInput(e.target.value)}
                   style={{

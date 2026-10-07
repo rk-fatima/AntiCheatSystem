@@ -372,7 +372,7 @@ function parseSheetRows(rows) {
     const teamName = r['Team Name'] || r['teamName'] || r['Team'] || r['team'] || '';
     if (!teamName) return null;
     const members = [];
-    const m1Name = r['Member 1 Name'] || r['Captain Name'] || r['member1'] || r['captain'] || '';
+    const m1Name = r['Member 1 Name'] || r['Leader Name'] || r['Captain Name'] || r['member1'] || r['leader'] || r['captain'] || '';
     if (m1Name) members.push({ name: m1Name, isCaptain: true, rollNo: r['Member 1 Roll No'] || '', email: r['Member 1 Email'] || '' });
     const m2Name = r['Member 2 Name'] || r['member2'] || '';
     if (m2Name) members.push({ name: m2Name, isCaptain: false, rollNo: r['Member 2 Roll No'] || '', email: r['Member 2 Email'] || '' });

@@ -386,7 +386,7 @@ export function GateModal({ onTeamSessionReady }) {
                               padding: '1px 5px',
                               borderRadius: '3px'
                             }}>
-                              <Crown size={10} /> Captain
+                              <Crown size={10} /> Leader
                             </span>
                           )}
                         </div>

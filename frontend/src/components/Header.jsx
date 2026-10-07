@@ -61,7 +61,7 @@ export function Header({ team, currentMember, onOpenProctor, onOpenLeaderboard, 
           gap: '6px'
         }}>
           {currentMember.isCaptain ? (
-            <Crown size={14} color="var(--neon)" title="Team Captain" />
+            <Crown size={14} color="var(--neon)" title="Team Leader" />
           ) : (
             <span style={{ color: 'var(--teal)', fontWeight: 700 }}>ID:</span>
           )}
