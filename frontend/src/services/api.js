@@ -219,3 +219,54 @@ export async function fetchTransactions() {
   if (!res.ok) return { transactions: [] };
   return res.json();
 }
+
+// --- POWER CARDS API (HINT PASS & SABOTAGE CARD - 40 ByteCoins) ---
+export async function purchaseHintPass({ teamName, memberId, problemId }) {
+  const res = await fetch(`${API_BASE}/cards/hint/purchase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamName, memberId, problemId })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to purchase Hint Pass');
+  return data;
+}
+
+export async function useHintPass({ teamName, memberId, problemId }) {
+  const res = await fetch(`${API_BASE}/cards/hint/use`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamName, memberId, problemId })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to use Hint Pass');
+  return data;
+}
+
+export async function purchaseSabotageCard({ teamName, memberId }) {
+  const res = await fetch(`${API_BASE}/cards/sabotage/purchase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamName, memberId })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to purchase Sabotage Card');
+  return data;
+}
+
+export async function useSabotageCard({ teamName, memberId, targetTeamName }) {
+  const res = await fetch(`${API_BASE}/cards/sabotage/use`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamName, memberId, targetTeamName })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to use Sabotage Card');
+  return data;
+}
+
+export async function fetchSabotageTargets(excludeTeam = '') {
+  const res = await fetch(`${API_BASE}/cards/targets?excludeTeam=${encodeURIComponent(excludeTeam)}`);
+  if (!res.ok) return { targets: [] };
+  return res.json();
+}

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getPredefinedHint } from './hints.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,23 +63,75 @@ class Database {
   }
 
   cleanDummyData() {
-    // Explicit requirement: "Do not create any default users, teams, or dummy data during initial setup.
-    // The system must start with an empty database."
-    // Clear out any old test teams, telemetry, and submissions
+    const dummyNames = ['testteam', 'demoteam'];
     let modified = false;
-    if (Object.keys(this.state.teams).length > 0) {
-      // Check if all existing teams are dummy/test teams
-      const dummyNames = ['testteam', 'qubit', 'abcd', 'demoteam', 'abcde', 'testunlock', 'qwerty', 'abcdef', 'visionx', 'synora'];
-      const teamKeys = Object.keys(this.state.teams);
-      const isAllDummy = teamKeys.every(k => dummyNames.includes(k.toLowerCase()));
-      if (isAllDummy) {
-        this.state.teams = {};
-        this.state.transactions = [];
-        this.state.telemetry = [];
-        this.state.submissions = [];
+    for (const key of Object.keys(this.state.teams)) {
+      if (dummyNames.includes(key.toLowerCase())) {
+        delete this.state.teams[key];
         modified = true;
       }
     }
+
+    // Testing teams requested by organizer: Synora (2 members) & VisionX (1 member)
+    if (!this.getTeam('Synora')) {
+      this.state.teams['Synora'] = {
+        id: 'Synora',
+        name: 'Synora',
+        size: 2,
+        captainId: 'SYNORA-001-M01',
+        captainName: 'Salman',
+        members: [
+          { memberId: 'SYNORA-001-M01', name: 'Salman', isCaptain: true, rollNo: '', phone: '', email: '', college: '' },
+          { memberId: 'SYNORA-001-M02', name: 'Sreethan', isCaptain: false, rollNo: '', phone: '', email: '', college: '' }
+        ],
+        balance: 1000,
+        unlocked: [],
+        solved: [],
+        problemStatuses: {},
+        revealedHints: {},
+        hintPassesCount: 0,
+        sabotageCardsCount: 0,
+        transactions: [],
+        score: 0,
+        wrong: 0,
+        violations: [],
+        isLocked: false,
+        lockReason: '',
+        attempts: [],
+        createdAt: new Date().toISOString()
+      };
+      modified = true;
+    }
+
+    if (!this.getTeam('VisionX')) {
+      this.state.teams['VisionX'] = {
+        id: 'VisionX',
+        name: 'VisionX',
+        size: 1,
+        captainId: 'VISIONX-001-M01',
+        captainName: 'Rukhsaar',
+        members: [
+          { memberId: 'VISIONX-001-M01', name: 'Rukhsaar', isCaptain: true, rollNo: '', phone: '', email: '', college: '' }
+        ],
+        balance: 1000,
+        unlocked: [],
+        solved: [],
+        problemStatuses: {},
+        revealedHints: {},
+        hintPassesCount: 0,
+        sabotageCardsCount: 0,
+        transactions: [],
+        score: 0,
+        wrong: 0,
+        violations: [],
+        isLocked: false,
+        lockReason: '',
+        attempts: [],
+        createdAt: new Date().toISOString()
+      };
+      modified = true;
+    }
+
     if (modified) {
       this.save();
     }
@@ -381,6 +434,10 @@ class Database {
     if (team.isLocked) {
       throw new Error('Your team session is locked by proctors.');
     }
+    if (this.isTeamFrozen(team.name)) {
+      const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+      throw new Error(`Your team is currently SABOTAGED and frozen! Remaining freeze time: ${remainingSec}s.`);
+    }
 
     const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
     if (!problem) {
@@ -569,6 +626,299 @@ class Database {
     team.attempts = [];
     this.updateTeam(team);
     return { success: true, team };
+  }
+
+  // --- POWER CARDS: 💡 HINT PASS (40 ByteCoins) ---
+  purchaseHintPass(teamName, memberId, problemId = null) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error('Team not found.');
+    if (this.isTeamFrozen(team.name)) {
+      const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+      throw new Error(`Your team is currently frozen! Remaining time: ${remainingSec}s.`);
+    }
+    if (team.isLocked) throw new Error('Your team session is locked by proctors.');
+
+    const cost = 40;
+    if (team.balance < cost) {
+      throw new Error(`Insufficient ByteCoins! Hint Pass costs ${cost} ByteCoins, but team only has ${team.balance} ByteCoins remaining.`);
+    }
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId || `${team.name}-01`,
+      name: memberId || 'Team Member'
+    };
+
+    let hintData = null;
+    if (problemId) {
+      const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
+      if (!problem) throw new Error(`Problem "${problemId}" not found in catalog.`);
+      if (!team.unlocked.includes(problem.id)) {
+        throw new Error(`Hint Pass can only be used on a problem that your team has already unlocked.`);
+      }
+
+      if (!team.revealedHints) team.revealedHints = {};
+      const hintText = getPredefinedHint(problem);
+      hintData = {
+        problemId: problem.id,
+        problemTitle: problem.title,
+        hint: hintText,
+        revealedBy: member.memberId,
+        revealedByName: member.name,
+        timestamp: Date.now()
+      };
+      team.revealedHints[problem.id] = hintData;
+    } else {
+      team.hintPassesCount = (team.hintPassesCount || 0) + 1;
+    }
+
+    team.balance -= cost;
+
+    const txn = {
+      id: `TXN-HINT-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      teamId: team.name,
+      teamName: team.name,
+      type: 'HINT_PASS',
+      cardType: 'HINT_PASS',
+      cost,
+      price: cost,
+      problemId: problemId || null,
+      purchasedBy: member.memberId,
+      purchasedByName: member.name,
+      remainingBalance: team.balance,
+      timestamp: Date.now(),
+      isoTime: new Date().toISOString()
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    this.state.transactions.unshift(txn);
+
+    this.save();
+    return { team, txn, hint: hintData };
+  }
+
+  useHintPass(teamName, memberId, problemId) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error('Team not found.');
+    if (this.isTeamFrozen(team.name)) {
+      const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+      throw new Error(`Your team is currently frozen! Remaining time: ${remainingSec}s.`);
+    }
+    if (team.isLocked) throw new Error('Your team session is locked by proctors.');
+
+    const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
+    if (!problem) throw new Error(`Problem "${problemId}" not found in catalog.`);
+    if (!team.unlocked.includes(problem.id)) {
+      throw new Error(`Hint Pass can only be used on a problem that your team has already unlocked.`);
+    }
+
+    if (!team.revealedHints) team.revealedHints = {};
+    if (team.revealedHints[problem.id]) {
+      return { team, hint: team.revealedHints[problem.id], alreadyRevealed: true };
+    }
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId || `${team.name}-01`,
+      name: memberId || 'Team Member'
+    };
+
+    const cost = 40;
+    if ((team.hintPassesCount || 0) > 0) {
+      team.hintPassesCount -= 1;
+    } else if (team.balance >= cost) {
+      team.balance -= cost;
+    } else {
+      throw new Error(`No Hint Passes available in inventory and insufficient ByteCoins (requires 40 ByteCoins).`);
+    }
+
+    const hintText = getPredefinedHint(problem);
+    const hintData = {
+      problemId: problem.id,
+      problemTitle: problem.title,
+      hint: hintText,
+      revealedBy: member.memberId,
+      revealedByName: member.name,
+      timestamp: Date.now()
+    };
+    team.revealedHints[problem.id] = hintData;
+
+    const txn = {
+      id: `TXN-HINT-USE-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      teamId: team.name,
+      teamName: team.name,
+      type: 'HINT_PASS',
+      cardType: 'HINT_PASS',
+      cost,
+      price: cost,
+      problemId: problem.id,
+      purchasedBy: member.memberId,
+      purchasedByName: member.name,
+      remainingBalance: team.balance,
+      timestamp: Date.now(),
+      isoTime: new Date().toISOString()
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    this.state.transactions.unshift(txn);
+
+    this.save();
+    return { team, txn, hint: hintData };
+  }
+
+  // --- POWER CARDS: ⚡ SABOTAGE CARD (40 ByteCoins) ---
+  purchaseSabotageCard(teamName, memberId) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error('Team not found.');
+    if (this.isTeamFrozen(team.name)) {
+      const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+      throw new Error(`Your team is currently frozen! Remaining time: ${remainingSec}s.`);
+    }
+    if (team.isLocked) throw new Error('Your team session is locked by proctors.');
+
+    const cost = 40;
+    if (team.balance < cost) {
+      throw new Error(`Insufficient ByteCoins! Sabotage Card costs ${cost} ByteCoins, but team only has ${team.balance} ByteCoins remaining.`);
+    }
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId || `${team.name}-01`,
+      name: memberId || 'Team Member'
+    };
+
+    team.balance -= cost;
+    team.sabotageCardsCount = (team.sabotageCardsCount || 0) + 1;
+
+    const txn = {
+      id: `TXN-SABOTAGE-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      teamId: team.name,
+      teamName: team.name,
+      type: 'SABOTAGE_CARD',
+      cardType: 'SABOTAGE_CARD',
+      cost,
+      price: cost,
+      purchasedBy: member.memberId,
+      purchasedByName: member.name,
+      remainingBalance: team.balance,
+      timestamp: Date.now(),
+      isoTime: new Date().toISOString()
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    this.state.transactions.unshift(txn);
+
+    this.save();
+    return { team, txn };
+  }
+
+  useSabotageCard(teamName, memberId, targetTeamName) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error('Team not found.');
+    if (this.isTeamFrozen(team.name)) {
+      const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+      throw new Error(`Your team is currently frozen! Remaining time: ${remainingSec}s.`);
+    }
+    if (team.isLocked) throw new Error('Your team session is locked by proctors.');
+
+    if (!targetTeamName || targetTeamName.trim().toLowerCase() === team.name.toLowerCase()) {
+      throw new Error('You cannot sabotage your own team!');
+    }
+
+    const target = this.getTeam(targetTeamName);
+    if (!target) {
+      throw new Error(`Target team "${targetTeamName}" not found.`);
+    }
+
+    const now = Date.now();
+    if (target.frozenUntil && target.frozenUntil > now) {
+      const remainingSec = Math.ceil((target.frozenUntil - now) / 1000);
+      throw new Error(`Team "${target.name}" is already frozen! Remaining freeze time: ${remainingSec}s.`);
+    }
+
+    const member = (team.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId || `${team.name}-01`,
+      name: memberId || 'Team Member'
+    };
+
+    const cost = 40;
+    if ((team.sabotageCardsCount || 0) > 0) {
+      team.sabotageCardsCount -= 1;
+    } else if (team.balance >= cost) {
+      team.balance -= cost;
+    } else {
+      throw new Error(`No Sabotage Cards in inventory and insufficient ByteCoins (requires 40 ByteCoins).`);
+    }
+
+    // Freeze target for exactly 5 minutes (300,000 ms)
+    const freezeDurationMs = 5 * 60 * 1000;
+    target.frozenUntil = now + freezeDurationMs;
+    target.frozenBy = team.name;
+    target.frozenAt = now;
+
+    const txn = {
+      id: `TXN-SABOTAGE-ACT-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      teamId: team.name,
+      teamName: team.name,
+      type: 'SABOTAGE',
+      cardType: 'SABOTAGE',
+      cost,
+      price: cost,
+      targetTeam: target.name,
+      purchasedBy: member.memberId,
+      purchasedByName: member.name,
+      remainingBalance: team.balance,
+      timestamp: now,
+      isoTime: new Date().toISOString()
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    this.state.transactions.unshift(txn);
+
+    this.save();
+    return {
+      attackingTeam: team,
+      targetTeam: target,
+      frozenUntil: target.frozenUntil,
+      txn
+    };
+  }
+
+  isTeamFrozen(teamName) {
+    const team = this.getTeam(teamName);
+    if (!team) return false;
+    if (team.frozenUntil) {
+      if (team.frozenUntil > Date.now()) {
+        return true;
+      } else {
+        team.frozenUntil = null;
+        team.frozenBy = null;
+        this.save();
+        return false;
+      }
+    }
+    return false;
+  }
+
+  getSabotageTargets(excludeTeamName) {
+    const now = Date.now();
+    const excludeKey = (excludeTeamName || '').trim().toLowerCase();
+    return this.getAllTeams()
+      .filter(t => t.name.toLowerCase() !== excludeKey)
+      .map(t => {
+        const isFrozen = Boolean(t.frozenUntil && t.frozenUntil > now);
+        return {
+          id: t.name,
+          name: t.name,
+          size: t.size,
+          isFrozen,
+          frozenBy: isFrozen ? t.frozenBy : null,
+          frozenUntil: isFrozen ? t.frozenUntil : null,
+          remainingSeconds: isFrozen ? Math.max(0, Math.ceil((t.frozenUntil - now) / 1000)) : 0,
+          status: isFrozen ? 'Frozen' : 'Playing'
+        };
+      });
   }
 
   // --- SUBMISSIONS ---

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Unlock, KeyRound, CheckCircle2, Search, Coins, Sparkles, User, Clock, AlertCircle, Gavel, X, Info } from 'lucide-react';
+import { PowerCardsSection } from './PowerCardsSection';
 
 export function ProblemCatalog({
   problems,
@@ -8,6 +9,8 @@ export function ProblemCatalog({
   problemStatuses = {},
   teamBalance = 1000,
   currentMember,
+  team,
+  onTeamUpdated,
   onSelectProblem,
   onPurchaseProblem
 }) {
@@ -132,6 +135,15 @@ export function ProblemCatalog({
             {notification.text}
           </div>
         )}
+
+        {/* Team Power Cards Arsenal (💡 Hint Pass & ⚡ Sabotage Card) */}
+        <PowerCardsSection
+          team={team}
+          currentMember={currentMember}
+          unlockedProblems={problems.filter(p => unlockedIds.includes(p.id))}
+          onTeamUpdated={onTeamUpdated}
+          onOpenProblem={onSelectProblem}
+        />
 
         {/* Quick Winning Bid Input Bar */}
         <div style={{

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Send, RotateCcw, Loader2, CheckCircle, AlertTriangle, XCircle, Terminal } from 'lucide-react';
+import { Play, Send, RotateCcw, Loader2, CheckCircle, AlertTriangle, XCircle, Terminal, Lightbulb, Zap, Snowflake } from 'lucide-react';
+import { useHintPass } from '../services/api';
 
 const STARTER_TEMPLATES = {
   python: `import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # TODO: parse input, solve, print output\n    print()\n\nif __name__ == "__main__":\n    main()\n`,
@@ -30,6 +31,8 @@ export function CodeEditorPane({
   onRunCode,
   onSubmitCode,
   currentMember,
+  team,
+  onTeamUpdated,
   problemStatus,
   reportViolation,
   internalClipboardRef
@@ -39,6 +42,30 @@ export function CodeEditorPane({
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allowPaste, setAllowPaste] = useState(false);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintError, setHintError] = useState('');
+
+  const isFrozen = Boolean(team?.frozenUntil && team.frozenUntil > Date.now());
+
+  const handleUnlockHintForProblem = async () => {
+    if (!problem?.id || !team?.name) return;
+    setHintLoading(true);
+    setHintError('');
+    try {
+      const res = await useHintPass({
+        teamName: team.name,
+        memberId: currentMember?.memberId,
+        problemId: problem.id
+      });
+      if (onTeamUpdated && res.team) {
+        onTeamUpdated(res.team);
+      }
+    } catch (err) {
+      setHintError(err.message || 'Failed to unlock hint.');
+    } finally {
+      setHintLoading(false);
+    }
+  };
 
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
@@ -233,6 +260,73 @@ export function CodeEditorPane({
           </span>
         </div>
 
+        {/* 💡 Blue Hint Card / Unlock Hint Button */}
+        {team?.revealedHints?.[problem.id] ? (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(0, 180, 216, 0.12) 0%, rgba(10, 25, 47, 0.9) 100%)',
+            border: '1px solid #00b4d8',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            marginBottom: '14px',
+            boxShadow: '0 0 15px rgba(0, 180, 216, 0.15)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#00b4d8', fontWeight: 800, fontSize: '12px' }}>
+                <Lightbulb size={16} /> 💡 TEAM ALGORITHMIC HINT
+              </div>
+              <span style={{ fontSize: '10px', color: 'var(--mut)' }}>
+                Unlocked by {team.revealedHints[problem.id].revealedByName || team.revealedHints[problem.id].revealedBy}
+              </span>
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--txt)', lineHeight: 1.5 }}>
+              {team.revealedHints[problem.id].hint}
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(0, 180, 216, 0.05)',
+            border: '1px dashed rgba(0, 180, 216, 0.4)',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            marginBottom: '14px'
+          }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#90e0ef', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Lightbulb size={14} color="#00b4d8" /> Need algorithmic guidance?
+              </div>
+              <small style={{ fontSize: '11px', color: 'var(--mut)' }}>
+                {team?.hintPassesCount > 0 ? `${team.hintPassesCount} Hint Pass available` : 'Cost: 40 ByteCoins from shared budget'}
+              </small>
+            </div>
+            <button
+              type="button"
+              onClick={handleUnlockHintForProblem}
+              disabled={hintLoading || ((team?.balance ?? 1000) < 40 && (team?.hintPassesCount || 0) === 0)}
+              style={{
+                background: '#00b4d8',
+                color: '#001a2c',
+                fontWeight: 700,
+                fontSize: '11px',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              {hintLoading ? 'Unlocking...' : (team?.hintPassesCount || 0) > 0 ? 'Use Hint Pass' : 'Unlock Hint (40 BC)'}
+            </button>
+          </div>
+        )}
+
+        {hintError && (
+          <div style={{ padding: '8px', background: 'var(--red-dim)', border: '1px solid var(--red)', borderRadius: '6px', color: 'var(--red)', fontSize: '11px', marginBottom: '12px' }}>
+            ⚠️ {hintError}
+          </div>
+        )}
+
         {/* Shared Team Workspace Status Banner */}
         {problemStatus?.status === 'SOLVED' && (
           <div style={{
@@ -353,19 +447,23 @@ export function CodeEditorPane({
           <button
             className="pri"
             onClick={handleRun}
-            disabled={isRunning || isSubmitting}
+            disabled={isRunning || isSubmitting || isFrozen}
+            title={isFrozen ? "Screen is frozen due to Sabotage attack" : "Run code against sample test cases"}
+            style={isFrozen ? { opacity: 0.5, cursor: 'not-allowed', background: 'var(--bg3)', borderColor: 'var(--red)', color: 'var(--red)' } : {}}
           >
-            {isRunning ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-            Run Code
+            {isRunning ? <Loader2 size={16} className="spin" /> : isFrozen ? <Zap size={16} color="#ff0055" /> : <Play size={16} />}
+            {isFrozen ? 'Frozen' : 'Run Code'}
           </button>
 
           <button
             className="ok"
             onClick={handleSubmit}
-            disabled={isRunning || isSubmitting}
+            disabled={isRunning || isSubmitting || isFrozen}
+            title={isFrozen ? "Screen is frozen due to Sabotage attack" : "Submit solution for judging"}
+            style={isFrozen ? { opacity: 0.5, cursor: 'not-allowed', background: 'var(--bg3)', borderColor: 'var(--red)', color: 'var(--red)' } : {}}
           >
-            {isSubmitting ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-            Submit Solution
+            {isSubmitting ? <Loader2 size={16} className="spin" /> : isFrozen ? <Zap size={16} color="#ff0055" /> : <Send size={16} />}
+            {isFrozen ? 'Frozen' : 'Submit Solution'}
           </button>
         </div>
 

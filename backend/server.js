@@ -287,8 +287,82 @@ app.get('/api/admin/problems/prices', (req, res) => {
   res.json({ prices: db.getAllPrices() });
 });
 
-app.get('/api/admin/transactions', (req, res) => {
-  res.json({ transactions: db.getAllTransactions() });
+// --- POWER CARDS API: 💡 HINT PASS & ⚡ SABOTAGE CARD (40 ByteCoins) ---
+app.post('/api/cards/hint/purchase', (req, res) => {
+  const { teamName, memberId, problemId } = req.body;
+  try {
+    const result = db.purchaseHintPass(teamName, memberId, problemId);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    if (result.txn) broadcastToProctors({ type: 'TRANSACTION_LOGGED', transaction: result.txn });
+    res.json({ success: true, team: result.team, hint: result.hint, txn: result.txn });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/cards/hint/use', (req, res) => {
+  const { teamName, memberId, problemId } = req.body;
+  try {
+    const result = db.useHintPass(teamName, memberId, problemId);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    if (result.txn) broadcastToProctors({ type: 'TRANSACTION_LOGGED', transaction: result.txn });
+    res.json({ success: true, team: result.team, hint: result.hint, alreadyRevealed: result.alreadyRevealed });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/cards/sabotage/purchase', (req, res) => {
+  const { teamName, memberId } = req.body;
+  try {
+    const result = db.purchaseSabotageCard(teamName, memberId);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    if (result.txn) broadcastToProctors({ type: 'TRANSACTION_LOGGED', transaction: result.txn });
+    res.json({ success: true, team: result.team, txn: result.txn });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/cards/sabotage/use', (req, res) => {
+  const { teamName, memberId, targetTeamName } = req.body;
+  try {
+    const result = db.useSabotageCard(teamName, memberId, targetTeamName);
+    // Real-time WebSocket: freeze the target team immediately!
+    broadcastToTeam(result.targetTeam.name, {
+      type: 'TEAM_SABOTAGED',
+      team: result.targetTeam,
+      frozenUntil: result.frozenUntil,
+      frozenBy: teamName
+    });
+    // Update attacking team workspace
+    broadcastToTeam(teamName, {
+      type: 'TEAM_WORKSPACE_UPDATED',
+      team: result.attackingTeam
+    });
+    // Update proctors
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.targetTeam });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.attackingTeam });
+    if (result.txn) broadcastToProctors({ type: 'TRANSACTION_LOGGED', transaction: result.txn });
+
+    res.json({
+      success: true,
+      attackingTeam: result.attackingTeam,
+      targetTeam: result.targetTeam.name,
+      frozenUntil: result.frozenUntil
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/cards/targets', (req, res) => {
+  const excludeTeam = req.query.excludeTeam || '';
+  const targets = db.getSabotageTargets(excludeTeam);
+  res.json({ targets });
 });
 
 // --- TEAM REGISTRATION & SESSION MANAGEMENT ---
@@ -321,14 +395,11 @@ app.post('/api/team/login', (req, res) => {
 app.get('/api/team/:name', (req, res) => {
   const team = db.getTeam(req.params.name);
   if (!team) return res.status(404).json({ error: `Team "${req.params.name}" not found in registration database.` });
+  db.isTeamFrozen(team.name);
   res.json({
     team: {
-      id: team.id,
-      name: team.name,
-      size: team.size,
-      balance: team.balance,
-      captainId: team.captainId,
-      captainName: team.captainName,
+      ...team,
+      isFrozen: db.isTeamFrozen(team.name),
       members: (team.members || []).map(m => ({
         memberId: m.memberId,
         name: m.name,
@@ -336,9 +407,7 @@ app.get('/api/team/:name', (req, res) => {
         rollNo: m.rollNo,
         email: m.email,
         college: m.college
-      })),
-      unlocked: team.unlocked || [],
-      solved: team.solved || []
+      }))
     }
   });
 });
@@ -449,6 +518,10 @@ app.post('/api/submissions/run', (req, res) => {
   if (team && team.isLocked) {
     return res.status(403).json({ error: 'Session is currently locked due to integrity flags.' });
   }
+  if (team && db.isTeamFrozen(team.name)) {
+    const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+    return res.status(403).json({ error: `⚡ Your team is currently SABOTAGED and frozen! Code execution is locked for another ${remainingSec}s.` });
+  }
 
   const jobId = executionQueue.enqueue({
     type: 'run',
@@ -472,6 +545,10 @@ app.post('/api/submissions/submit', (req, res) => {
   const team = db.getTeam(teamName);
   if (team && team.isLocked) {
     return res.status(403).json({ error: 'Session is locked by proctors.' });
+  }
+  if (team && db.isTeamFrozen(team.name)) {
+    const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+    return res.status(403).json({ error: `⚡ Your team is currently SABOTAGED and frozen! Submissions are locked for another ${remainingSec}s.` });
   }
 
   const jobId = executionQueue.enqueue({

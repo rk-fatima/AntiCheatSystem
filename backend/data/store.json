@@ -1402,32 +1402,35 @@
       "id": "Synora",
       "name": "Synora",
       "size": 2,
-      "captainId": "Synora-001-M01",
+      "captainId": "SYNORA-001-M01",
       "captainName": "Salman",
       "members": [
         {
-          "memberId": "Synora-001-M01",
+          "memberId": "SYNORA-001-M01",
           "name": "Salman",
+          "isCaptain": true,
           "rollNo": "",
           "phone": "",
           "email": "",
-          "college": "",
-          "isCaptain": true
+          "college": ""
         },
         {
-          "memberId": "Synora-001-M02",
+          "memberId": "SYNORA-001-M02",
           "name": "Sreethan",
+          "isCaptain": false,
           "rollNo": "",
           "phone": "",
           "email": "",
-          "college": "",
-          "isCaptain": false
+          "college": ""
         }
       ],
       "balance": 1000,
       "unlocked": [],
       "solved": [],
       "problemStatuses": {},
+      "revealedHints": {},
+      "hintPassesCount": 0,
+      "sabotageCardsCount": 0,
       "transactions": [],
       "score": 0,
       "wrong": 0,
@@ -1435,29 +1438,32 @@
       "isLocked": false,
       "lockReason": "",
       "attempts": [],
-      "createdAt": "2026-10-07T19:13:42.726Z"
+      "createdAt": "2026-10-07T19:33:54.805Z"
     },
     "VisionX": {
       "id": "VisionX",
       "name": "VisionX",
       "size": 1,
-      "captainId": "VisionX-001-M01",
+      "captainId": "VISIONX-001-M01",
       "captainName": "Rukhsaar",
       "members": [
         {
-          "memberId": "VisionX-001-M01",
+          "memberId": "VISIONX-001-M01",
           "name": "Rukhsaar",
+          "isCaptain": true,
           "rollNo": "",
           "phone": "",
           "email": "",
-          "college": "",
-          "isCaptain": true
+          "college": ""
         }
       ],
       "balance": 1000,
       "unlocked": [],
       "solved": [],
       "problemStatuses": {},
+      "revealedHints": {},
+      "hintPassesCount": 0,
+      "sabotageCardsCount": 0,
       "transactions": [],
       "score": 0,
       "wrong": 0,
@@ -1465,7 +1471,7 @@
       "isLocked": false,
       "lockReason": "",
       "attempts": [],
-      "createdAt": "2026-10-07T19:13:42.726Z"
+      "createdAt": "2026-10-07T19:33:54.806Z"
     }
   },
   "transactions": [],

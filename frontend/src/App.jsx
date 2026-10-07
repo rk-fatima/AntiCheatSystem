@@ -7,6 +7,7 @@ import { LockOverlay } from './components/LockOverlay';
 import { ProctorDashboard } from './components/ProctorDashboard';
 import { LeaderboardModal } from './components/LeaderboardModal';
 import { TransactionsModal } from './components/TransactionsModal';
+import { SabotageFreezeOverlay } from './components/SabotageFreezeOverlay';
 import { useAntiCheat } from './hooks/useAntiCheat';
 import {
   fetchProblems,
@@ -80,6 +81,10 @@ export function App() {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'TEAM_WORKSPACE_UPDATED') {
+            if (msg.team) {
+              setTeam(msg.team);
+            }
+          } else if (msg.type === 'TEAM_SABOTAGED') {
             if (msg.team) {
               setTeam(msg.team);
             }
@@ -394,6 +399,8 @@ export function App() {
             onRunCode={handleRunCode}
             onSubmitCode={handleSubmitCode}
             currentMember={currentMember}
+            team={team}
+            onTeamUpdated={setTeam}
             problemStatus={activeProblemStatus}
             reportViolation={reportViolation}
             internalClipboardRef={internalClipboardRef}
@@ -407,6 +414,8 @@ export function App() {
             problemStatuses={team?.problemStatuses || {}}
             teamBalance={team?.balance ?? 1000}
             currentMember={currentMember}
+            team={team}
+            onTeamUpdated={setTeam}
             onSelectProblem={handleSelectProblem}
             onPurchaseProblem={handlePurchaseProblem}
           />
@@ -416,6 +425,16 @@ export function App() {
       {/* Mandatory Exam Entrance Gate (Team Registration & Member Selection) */}
       {!isExamStarted && (
         <GateModal onTeamSessionReady={handleTeamSessionReady} />
+      )}
+
+      {/* Sabotage Freeze Overlay (5-minute full screen lockout with real-time countdown) */}
+      {isExamStarted && team?.frozenUntil && team.frozenUntil > Date.now() && (
+        <SabotageFreezeOverlay
+          team={team}
+          onFreezeExpired={() => {
+            setTeam(prev => prev ? { ...prev, frozenUntil: null, frozenBy: null } : prev);
+          }}
+        />
       )}
 
       {/* Lock Overlay (Anti-cheat lockout screen with Organiser PIN) */}
