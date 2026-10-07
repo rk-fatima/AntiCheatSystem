@@ -158,43 +158,6 @@ export function ProblemCatalog({
               )}
             </div>
           </div>
-
-          {/* Official Contest Rules Accordion / Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '12px',
-            marginTop: '16px',
-            borderTop: '1px solid var(--bd)',
-            paddingTop: '14px'
-          }}>
-            <div style={ruleBoxStyle}>
-              <b style={{ color: 'var(--neon)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                💰 Shared Team Budget (₹1,000)
-              </b>
-              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5 }}>
-                The balance is shared across all 3 members. If Member 3 spends ₹300, only ₹700 remains for the whole team. Coordinate on your team chat before unlocking.
-              </p>
-            </div>
-
-            <div style={ruleBoxStyle}>
-              <b style={{ color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                📊 Catalog Distribution
-              </b>
-              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5 }}>
-                There are <b>71 Easy</b>, <b>21 Medium</b>, and <b>1 Hard</b> problem. Do not blow your entire ₹1,000 on low-point Easy problems if Medium/Hard problems give significantly higher points on the leaderboard.
-              </p>
-            </div>
-
-            <div style={ruleBoxStyle}>
-              <b style={{ color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                📢 What to do right now
-              </b>
-              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt)', lineHeight: 1.5 }}>
-                Wait for the organizer to make an announcement in the hall/Discord/portal. Refresh the page once the bidding/purchase round is announced to see the updated buttons and prices.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Global Notification Banner */}
@@ -552,10 +515,3 @@ export function ProblemCatalog({
     </div>
   );
 }
-
-const ruleBoxStyle = {
-  background: 'var(--bg4)',
-  border: '1px solid var(--bd)',
-  borderRadius: '8px',
-  padding: '12px 14px'
-};
