@@ -116,50 +116,6 @@ export function ProblemCatalog({
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
       <div style={{ maxWidth: '980px', margin: '0 auto' }}>
-        {/* Banner with Rules & Real-time Shared Team Balance */}
-        <div style={{
-          background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
-          padding: '20px',
-          borderRadius: '10px',
-          border: '1px solid var(--bd)',
-          marginBottom: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Gavel size={22} color="var(--teal)" />
-                <h2 style={{ color: 'var(--teal)', margin: 0, fontSize: '22px' }}>
-                  Offline Auction Problem Catalog
-                </h2>
-              </div>
-              <div style={{ color: 'var(--mut)', fontSize: '13px', marginTop: '6px' }}>
-                Offline bidding is conducted manually by the organizer. Once your team wins a problem bid, enter the final bid amount to unlock it.
-              </div>
-            </div>
-
-            <div style={{
-              background: 'var(--bg4)',
-              border: '1px solid var(--neon)',
-              borderRadius: '8px',
-              padding: '10px 20px',
-              textAlign: 'right',
-              boxShadow: '0 0 12px var(--neon-dim)'
-            }}>
-              <small style={{ color: 'var(--mut)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
-                Shared Team Budget
-              </small>
-              <div style={{ color: 'var(--neon)', fontSize: '24px', fontWeight: 800 }}>
-                ₹{teamBalance ?? 1000}
-              </div>
-              {currentMember && (
-                <div style={{ fontSize: '11px', color: 'var(--teal)', marginTop: '2px' }}>
-                  Bidder: {currentMember.memberId}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Global Notification Banner */}
         {notification && (
           <div style={{

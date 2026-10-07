@@ -1400,35 +1400,7 @@
   "teams": {},
   "transactions": [],
   "submissions": [],
-  "telemetry": [
-    {
-      "id": "1791397890001-sk0y1z",
-      "teamName": "SYNORA",
-      "memberId": "SYNORA-01",
-      "event": "TAB_SWITCH",
-      "details": "Switched away from browser tab or minimized window.",
-      "timestamp": 1791397890001,
-      "isoTime": "2026-10-07T18:31:30.001Z"
-    },
-    {
-      "id": "1791397884011-d364yu",
-      "teamName": "SYNORA",
-      "memberId": "SYNORA-01",
-      "event": "FOCUS_LOST",
-      "details": "Window lost focus (switched to external application).",
-      "timestamp": 1791397884011,
-      "isoTime": "2026-10-07T18:31:24.011Z"
-    },
-    {
-      "id": "1791397878967-ctxui2",
-      "teamName": "SYNORA",
-      "memberId": "SYNORA-01",
-      "event": "FOCUS_LOST",
-      "details": "Window lost focus (switched to external application).",
-      "timestamp": 1791397878967,
-      "isoTime": "2026-10-07T18:31:18.967Z"
-    }
-  ],
+  "telemetry": [],
   "config": {
     "adminPin": "qubit",
     "maxFlags": 3,
