@@ -34,7 +34,7 @@ export function GateModal({ onTeamSessionReady }) {
       setSelectedMember(null);
       setFeedback({
         type: 'error',
-        message: err.message || `Team "${trimmed}" not found in registration database. Please verify your team name.`
+        message: err.message || `Team "${trimmed}" not found in registration database.`
       });
     } finally {
       setVerifying(false);
@@ -71,7 +71,7 @@ export function GateModal({ onTeamSessionReady }) {
     } catch (err) {
       setFeedback({
         type: 'error',
-        message: err.message || 'Login failed. Please verify your team identity with the proctor.'
+        message: err.message || 'Login failed. Please verify with the proctor.'
       });
     } finally {
       setSubmitting(false);
@@ -85,11 +85,11 @@ export function GateModal({ onTeamSessionReady }) {
         style={{
           maxWidth: '460px',
           width: '100%',
-          padding: '20px 22px',
-          background: 'var(--bg2)',
-          border: '1px solid var(--bd)',
-          borderRadius: '10px',
-          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.75), 0 0 1px var(--teal)',
+          padding: '28px 24px',
+          background: '#0d111c',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 255, 255, 0.2)',
           position: 'relative',
           maxHeight: '94vh',
           display: 'flex',
@@ -97,132 +97,94 @@ export function GateModal({ onTeamSessionReady }) {
         }}
       >
         {/* Top Header Row with Shared Budget Badge */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'rgba(20, 217, 196, 0.1)',
-              border: '1px solid rgba(20, 217, 196, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <ShieldCheck size={20} color="var(--teal)" />
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '18px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>QUBIT</span>
+              <span style={{ color: '#bc8cff', fontWeight: 600, fontSize: '14px' }}>//</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '1px', color: 'var(--txt-muted)', textTransform: 'uppercase' }}>
+                ENTRANCE
+              </span>
             </div>
-            <div>
-              <h2 style={{
-                color: 'var(--txt)',
-                margin: 0,
-                fontSize: '17px',
-                fontWeight: 700,
-                letterSpacing: '0.3px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                Qubit <span style={{ color: 'var(--teal)', fontSize: '13px', fontWeight: 600 }}>// Team Entrance</span>
-              </h2>
-              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: 'var(--mut)' }}>
-                Competitive Programming Shared Workspace
-              </p>
-            </div>
+            <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--txt-muted)' }}>
+              Developer Competitive Platform
+            </p>
           </div>
 
-          {/* Shared Team Budget Badge (Requirement 9) */}
+          {/* Shared Team Budget Badge */}
           <div style={{
-            background: 'rgba(57, 255, 20, 0.06)',
-            border: '1px solid rgba(57, 255, 20, 0.35)',
-            borderRadius: '7px',
-            padding: '5px 9px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '8px',
+            padding: '6px 10px',
             textAlign: 'right',
             flexShrink: 0
           }}>
-            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--mut)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              TEAM BUDGET
+            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--txt-dim)', textTransform: 'uppercase' }}>
+              Team Budget
             </div>
-            <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--neon)', lineHeight: 1.1, margin: '2px 0' }}>
+            <div style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
               ₹1,000
             </div>
-            <div style={{ fontSize: '9px', color: 'var(--mut)', whiteSpace: 'nowrap' }}>
-              Shared by all team members
+            <div style={{ fontSize: '10px', color: 'var(--txt-muted)' }}>
+              Shared balance
             </div>
           </div>
         </div>
 
         {/* Step 1: Team Name Verification Input */}
-        <div style={{ marginBottom: '14px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <label style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '11px',
-            fontWeight: 700,
-            color: 'var(--teal)',
-            letterSpacing: '0.5px',
-            textTransform: 'uppercase',
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'var(--txt-muted)',
             marginBottom: '6px'
           }}>
-            <span>Registered Team Name</span>
-            {verifiedTeam && (
-              <span style={{ fontSize: '10px', color: 'var(--mut)', textTransform: 'none', fontWeight: 500 }}>
-                Press Enter to re-verify
-              </span>
-            )}
+            Registered Team Name
           </label>
 
           <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <input
-                type="text"
-                placeholder="e.g. SYNORA"
-                value={teamInput}
-                onChange={(e) => {
-                  setTeamInput(e.target.value.toUpperCase());
-                  if (verifiedTeam) {
-                    setVerifiedTeam(null);
-                    setSelectedMember(null);
-                  }
-                  if (feedback) setFeedback(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleVerifyTeam();
-                  }
-                }}
-                disabled={verifying}
-                autoFocus
-                style={{
-                  padding: '8px 10px',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  border: verifiedTeam ? '1px solid var(--teal)' : '1px solid var(--bd)',
-                  background: 'var(--bg4)',
-                  borderRadius: '6px'
-                }}
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="e.g. SYNORA"
+              value={teamInput}
+              onChange={(e) => {
+                setTeamInput(e.target.value.toUpperCase());
+                if (verifiedTeam) {
+                  setVerifiedTeam(null);
+                  setSelectedMember(null);
+                }
+                if (feedback) setFeedback(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleVerifyTeam();
+                }
+              }}
+              disabled={verifying}
+              autoFocus
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase'
+              }}
+            />
 
             <button
               type="button"
               onClick={handleVerifyTeam}
               disabled={verifying || !teamInput.trim()}
-              className={verifiedTeam ? '' : 'pri'}
+              className={verifiedTeam ? 'btn-ghost' : 'btn-primary'}
               style={{
                 padding: '8px 14px',
                 fontSize: '12px',
-                fontWeight: 700,
                 whiteSpace: 'nowrap',
-                borderRadius: '6px',
-                minWidth: '105px',
-                background: verifiedTeam ? 'var(--bg3)' : 'var(--teal)',
-                color: verifiedTeam ? 'var(--teal)' : '#012',
-                border: verifiedTeam ? '1px solid var(--teal)' : 'none'
+                minWidth: '100px'
               }}
             >
               {verifying ? (
@@ -232,7 +194,7 @@ export function GateModal({ onTeamSessionReady }) {
                 </>
               ) : verifiedTeam ? (
                 <>
-                  <Check size={13} color="var(--neon)" />
+                  <Check size={13} color="#3fb950" />
                   <span>Verified ✓</span>
                 </>
               ) : (
@@ -245,57 +207,48 @@ export function GateModal({ onTeamSessionReady }) {
           </div>
 
           {/* Validation Feedback States */}
-          {verifying && (
-            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <RefreshCw size={11} className="spin" />
-              <span>Loading team members...</span>
-            </div>
-          )}
-
           {!verifying && verifiedTeam && (
             <div style={{
-              marginTop: '6px',
+              marginTop: '8px',
               padding: '6px 10px',
-              background: 'rgba(57, 255, 20, 0.08)',
-              border: '1px solid rgba(57, 255, 20, 0.25)',
-              borderRadius: '5px',
-              fontSize: '11px',
-              color: 'var(--neon)',
+              background: 'rgba(63, 185, 80, 0.1)',
+              border: '1px solid rgba(63, 185, 80, 0.25)',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#3fb950',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
               <span>✓ Team found: <b>{verifiedTeam.name}</b> ({verifiedTeam.members?.length || 0} registered)</span>
-              <span style={{ fontSize: '10px', color: 'var(--mut)' }}>Shared Workspace</span>
             </div>
           )}
 
           {!verifying && feedback?.type === 'error' && (
             <div style={{
-              marginTop: '6px',
-              padding: '7px 10px',
-              background: 'var(--red-dim)',
-              border: '1px solid var(--red)',
-              borderRadius: '5px',
-              fontSize: '11px',
-              color: 'var(--red)',
-              lineHeight: 1.4,
+              marginTop: '8px',
+              padding: '8px 12px',
+              background: 'rgba(248, 81, 73, 0.1)',
+              border: '1px solid rgba(248, 81, 73, 0.25)',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#ff7b72',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
             }}>
-              <AlertCircle size={13} style={{ flexShrink: 0 }} />
+              <AlertCircle size={14} style={{ flexShrink: 0 }} />
               <span>{feedback.message}</span>
             </div>
           )}
         </div>
 
-        {/* Step 2: Dynamic Member Selection (Requirement 4, 5, 6, 7) */}
+        {/* Step 2: Dynamic Member Selection */}
         <div style={{
-          marginBottom: '14px',
-          opacity: verifiedTeam ? 1 : 0.5,
+          marginBottom: '16px',
+          opacity: verifiedTeam ? 1 : 0.45,
           pointerEvents: verifiedTeam ? 'auto' : 'none',
-          transition: 'all 0.2s ease'
+          transition: 'opacity 0.2s ease'
         }}>
           <div style={{
             display: 'flex',
@@ -304,35 +257,33 @@ export function GateModal({ onTeamSessionReady }) {
             marginBottom: '6px'
           }}>
             <span style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              color: 'var(--teal)',
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase'
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--txt-muted)'
             }}>
-              Select Your Identity
+              Select Identity
             </span>
             {verifiedTeam && (
-              <span style={{ fontSize: '10px', color: 'var(--mut)' }}>
-                {verifiedTeam.members?.length} {verifiedTeam.members?.length === 1 ? 'member' : 'members'} registered
+              <span style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>
+                {verifiedTeam.members?.length} registered
               </span>
             )}
           </div>
 
           {!verifiedTeam ? (
             <div style={{
-              padding: '14px',
-              borderRadius: '6px',
-              background: 'var(--bg3)',
-              border: '1px dashed var(--bd)',
+              padding: '16px',
+              borderRadius: '8px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px dashed rgba(255, 255, 255, 0.08)',
               textAlign: 'center',
-              color: 'var(--mut)',
-              fontSize: '11px'
+              color: 'var(--txt-dim)',
+              fontSize: '12px'
             }}>
               Enter and verify your registered Team Name above to load members.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {verifiedTeam.members.map((member) => {
                 const isSelected = selectedMember?.memberId === member.memberId;
                 return (
@@ -343,32 +294,29 @@ export function GateModal({ onTeamSessionReady }) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      background: isSelected ? 'rgba(20, 217, 196, 0.08)' : 'var(--bg3)',
-                      border: isSelected ? '1px solid var(--teal)' : '1px solid var(--bd)',
-                      boxShadow: isSelected ? '0 0 10px rgba(20, 217, 196, 0.15)' : 'none',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      background: isSelected ? 'rgba(56, 139, 253, 0.12)' : 'rgba(255, 255, 255, 0.025)',
+                      border: `1px solid ${isSelected ? 'rgba(56, 139, 253, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    {/* Left: Radio Dot + Member Name */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{
                         width: '14px',
                         height: '14px',
                         borderRadius: '50%',
-                        border: isSelected ? '4px solid var(--teal)' : '2px solid var(--mut)',
-                        background: isSelected ? '#0a1128' : 'transparent',
-                        flexShrink: 0,
-                        transition: 'all 0.15s ease'
+                        border: isSelected ? '4px solid #58a6ff' : '2px solid var(--txt-dim)',
+                        background: isSelected ? '#0d111c' : 'transparent',
+                        flexShrink: 0
                       }} />
 
                       <div>
                         <div style={{
                           fontSize: '13px',
-                          fontWeight: isSelected ? 700 : 600,
-                          color: isSelected ? 'var(--teal)' : 'var(--txt)',
+                          fontWeight: isSelected ? 600 : 500,
+                          color: isSelected ? '#ffffff' : 'var(--txt)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px'
@@ -379,12 +327,12 @@ export function GateModal({ onTeamSessionReady }) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '3px',
-                              fontSize: '9px',
-                              fontWeight: 700,
-                              color: 'var(--amber)',
-                              background: 'rgba(255, 196, 61, 0.12)',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              color: '#d29922',
+                              background: 'rgba(210, 153, 34, 0.12)',
                               padding: '1px 5px',
-                              borderRadius: '3px'
+                              borderRadius: '4px'
                             }}>
                               <Crown size={10} /> Leader
                             </span>
@@ -393,15 +341,13 @@ export function GateModal({ onTeamSessionReady }) {
                       </div>
                     </div>
 
-                    {/* Right: Member ID Monospace Badge */}
                     <div style={{
                       fontFamily: 'var(--font-mono)',
                       fontSize: '11px',
-                      fontWeight: 700,
-                      color: isSelected ? 'var(--teal)' : 'var(--mut)',
-                      background: isSelected ? 'rgba(20, 217, 196, 0.12)' : 'var(--bg4)',
-                      border: isSelected ? '1px solid rgba(20, 217, 196, 0.3)' : '1px solid var(--bd)',
-                      padding: '2px 7px',
+                      fontWeight: 600,
+                      color: isSelected ? '#58a6ff' : 'var(--txt-muted)',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      padding: '2px 8px',
                       borderRadius: '4px'
                     }}>
                       {member.memberId}
@@ -413,40 +359,28 @@ export function GateModal({ onTeamSessionReady }) {
           )}
         </div>
 
-        {/* Step 3: Selected Identity Confirmation Card (Requirement 8) */}
+        {/* Confirmation Card */}
         {selectedMember && verifiedTeam && (
           <div style={{
-            background: 'rgba(20, 217, 196, 0.05)',
-            border: '1px solid rgba(20, 217, 196, 0.25)',
-            borderRadius: '6px',
-            padding: '8px 12px',
-            marginBottom: '12px',
-            fontSize: '11px'
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            fontSize: '12px'
           }}>
-            <div style={{
-              fontSize: '9px',
-              fontWeight: 700,
-              color: 'var(--teal)',
-              letterSpacing: '0.6px',
-              textTransform: 'uppercase',
-              marginBottom: '4px'
-            }}>
-              Confirmed Session Identity
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '8px' }}>
               <div>
-                <div style={{ fontSize: '9px', color: 'var(--mut)' }}>Team:</div>
-                <div style={{ fontWeight: 700, color: 'var(--txt)', fontSize: '12px' }}>{verifiedTeam.name}</div>
+                <div style={{ fontSize: '10px', color: 'var(--txt-dim)' }}>Team</div>
+                <div style={{ fontWeight: 600, color: '#ffffff' }}>{verifiedTeam.name}</div>
               </div>
               <div>
-                <div style={{ fontSize: '9px', color: 'var(--mut)' }}>Member:</div>
-                <div style={{ fontWeight: 700, color: 'var(--txt)', fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {selectedMember.name}
-                </div>
+                <div style={{ fontSize: '10px', color: 'var(--txt-dim)' }}>Member</div>
+                <div style={{ fontWeight: 600, color: '#ffffff' }}>{selectedMember.name}</div>
               </div>
               <div>
-                <div style={{ fontSize: '9px', color: 'var(--mut)' }}>Member ID:</div>
-                <div style={{ fontWeight: 700, color: 'var(--teal)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--txt-dim)' }}>Member ID</div>
+                <div style={{ fontWeight: 600, color: '#58a6ff', fontFamily: 'var(--font-mono)' }}>
                   {selectedMember.memberId}
                 </div>
               </div>
@@ -454,43 +388,37 @@ export function GateModal({ onTeamSessionReady }) {
           </div>
         )}
 
-        {/* Compact Anti-Cheat & Fullscreen Notice */}
+        {/* Anti-Cheat Notice */}
         <div style={{
-          background: 'var(--bg4)',
-          border: '1px solid var(--bd)',
-          borderRadius: '6px',
-          padding: '8px 10px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRadius: '8px',
+          padding: '8px 12px',
           fontSize: '11px',
-          color: 'var(--mut)',
-          marginBottom: '14px',
+          color: 'var(--txt-dim)',
+          marginBottom: '18px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          lineHeight: 1.4
+          gap: '8px'
         }}>
-          <Lock size={13} color="var(--amber)" style={{ flexShrink: 0 }} />
-          <span>Fullscreen examination is mandatory. Tab switches or exits trigger integrity flags.</span>
+          <Lock size={13} color="#d29922" style={{ flexShrink: 0 }} />
+          <span>Fullscreen examination mode is mandatory. Exits trigger integrity flags.</span>
         </div>
 
         {/* Main Action Button */}
         <button
           type="button"
-          className="pri"
+          className="btn-primary"
           onClick={handleEnterWorkspace}
           disabled={submitting || !verifiedTeam || !selectedMember}
           style={{
             width: '100%',
             padding: '11px',
-            fontSize: '14px',
-            fontWeight: 700,
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
+            fontSize: '13px',
+            borderRadius: '8px'
           }}
         >
-          <Maximize2 size={16} />
+          <Maximize2 size={15} />
           {submitting ? 'Entering Workspace...' : 'Enter Shared Workspace in Fullscreen'}
         </button>
       </div>

@@ -1424,12 +1424,14 @@
           "college": ""
         }
       ],
-      "balance": 830,
+      "balance": 730,
       "unlocked": [
-        "E1"
+        "E1",
+        "E2"
       ],
       "solved": [
-        "E1"
+        "E1",
+        "E2"
       ],
       "problemStatuses": {
         "E1": {
@@ -1448,12 +1450,39 @@
           "solvedByName": "Salman",
           "solvedAt": "2026-10-07T19:48:39.626Z",
           "finalProblemScore": 180
+        },
+        "E2": {
+          "status": "SOLVED",
+          "workingBy": "SYNORA-001-M01",
+          "workingByName": "Salman",
+          "updatedAt": "2026-10-07T19:50:54.292Z",
+          "difficultyPoints": 200,
+          "wrongSubmissions": 1,
+          "penaltyDeduction": 10,
+          "solvedBy": "SYNORA-001-M01",
+          "solvedByName": "Salman",
+          "solvedAt": "2026-10-07T19:51:59.773Z",
+          "finalProblemScore": 190
         }
       },
       "revealedHints": {},
       "hintPassesCount": 2,
       "sabotageCardsCount": 0,
       "transactions": [
+        {
+          "id": "TXN-1791402644842-NJUSP",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "problemId": "E2",
+          "problemTitle": "Palindrome Number",
+          "bidAmount": 100,
+          "price": 100,
+          "purchasedBy": "SYNORA-001-M01",
+          "purchasedByName": "Salman",
+          "remainingBalance": 730,
+          "purchaseTime": "2026-10-07T19:50:44.842Z",
+          "displayTime": "01:20 AM"
+        },
         {
           "id": "TXN-1791402493656-77H35",
           "teamId": "Synora",
@@ -1528,8 +1557,8 @@
           "isoTime": "2026-10-07T19:35:10.499Z"
         }
       ],
-      "score": 180,
-      "wrong": 2,
+      "score": 370,
+      "wrong": 3,
       "violations": [
         {
           "id": "1791401694565-52p4ha",
@@ -1557,11 +1586,226 @@
           "details": "Switched away from browser tab or minimized window.",
           "timestamp": 1791401756888,
           "isoTime": "2026-10-07T19:35:56.888Z"
+        },
+        {
+          "id": "1791402681070-egvyvk",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791402681070,
+          "isoTime": "2026-10-07T19:51:21.070Z"
+        },
+        {
+          "id": "1791402777786-vdn5ul",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791402777786,
+          "isoTime": "2026-10-07T19:52:57.786Z"
+        },
+        {
+          "id": "1791403699217-7dkafn",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791403699217,
+          "isoTime": "2026-10-07T20:08:19.217Z"
+        },
+        {
+          "id": "1791403768451-o57fle",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791403768451,
+          "isoTime": "2026-10-07T20:09:28.451Z"
+        },
+        {
+          "id": "1791403774288-lyqr96",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791403774288,
+          "isoTime": "2026-10-07T20:09:34.288Z"
+        },
+        {
+          "id": "1791403813547-452kxo",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791403813547,
+          "isoTime": "2026-10-07T20:10:13.547Z"
+        },
+        {
+          "id": "1791404282411-sbg009",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791404282411,
+          "isoTime": "2026-10-07T20:18:02.411Z"
+        },
+        {
+          "id": "1791404384358-igacoc",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791404384358,
+          "isoTime": "2026-10-07T20:19:44.358Z"
+        },
+        {
+          "id": "1791404391899-kn1qax",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791404391899,
+          "isoTime": "2026-10-07T20:19:51.899Z"
+        },
+        {
+          "id": "1791404434516-wg0f3x",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791404434516,
+          "isoTime": "2026-10-07T20:20:34.516Z"
+        },
+        {
+          "id": "1791404544878-jhk739",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791404544878,
+          "isoTime": "2026-10-07T20:22:24.878Z"
+        },
+        {
+          "id": "1791404595683-rd1cld",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791404595683,
+          "isoTime": "2026-10-07T20:23:15.683Z"
+        },
+        {
+          "id": "1791405063628-f4noda",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791405063628,
+          "isoTime": "2026-10-07T20:31:03.628Z"
+        },
+        {
+          "id": "1791405149175-v9fxdu",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791405149175,
+          "isoTime": "2026-10-07T20:32:29.175Z"
+        },
+        {
+          "id": "1791405244285-5oiva5",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791405244285,
+          "isoTime": "2026-10-07T20:34:04.285Z"
+        },
+        {
+          "id": "1791405256816-crsx1j",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791405256816,
+          "isoTime": "2026-10-07T20:34:16.816Z"
+        },
+        {
+          "id": "1791405336098-s88ymi",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791405336098,
+          "isoTime": "2026-10-07T20:35:36.098Z"
+        },
+        {
+          "id": "1791405418269-rpokt5",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791405418269,
+          "isoTime": "2026-10-07T20:36:58.269Z"
+        },
+        {
+          "id": "1791405498808-fsvx20",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791405498808,
+          "isoTime": "2026-10-07T20:38:18.808Z"
         }
       ],
       "isLocked": false,
       "lockReason": "",
       "attempts": [
+        {
+          "id": "SUB-1791402719773-OO6R",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "memberName": "Salman",
+          "problemId": "E2",
+          "problemTitle": "Palindrome Number",
+          "difficulty": "Easy",
+          "difficultyPoints": 200,
+          "result": "ACCEPTED",
+          "verdict": "ACCEPTED",
+          "passed": true,
+          "penalty": 0,
+          "awardedPoints": 200,
+          "wrongCountOnProblem": 1,
+          "totalTeamWrong": 3,
+          "currentTeamScore": 370,
+          "details": "All 3 hidden tests passed!",
+          "timestamp": 1791402719773,
+          "isoTime": "2026-10-07T19:51:59.773Z"
+        },
+        {
+          "id": "SUB-1791402654292-NLY3",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "memberName": "Salman",
+          "problemId": "E2",
+          "problemTitle": "Palindrome Number",
+          "difficulty": "Easy",
+          "difficultyPoints": 200,
+          "result": "WRONG_ANSWER",
+          "verdict": "WRONG_ANSWER",
+          "passed": false,
+          "penalty": -10,
+          "awardedPoints": 0,
+          "wrongCountOnProblem": 1,
+          "totalTeamWrong": 3,
+          "currentTeamScore": 170,
+          "details": "Sample Output Mismatch. Expected:\ntrue\nGot:\n",
+          "timestamp": 1791402654292,
+          "isoTime": "2026-10-07T19:50:54.292Z"
+        },
         {
           "id": "SUB-1791402519626-UD9L",
           "teamId": "Synora",
@@ -1631,7 +1875,8 @@
       ],
       "createdAt": "2026-10-07T19:33:54.805Z",
       "problemWrong": {
-        "E1": 2
+        "E1": 2,
+        "E2": 1
       }
     },
     "VisionX": {
@@ -1672,6 +1917,20 @@
     }
   },
   "transactions": [
+    {
+      "id": "TXN-1791402644842-NJUSP",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "problemId": "E2",
+      "problemTitle": "Palindrome Number",
+      "bidAmount": 100,
+      "price": 100,
+      "purchasedBy": "SYNORA-001-M01",
+      "purchasedByName": "Salman",
+      "remainingBalance": 730,
+      "purchaseTime": "2026-10-07T19:50:44.842Z",
+      "displayTime": "01:20 AM"
+    },
     {
       "id": "TXN-1791402493656-77H35",
       "teamId": "Synora",
@@ -1748,6 +2007,50 @@
   ],
   "submissions": [
     {
+      "id": "SUB-1791402719773-OO6R",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "memberName": "Salman",
+      "problemId": "E2",
+      "problemTitle": "Palindrome Number",
+      "difficulty": "Easy",
+      "difficultyPoints": 200,
+      "result": "ACCEPTED",
+      "verdict": "ACCEPTED",
+      "passed": true,
+      "penalty": 0,
+      "awardedPoints": 200,
+      "wrongCountOnProblem": 1,
+      "totalTeamWrong": 3,
+      "currentTeamScore": 370,
+      "details": "All 3 hidden tests passed!",
+      "timestamp": 1791402719773,
+      "isoTime": "2026-10-07T19:51:59.773Z"
+    },
+    {
+      "id": "SUB-1791402654292-NLY3",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "memberName": "Salman",
+      "problemId": "E2",
+      "problemTitle": "Palindrome Number",
+      "difficulty": "Easy",
+      "difficultyPoints": 200,
+      "result": "WRONG_ANSWER",
+      "verdict": "WRONG_ANSWER",
+      "passed": false,
+      "penalty": -10,
+      "awardedPoints": 0,
+      "wrongCountOnProblem": 1,
+      "totalTeamWrong": 3,
+      "currentTeamScore": 170,
+      "details": "Sample Output Mismatch. Expected:\ntrue\nGot:\n",
+      "timestamp": 1791402654292,
+      "isoTime": "2026-10-07T19:50:54.292Z"
+    },
+    {
       "id": "SUB-1791402519626-UD9L",
       "teamId": "Synora",
       "teamName": "Synora",
@@ -1815,6 +2118,177 @@
     }
   ],
   "telemetry": [
+    {
+      "id": "1791405498808-fsvx20",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791405498808,
+      "isoTime": "2026-10-07T20:38:18.808Z"
+    },
+    {
+      "id": "1791405418269-rpokt5",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791405418269,
+      "isoTime": "2026-10-07T20:36:58.269Z"
+    },
+    {
+      "id": "1791405336098-s88ymi",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791405336098,
+      "isoTime": "2026-10-07T20:35:36.098Z"
+    },
+    {
+      "id": "1791405256816-crsx1j",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791405256816,
+      "isoTime": "2026-10-07T20:34:16.816Z"
+    },
+    {
+      "id": "1791405244285-5oiva5",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791405244285,
+      "isoTime": "2026-10-07T20:34:04.285Z"
+    },
+    {
+      "id": "1791405149175-v9fxdu",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791405149175,
+      "isoTime": "2026-10-07T20:32:29.175Z"
+    },
+    {
+      "id": "1791405063628-f4noda",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791405063628,
+      "isoTime": "2026-10-07T20:31:03.628Z"
+    },
+    {
+      "id": "1791404595683-rd1cld",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791404595683,
+      "isoTime": "2026-10-07T20:23:15.683Z"
+    },
+    {
+      "id": "1791404544878-jhk739",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791404544878,
+      "isoTime": "2026-10-07T20:22:24.878Z"
+    },
+    {
+      "id": "1791404434516-wg0f3x",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791404434516,
+      "isoTime": "2026-10-07T20:20:34.516Z"
+    },
+    {
+      "id": "1791404391899-kn1qax",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791404391899,
+      "isoTime": "2026-10-07T20:19:51.899Z"
+    },
+    {
+      "id": "1791404384358-igacoc",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791404384358,
+      "isoTime": "2026-10-07T20:19:44.358Z"
+    },
+    {
+      "id": "1791404282411-sbg009",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791404282411,
+      "isoTime": "2026-10-07T20:18:02.411Z"
+    },
+    {
+      "id": "1791403813547-452kxo",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791403813547,
+      "isoTime": "2026-10-07T20:10:13.547Z"
+    },
+    {
+      "id": "1791403774288-lyqr96",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791403774288,
+      "isoTime": "2026-10-07T20:09:34.288Z"
+    },
+    {
+      "id": "1791403768451-o57fle",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791403768451,
+      "isoTime": "2026-10-07T20:09:28.451Z"
+    },
+    {
+      "id": "1791403699217-7dkafn",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791403699217,
+      "isoTime": "2026-10-07T20:08:19.217Z"
+    },
+    {
+      "id": "1791402777786-vdn5ul",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791402777786,
+      "isoTime": "2026-10-07T19:52:57.786Z"
+    },
+    {
+      "id": "1791402681070-egvyvk",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791402681070,
+      "isoTime": "2026-10-07T19:51:21.070Z"
+    },
     {
       "id": "1791401756888-e13vj6",
       "teamName": "Synora",

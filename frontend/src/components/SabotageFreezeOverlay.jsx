@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, ShieldAlert, Lock, AlertOctagon } from 'lucide-react';
+import { Zap, Lock } from 'lucide-react';
 
 export function SabotageFreezeOverlay({ team, onFreezeExpired }) {
   const [remainingMs, setRemainingMs] = useState(() => {
@@ -38,7 +38,7 @@ export function SabotageFreezeOverlay({ team, onFreezeExpired }) {
         position: 'fixed',
         inset: 0,
         zIndex: 10000,
-        background: 'rgba(8, 2, 14, 0.94)',
+        background: 'rgba(4, 7, 16, 0.92)',
         backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
@@ -50,66 +50,61 @@ export function SabotageFreezeOverlay({ team, onFreezeExpired }) {
     >
       <div
         style={{
-          maxWidth: '520px',
+          maxWidth: '460px',
           width: '100%',
-          background: 'radial-gradient(ellipse at top, #2b0a1a 0%, #12040c 70%, #080106 100%)',
-          border: '2px solid #ff0055',
+          background: '#0d111c',
+          border: '1px solid rgba(248, 81, 73, 0.35)',
           borderRadius: '12px',
           padding: '32px 28px',
           textAlign: 'center',
-          boxShadow: '0 0 50px rgba(255, 0, 85, 0.4), inset 0 0 30px rgba(255, 0, 85, 0.15)',
-          animation: 'pulseGlow 2s infinite ease-in-out'
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8), 0 0 30px rgba(248, 81, 73, 0.08)'
         }}
       >
         {/* Pulsing Lightning Icon */}
         <div
           style={{
-            width: '68px',
-            height: '68px',
-            borderRadius: '50%',
-            background: 'rgba(255, 0, 85, 0.15)',
-            border: '2px solid #ff0055',
-            color: '#ff0055',
+            width: '56px',
+            height: '56px',
+            borderRadius: '12px',
+            background: 'rgba(248, 81, 73, 0.12)',
+            border: '1px solid rgba(248, 81, 73, 0.3)',
+            color: '#ff7b72',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 16px',
-            boxShadow: '0 0 24px rgba(255, 0, 85, 0.6)'
+            margin: '0 auto 16px'
           }}
         >
-          <Zap size={38} className="spin-slow" />
+          <Zap size={28} />
         </div>
 
-        {/* Heading */}
         <div style={{
           fontSize: '11px',
-          fontWeight: 800,
-          letterSpacing: '2px',
-          color: '#ff4d6d',
+          fontWeight: 700,
+          letterSpacing: '1.2px',
+          color: '#ff7b72',
           textTransform: 'uppercase',
-          marginBottom: '6px'
+          marginBottom: '4px'
         }}>
           RIVAL POWER CARD TRIGGERED
         </div>
 
         <h1
           style={{
-            fontSize: '32px',
-            fontWeight: 900,
-            color: '#fff',
-            margin: '0 0 6px 0',
-            letterSpacing: '2px',
-            textShadow: '0 0 16px #ff0055'
+            fontSize: '26px',
+            fontWeight: 800,
+            color: '#ffffff',
+            margin: '0 0 4px 0',
+            letterSpacing: '0.5px'
           }}
         >
           ⚡ SABOTAGED
         </h1>
 
         <p style={{
-          fontSize: '16px',
-          fontWeight: 700,
-          color: '#ff758f',
-          margin: '0 0 18px 0'
+          fontSize: '14px',
+          color: 'var(--txt-muted)',
+          margin: '0 0 20px 0'
         }}>
           Your screen is frozen
         </p>
@@ -117,21 +112,20 @@ export function SabotageFreezeOverlay({ team, onFreezeExpired }) {
         {/* Countdown Timer Display */}
         <div
           style={{
-            background: 'rgba(20, 3, 10, 0.8)',
-            border: '1px solid rgba(255, 0, 85, 0.5)',
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(248, 81, 73, 0.25)',
             borderRadius: '10px',
             padding: '16px 20px',
-            marginBottom: '20px',
-            boxShadow: 'inset 0 0 15px rgba(255, 0, 85, 0.2)'
+            marginBottom: '20px'
           }}
         >
           <div style={{
             fontSize: '11px',
-            fontWeight: 700,
-            color: 'var(--mut)',
+            fontWeight: 600,
+            color: 'var(--txt-dim)',
             textTransform: 'uppercase',
             letterSpacing: '1px',
-            marginBottom: '6px'
+            marginBottom: '4px'
           }}>
             Time Remaining
           </div>
@@ -140,50 +134,23 @@ export function SabotageFreezeOverlay({ team, onFreezeExpired }) {
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '44px',
-              fontWeight: 900,
-              color: '#ff0055',
-              letterSpacing: '3px',
-              textShadow: '0 0 20px #ff0055'
+              fontWeight: 800,
+              color: '#ffffff',
+              letterSpacing: '2px'
             }}
           >
             {formattedTime}
           </div>
-
-          <div style={{
-            fontSize: '12px',
-            color: '#ffb3c1',
-            marginTop: '6px',
-            fontWeight: 600
-          }}>
-            {team?.frozenBy ? (
-              <>Attack launched by: <b style={{ color: '#fff' }}>Team {team.frozenBy}</b></>
-            ) : (
-              'Attack launched by rival team'
-            )}
-          </div>
         </div>
 
-        {/* Lockout Details */}
-        <div
-          style={{
-            background: 'rgba(255, 0, 85, 0.08)',
-            border: '1px solid rgba(255, 0, 85, 0.2)',
-            borderRadius: '8px',
-            padding: '12px 14px',
-            fontSize: '12px',
-            color: '#ffccd5',
-            lineHeight: 1.5,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            textAlign: 'left'
-          }}
-        >
-          <Lock size={18} color="#ff0055" style={{ flexShrink: 0 }} />
-          <span>
-            Code editor execution, tests, and submissions are strictly locked during this 5-minute freeze. Your workspace will automatically re-activate when the countdown reaches 00:00.
-          </span>
-        </div>
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--txt-dim)',
+          lineHeight: 1.5,
+          margin: 0
+        }}>
+          Workspace runs and submissions are temporarily locked. The workspace unlocks automatically when the timer reaches 00:00.
+        </p>
       </div>
     </div>
   );

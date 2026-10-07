@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Lock, Unlock, KeyRound, CheckCircle2, Search, Coins, Sparkles, User, Clock, AlertCircle, Gavel, X, Info } from 'lucide-react';
+import { Lock, Unlock, CheckCircle2, Search, X, Gavel, KeyRound, AlertCircle, Sparkles } from 'lucide-react';
 import { PowerCardsSection } from './PowerCardsSection';
 
 export function ProblemCatalog({
-  problems,
+  problems = [],
   unlockedIds = [],
   solvedIds = [],
   problemStatuses = {},
@@ -18,8 +18,8 @@ export function ProblemCatalog({
   const [diffFilter, setDiffFilter] = useState('ALL');
   const [selectedBidProblem, setSelectedBidProblem] = useState(null);
   const [bidAmountInput, setBidAmountInput] = useState('');
-  const [quickProblemId, setQuickProblemId] = useState('');
-  const [quickBidAmount, setQuickBidAmount] = useState('');
+  const [customProblemId, setCustomProblemId] = useState('');
+  const [isQuickUnlockOpen, setIsQuickUnlockOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -29,8 +29,21 @@ export function ProblemCatalog({
     setNotification(null);
   };
 
+  const handleOpenQuickUnlockModal = () => {
+    setIsQuickUnlockOpen(true);
+    setCustomProblemId('');
+    setBidAmountInput('');
+    setNotification(null);
+  };
+
   const handleConfirmBid = async () => {
-    if (!selectedBidProblem) return;
+    const targetProblem = selectedBidProblem || (customProblemId ? problems.find(p => p.id.toUpperCase() === customProblemId.trim().toUpperCase()) : null);
+    const probId = targetProblem ? targetProblem.id : customProblemId.trim().toUpperCase();
+
+    if (!probId) {
+      setNotification({ success: false, text: 'Please select or enter a valid Problem ID.' });
+      return;
+    }
 
     const amount = parseInt(bidAmountInput, 10);
     if (isNaN(amount) || amount < 0) {
@@ -49,47 +62,20 @@ export function ProblemCatalog({
     setLoading(true);
     setNotification(null);
     try {
-      const res = await onPurchaseProblem(selectedBidProblem.id, amount);
+      const res = await onPurchaseProblem(probId, amount);
       setNotification({
         success: true,
-        text: `✅ Won & Unlocked "${selectedBidProblem.id} — ${selectedBidProblem.title}" for ₹${amount}! Remaining Team Balance: ₹${res.team?.balance}. Unlocked for all members.`
+        text: `Unlocked "${probId}" for ₹${amount}. Remaining Team Balance: ₹${res.team?.balance}.`
       });
       setSelectedBidProblem(null);
+      setIsQuickUnlockOpen(false);
       setBidAmountInput('');
+      setCustomProblemId('');
     } catch (err) {
       setNotification({
         success: false,
-        text: `❌ ${err.message || 'Unlock failed'}`
+        text: err.message || 'Unlock failed. Please check the problem ID and budget.'
       });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickUnlock = async () => {
-    const pId = quickProblemId.trim().toUpperCase();
-    if (!pId) {
-      setNotification({ success: false, text: 'Please enter a Problem ID (e.g. E1, M2, H1).' });
-      return;
-    }
-    const amount = parseInt(quickBidAmount, 10);
-    if (isNaN(amount) || amount < 0) {
-      setNotification({ success: false, text: 'Please enter a valid winning bid amount.' });
-      return;
-    }
-
-    setLoading(true);
-    setNotification(null);
-    try {
-      const res = await onPurchaseProblem(pId, amount);
-      setNotification({
-        success: true,
-        text: `✅ Won & Unlocked "${res.problem?.id || pId}" for ₹${amount}! Remaining Team Balance: ₹${res.team?.balance}. Unlocked for all members.`
-      });
-      setQuickProblemId('');
-      setQuickBidAmount('');
-    } catch (err) {
-      setNotification({ success: false, text: `❌ ${err.message || 'Unlock failed'}` });
     } finally {
       setLoading(false);
     }
@@ -109,34 +95,38 @@ export function ProblemCatalog({
     return matchesSearch && matchesDiff;
   });
 
-  const easyCount = problems.filter(p => p.diff === 'Easy').length;
-  const medCount = problems.filter(p => p.diff === 'Medium').length;
-  const hardCount = problems.filter(p => p.diff === 'Hard').length;
-
   const currentBidNum = parseInt(bidAmountInput, 10) || 0;
   const projectedRemaining = (teamBalance ?? 1000) - currentBidNum;
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-      <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '32px 24px' }}>
+      <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
         {/* Global Notification Banner */}
         {notification && (
           <div style={{
-            padding: '12px 16px',
+            padding: '12px 18px',
             borderRadius: '8px',
-            marginBottom: '16px',
-            background: notification.success ? 'rgba(0,255,157,0.1)' : 'var(--red-dim)',
-            border: '1px solid',
-            borderColor: notification.success ? 'var(--neon)' : 'var(--red)',
-            color: notification.success ? 'var(--neon)' : 'var(--red)',
-            fontWeight: 600,
-            fontSize: '13px'
+            marginBottom: '20px',
+            background: notification.success ? 'rgba(63, 185, 80, 0.1)' : 'rgba(248, 81, 73, 0.1)',
+            border: `1px solid ${notification.success ? 'rgba(63, 185, 80, 0.3)' : 'rgba(248, 81, 73, 0.3)'}`,
+            color: notification.success ? '#3fb950' : '#f85149',
+            fontWeight: 500,
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
           }}>
-            {notification.text}
+            <span>{notification.text}</span>
+            <button
+              onClick={() => setNotification(null)}
+              style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
+            >
+              <X size={15} />
+            </button>
           </div>
         )}
 
-        {/* Team Power Cards Arsenal (💡 Hint Pass & ⚡ Sabotage Card) */}
+        {/* 1. HERO SECTION: Team Power Cards Arsenal */}
         <PowerCardsSection
           team={team}
           currentMember={currentMember}
@@ -145,133 +135,102 @@ export function ProblemCatalog({
           onOpenProblem={onSelectProblem}
         />
 
-        {/* Contest Scoring & Separate Currencies Notice Banner */}
+        {/* 2. SEARCH & SEGMENTED FILTERS (Single Elegant Control) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'var(--bg2)',
-          border: '1px solid var(--bd)',
-          borderRadius: '8px',
-          padding: '10px 16px',
-          marginBottom: '16px',
-          fontSize: '12px',
-          flexWrap: 'wrap',
-          gap: '8px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 800, color: 'var(--teal)', textTransform: 'uppercase' }}>🏆 Contest Scoring:</span>
-            <span>Easy: <b style={{ color: 'var(--neon)' }}>200 pts</b></span>
-            <span>•</span>
-            <span>Medium: <b style={{ color: 'var(--amber)' }}>300 pts</b></span>
-            <span>•</span>
-            <span>Hard: <b style={{ color: 'var(--red)' }}>400 pts</b></span>
-            <span>•</span>
-            <span style={{ color: '#ff758f', fontWeight: 700 }}>Wrong Submission: −10 pts penalty</span>
-          </div>
-          <div style={{ color: 'var(--mut)', fontSize: '11px' }}>
-            Contest Points (Leaderboard) & ByteCoins (Auction Budget) are separate
-          </div>
-        </div>
-
-        {/* Quick Winning Bid Input Bar */}
-        <div style={{
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'center',
-          marginBottom: '16px',
-          background: 'var(--bg2)',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          border: '1px solid var(--bd)',
+          gap: '16px',
+          marginBottom: '24px',
           flexWrap: 'wrap'
         }}>
-          <Gavel size={18} color="var(--teal)" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--txt)' }}>Quick Unlock:</span>
-          <input
-            placeholder="Problem ID (e.g. E1, M2, H1)..."
-            value={quickProblemId}
-            onChange={(e) => setQuickProblemId(e.target.value)}
-            style={{ width: '180px' }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ color: 'var(--mut)', fontSize: '13px' }}>₹</span>
+          {/* Search Input */}
+          <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+            <Search
+              size={15}
+              color="var(--txt-dim)"
+              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+            />
             <input
-              type="number"
-              placeholder="Winning Bid"
-              value={quickBidAmount}
-              onChange={(e) => setQuickBidAmount(e.target.value)}
-              style={{ width: '130px' }}
+              placeholder="Search problems..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                paddingLeft: '36px',
+                paddingRight: '12px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}
             />
           </div>
+
+          {/* Segmented Filter Control */}
+          <div style={{
+            display: 'flex',
+            background: 'rgba(255, 255, 255, 0.03)',
+            padding: '3px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            gap: '2px'
+          }}>
+            {[
+              { id: 'ALL', label: 'All' },
+              { id: 'EASY', label: 'Easy' },
+              { id: 'MEDIUM', label: 'Medium' },
+              { id: 'HARD', label: 'Hard' },
+              { id: 'UNLOCKED', label: 'Unlocked' }
+            ].map(tab => {
+              const isActive = diffFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setDiffFilter(tab.id)}
+                  style={{
+                    background: isActive ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                    color: isActive ? '#ffffff' : 'var(--txt-muted)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 12px',
+                    fontSize: '12px',
+                    fontWeight: isActive ? 600 : 500,
+                    boxShadow: 'none',
+                    transform: 'none'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Unlock Action Trigger */}
           <button
-            className="pri"
-            onClick={handleQuickUnlock}
-            disabled={loading}
-            style={{ padding: '8px 16px', fontWeight: 700 }}
+            className="btn-ghost"
+            onClick={handleOpenQuickUnlockModal}
+            title="Record winning bid by Problem ID"
+            style={{ fontSize: '12px', padding: '7px 12px', borderRadius: '8px' }}
           >
-            {loading ? 'Unlocking...' : 'Unlock via Winning Bid'}
+            <Gavel size={14} /> Record Winning Bid
           </button>
         </div>
 
-        {/* Search & Filter Bar */}
+        {/* 3. PROBLEM LIST (Whitespace over borders) */}
         <div style={{
           display: 'flex',
-          gap: '10px',
-          alignItems: 'center',
-          marginBottom: '16px',
-          flexWrap: 'wrap'
+          flexDirection: 'column',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-            <Search size={16} color="var(--mut)" style={{ position: 'absolute', left: '10px', top: '10px' }} />
-            <input
-              placeholder="Search problems by title, ID, or topic..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '32px' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              onClick={() => setDiffFilter('ALL')}
-              style={{ background: diffFilter === 'ALL' ? 'var(--teal)' : 'var(--bg3)', color: diffFilter === 'ALL' ? '#000' : 'var(--txt)' }}
-            >
-              All ({problems.length})
-            </button>
-            <button
-              onClick={() => setDiffFilter('EASY')}
-              style={{ background: diffFilter === 'EASY' ? 'var(--neon)' : 'var(--bg3)', color: diffFilter === 'EASY' ? '#000' : 'var(--txt)' }}
-            >
-              Easy ({easyCount})
-            </button>
-            <button
-              onClick={() => setDiffFilter('MEDIUM')}
-              style={{ background: diffFilter === 'MEDIUM' ? 'var(--amber)' : 'var(--bg3)', color: diffFilter === 'MEDIUM' ? '#000' : 'var(--txt)' }}
-            >
-              Medium ({medCount})
-            </button>
-            <button
-              onClick={() => setDiffFilter('HARD')}
-              style={{ background: diffFilter === 'HARD' ? 'var(--red)' : 'var(--bg3)', color: diffFilter === 'HARD' ? '#fff' : 'var(--txt)' }}
-            >
-              Hard ({hardCount})
-            </button>
-            <button
-              onClick={() => setDiffFilter('UNLOCKED')}
-              style={{ background: diffFilter === 'UNLOCKED' ? 'var(--teal)' : 'var(--bg3)', color: diffFilter === 'UNLOCKED' ? '#000' : 'var(--txt)' }}
-            >
-              Unlocked ({unlockedIds.length})
-            </button>
-          </div>
-        </div>
-
-        {/* Problem Cards List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredProblems.map((prob) => {
             const isUnlocked = unlockedIds.includes(prob.id);
             const isSolved = solvedIds.includes(prob.id);
             const statusInfo = problemStatuses[prob.id];
+            const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
+            const wrongCount = team?.problemWrong?.[prob.id] ?? statusInfo?.wrongSubmissions ?? 0;
 
             return (
               <div
@@ -280,127 +239,112 @@ export function ProblemCatalog({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '14px 20px',
+                  padding: '14px 16px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
                   borderRadius: '8px',
-                  border: '1px solid',
-                  borderColor: isSolved ? 'var(--neon)' : (isUnlocked ? 'var(--teal)' : 'var(--bd)'),
-                  background: isUnlocked ? 'var(--bg3)' : 'var(--bg2)',
-                  boxShadow: isSolved ? '0 0 10px #00ff9d22' : (isUnlocked ? '0 0 8px #14d9c422' : 'none'),
-                  transition: 'all 0.15s ease'
+                  transition: 'background 0.15s ease',
+                  gap: '16px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.025)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
-                  {isSolved ? (
-                    <CheckCircle2 size={22} color="var(--neon)" style={{ flexShrink: 0 }} />
-                  ) : isUnlocked ? (
-                    <Unlock size={22} color="var(--teal)" style={{ flexShrink: 0 }} />
-                  ) : (
-                    <Lock size={22} color="var(--mut)" style={{ flexShrink: 0 }} />
-                  )}
+                {/* Left: Status Icon + Title + Metadata */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1 }}>
+                  {/* Status Indicator */}
+                  <div style={{ flexShrink: 0, width: '20px', textAlign: 'center' }}>
+                    {isSolved ? (
+                      <span style={{ color: '#3fb950', fontSize: '16px', fontWeight: 700 }}>✓</span>
+                    ) : isUnlocked ? (
+                      <span style={{ color: '#58a6ff', fontSize: '13px' }}>●</span>
+                    ) : (
+                      <span style={{ color: 'var(--txt-dim)', fontSize: '14px' }}>🔒</span>
+                    )}
+                  </div>
 
-                  <div style={{ minWidth: 0 }}>
-                    {(() => {
-                      const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
-                      const wrongCount = team?.problemWrong?.[prob.id] ?? statusInfo?.wrongSubmissions ?? 0;
-                      const problemScore = statusInfo?.finalProblemScore ?? (diffPoints - (wrongCount * 10));
+                  {/* Problem Details */}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        color: isUnlocked ? '#ffffff' : '#c9d1d9',
+                        letterSpacing: '0.1px'
+                      }}>
+                        {prob.id} &nbsp;{prob.title}
+                      </span>
+                    </div>
 
-                      return (
-                        <div style={{
-                          fontWeight: 700,
-                          fontSize: '15px',
-                          color: isUnlocked ? 'var(--txt)' : '#c9d1d9',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          flexWrap: 'wrap'
-                        }}>
-                          <span>{prob.id} — {prob.title}</span>
-                          <span className={`badge ${prob.diff}`}>{prob.diff} ({diffPoints} pts)</span>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '12px',
+                      color: 'var(--txt-muted)',
+                      marginTop: '2px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <span>{prob.diff} · {diffPoints} pts</span>
 
-                          {/* Solved attribution & net problem score */}
-                          {isSolved && (
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: 'rgba(0, 255, 157, 0.15)',
-                              color: 'var(--neon)',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700
-                            }}>
-                              ✅ SOLVED {statusInfo?.solvedBy ? `by ${statusInfo.solvedBy}` : ''} • Score: {problemScore} pts {wrongCount > 0 ? `(${diffPoints} - ${wrongCount * 10})` : ''}
-                            </span>
-                          )}
+                      {isSolved && (
+                        <>
+                          <span>•</span>
+                          <span style={{ color: '#3fb950', fontWeight: 500 }}>
+                            Solved {statusInfo?.solvedByName || statusInfo?.solvedBy ? `by ${statusInfo.solvedByName || statusInfo.solvedBy}` : ''}
+                          </span>
+                        </>
+                      )}
 
-                          {/* In-progress attribution */}
-                          {!isSolved && statusInfo?.status === 'IN_PROGRESS' && (
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: 'rgba(255, 196, 61, 0.15)',
-                              color: 'var(--amber)',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700
-                            }}>
-                              🟡 IN PROGRESS ({statusInfo.workingBy})
-                            </span>
-                          )}
+                      {!isSolved && statusInfo?.status === 'IN_PROGRESS' && (
+                        <>
+                          <span>•</span>
+                          <span style={{ color: '#d29922', fontWeight: 500 }}>
+                            In progress by {statusInfo.workingBy}
+                          </span>
+                        </>
+                      )}
 
-                          {/* Wrong submissions penalty indicator */}
-                          {!isSolved && wrongCount > 0 && (
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              background: 'rgba(255, 0, 85, 0.12)',
-                              border: '1px solid rgba(255, 0, 85, 0.3)',
-                              color: '#ff758f',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700
-                            }}>
-                              ⚠️ {wrongCount} WA (-{wrongCount * 10} pts)
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    <div style={{ fontSize: '12px', color: 'var(--mut)', marginTop: '3px' }}>
-                      {prob.cat || 'Algorithms'}
-                      {isUnlocked && statusInfo?.unlockedBy && (
-                        <span style={{ marginLeft: '10px', color: 'var(--teal)' }}>
-                          • Won by {statusInfo.unlockedBy} {statusInfo.bidAmount ? `(Bid: ₹${statusInfo.bidAmount})` : ''}
-                        </span>
+                      {wrongCount > 0 && !isSolved && (
+                        <>
+                          <span>•</span>
+                          <span style={{ color: '#ff7b72' }}>
+                            {wrongCount} WA (-{wrongCount * 10} pts)
+                          </span>
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right Action */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                {/* Right: Clean Action Button */}
+                <div style={{ flexShrink: 0 }}>
                   {isUnlocked ? (
                     <button
-                      className="pri"
+                      className="btn-ghost"
                       onClick={() => onSelectProblem(prob.id)}
-                      style={{ padding: '7px 16px', fontWeight: 700 }}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '13px',
+                        borderRadius: '6px',
+                        color: '#58a6ff'
+                      }}
                     >
-                      Open in Workspace
+                      Open →
                     </button>
                   ) : (
                     <button
-                      className="ok"
+                      className="btn-ghost"
                       onClick={() => handleOpenBidModal(prob)}
-                      style={{ padding: '7px 16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
-                      title="Enter the winning bid amount from offline auction"
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '13px',
+                        borderRadius: '6px'
+                      }}
                     >
-                      <Gavel size={14} /> Enter Winning Bid
+                      Unlock →
                     </button>
                   )}
                 </div>
@@ -410,125 +354,132 @@ export function ProblemCatalog({
 
           {filteredProblems.length === 0 && (
             <div style={{
-              padding: '30px',
+              padding: '48px 24px',
               textAlign: 'center',
-              color: 'var(--mut)',
-              background: 'var(--bg2)',
-              borderRadius: '8px',
-              border: '1px solid var(--bd)'
+              color: 'var(--txt-dim)',
+              fontSize: '13px'
             }}>
-              No problems found matching "{searchTerm}".
+              No problems match "{searchTerm}".
             </div>
           )}
         </div>
 
-        {/* Modal: Enter Winning Bid Amount */}
-        {selectedBidProblem && (
+        {/* 4. MODAL: UNLOCK PROBLEM */}
+        {(selectedBidProblem || isQuickUnlockOpen) && (
           <div className="ov" style={{ zIndex: 1100 }}>
-            <div className="box" style={{ maxWidth: '480px', width: '92%', padding: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Gavel size={22} color="var(--teal)" />
-                  <h3 style={{ margin: 0, color: 'var(--teal)', fontSize: '18px' }}>
-                    Offline Bid Unlock
-                  </h3>
-                </div>
-                <button onClick={() => setSelectedBidProblem(null)}><X size={16} /></button>
+            <div className="box" style={{ maxWidth: '440px', padding: '24px' }}>
+              {/* Modal Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#ffffff' }}>
+                  Unlock Problem
+                </h3>
+                <button
+                  className="btn-ghost"
+                  onClick={() => { setSelectedBidProblem(null); setIsQuickUnlockOpen(false); }}
+                  style={{ padding: '6px' }}
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              <div style={{
-                background: 'var(--bg3)',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid var(--bd)',
-                marginBottom: '16px'
-              }}>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--txt)' }}>
-                  {selectedBidProblem.id} — {selectedBidProblem.title}
+              {/* Target Problem Info */}
+              {selectedBidProblem ? (
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  marginBottom: '18px'
+                }}>
+                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                    {selectedBidProblem.id} — {selectedBidProblem.title}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
+                    {selectedBidProblem.diff} · {selectedBidProblem.diff === 'Hard' ? 400 : (selectedBidProblem.diff === 'Medium' ? 300 : 200)} pts
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                  <span className={`badge ${selectedBidProblem.diff}`}>{selectedBidProblem.diff}</span>
-                  <span style={{ fontSize: '12px', color: 'var(--mut)' }}>{selectedBidProblem.cat}</span>
+              ) : (
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '6px' }}>
+                    Problem ID
+                  </label>
+                  <input
+                    placeholder="e.g. E3, M1, H2"
+                    value={customProblemId}
+                    onChange={(e) => setCustomProblemId(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', fontSize: '13px' }}
+                  />
                 </div>
-              </div>
+              )}
 
+              {/* Winning Bid Input */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: 'var(--teal)', fontWeight: 700, marginBottom: '6px' }}>
-                  ENTER FINAL WINNING BID AMOUNT (₹)
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '6px' }}>
+                  Winning Bid (ByteCoins)
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '18px', color: 'var(--neon)', fontWeight: 700 }}>₹</span>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--txt-dim)', fontSize: '14px' }}>
+                    ₹
+                  </span>
                   <input
                     type="number"
-                    placeholder="e.g. 250"
+                    min="0"
+                    placeholder="Enter winning bid amount"
                     value={bidAmountInput}
                     onChange={(e) => setBidAmountInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleConfirmBid()}
                     autoFocus
-                    style={{ fontSize: '16px', fontWeight: 700, padding: '8px 12px' }}
+                    style={{
+                      width: '100%',
+                      paddingLeft: '28px',
+                      paddingRight: '12px',
+                      paddingTop: '9px',
+                      paddingBottom: '9px',
+                      fontSize: '14px',
+                      fontFamily: 'var(--font-mono)'
+                    }}
                   />
                 </div>
               </div>
 
-              {/* Budget impact preview */}
+              {/* Budget Impact Preview */}
               <div style={{
-                background: 'var(--bg4)',
-                border: '1px solid var(--bd)',
-                borderRadius: '6px',
-                padding: '10px 14px',
+                display: 'flex',
+                justifyContent: 'space-between',
                 fontSize: '12px',
-                marginBottom: '18px',
-                lineHeight: 1.6
+                color: 'var(--txt-muted)',
+                marginBottom: '20px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'rgba(255, 255, 255, 0.02)'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--mut)' }}>
-                  <span>Current Team Balance:</span>
-                  <b style={{ color: 'var(--txt)' }}>₹{teamBalance ?? 1000}</b>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--mut)' }}>
-                  <span>Bid Amount Deducted:</span>
-                  <b style={{ color: 'var(--red)' }}>- ₹{currentBidNum}</b>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  borderTop: '1px solid var(--bd)',
-                  marginTop: '6px',
-                  paddingTop: '6px'
+                <span>Remaining after unlock:</span>
+                <span style={{
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                  color: projectedRemaining < 0 ? '#f85149' : '#ffffff'
                 }}>
-                  <span style={{ fontWeight: 700, color: projectedRemaining >= 0 ? 'var(--neon)' : 'var(--red)' }}>
-                    Remaining Team Budget:
-                  </span>
-                  <b style={{
-                    fontSize: '14px',
-                    color: projectedRemaining >= 0 ? 'var(--neon)' : 'var(--red)'
-                  }}>
-                    ₹{projectedRemaining}
-                  </b>
-                </div>
-                {currentMember && (
-                  <div style={{ fontSize: '11px', color: 'var(--teal)', marginTop: '4px' }}>
-                    Purchaser Identity: <b>{currentMember.memberId}</b> ({currentMember.name})
-                  </div>
-                )}
+                  ₹{projectedRemaining} ByteCoins
+                </span>
               </div>
 
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '10px' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  onClick={() => setSelectedBidProblem(null)}
-                  style={{ flex: 1, padding: '10px' }}
+                  className="btn-ghost"
+                  onClick={() => { setSelectedBidProblem(null); setIsQuickUnlockOpen(false); }}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="pri"
+                  className="btn-primary"
                   onClick={handleConfirmBid}
-                  disabled={loading || projectedRemaining < 0}
-                  style={{ flex: 2, padding: '10px', fontWeight: 700 }}
+                  disabled={loading || (currentBidNum > (teamBalance ?? 1000))}
+                  style={{ padding: '8px 18px', borderRadius: '6px' }}
                 >
-                  {loading ? 'Unlocking...' : 'Confirm'}
+                  {loading ? 'Unlocking...' : 'Unlock Problem'}
                 </button>
               </div>
             </div>

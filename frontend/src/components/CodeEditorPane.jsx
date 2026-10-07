@@ -241,62 +241,73 @@ export function CodeEditorPane({
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-      {/* Left Pane: Problem Specification */}
+    <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+      {/* Left Pane: Problem Statement */}
       <div style={{
-        flex: '0 0 42%',
-        borderRight: '1px solid var(--bd)',
+        width: '420px',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
         overflowY: 'auto',
-        padding: '18px',
-        background: 'var(--bg)'
+        padding: '24px',
+        background: 'rgba(8, 12, 22, 0.6)',
+        flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, color: 'var(--teal)', fontSize: '20px' }}>
-            {problem.id} — {problem.title}
-          </h2>
-          <span className={`badge ${problem.diff}`}>
-            {problem.diff} ({problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts)
-          </span>
-
-          {/* Wrong submissions counter & penalty */}
-          {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions || 0) > 0 && (
+        {/* Title & Difficulty Row */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
             <span style={{
-              background: 'rgba(255, 0, 85, 0.12)',
-              border: '1px solid rgba(255, 0, 85, 0.3)',
-              color: '#ff758f',
-              padding: '2px 8px',
-              borderRadius: '4px',
               fontSize: '11px',
-              fontWeight: 700
+              fontWeight: 600,
+              color: 'var(--txt-muted)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '2px 8px',
+              borderRadius: '4px'
             }}>
-              ⚠️ {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions)} WA (−{(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions) * 10} pts)
+              {problem.cat || 'Algorithms'}
             </span>
-          )}
+            <span className={`badge ${problem.diff}`}>
+              {problem.diff} · {problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts
+            </span>
 
-          <span style={{ color: 'var(--neon)', fontSize: '13px', marginLeft: 'auto', fontWeight: 700 }}>
-            {problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts
-          </span>
+            {/* Wrong submissions counter & penalty */}
+            {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions || 0) > 0 && (
+              <span style={{
+                background: 'rgba(248, 81, 73, 0.1)',
+                border: '1px solid rgba(248, 81, 73, 0.25)',
+                color: '#ff7b72',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 600
+              }}>
+                {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions)} WA (−{(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions) * 10} pts)
+              </span>
+            )}
+          </div>
+
+          <h1 style={{ margin: 0, color: '#ffffff', fontSize: '20px', fontWeight: 700, letterSpacing: '0.2px' }}>
+            {problem.id} — {problem.title}
+          </h1>
         </div>
 
         {/* 💡 Blue Hint Card / Unlock Hint Button */}
         {team?.revealedHints?.[problem.id] ? (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(0, 180, 216, 0.12) 0%, rgba(10, 25, 47, 0.9) 100%)',
-            border: '1px solid #00b4d8',
-            borderRadius: '8px',
-            padding: '12px 14px',
-            marginBottom: '14px',
-            boxShadow: '0 0 15px rgba(0, 180, 216, 0.15)'
+            background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.8) 100%)',
+            border: '1px solid rgba(56, 139, 253, 0.3)',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            marginBottom: '18px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#00b4d8', fontWeight: 800, fontSize: '12px' }}>
-                <Lightbulb size={16} /> 💡 TEAM ALGORITHMIC HINT
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#58a6ff', fontWeight: 700, fontSize: '12px' }}>
+                <Lightbulb size={15} /> Algorithmic Hint
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--mut)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>
                 Unlocked by {team.revealedHints[problem.id].revealedByName || team.revealedHints[problem.id].revealedBy}
               </span>
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--txt)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '13px', color: '#f0f6fc', lineHeight: 1.55 }}>
               {team.revealedHints[problem.id].hint}
             </div>
           </div>
@@ -305,127 +316,129 @@ export function CodeEditorPane({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'rgba(0, 180, 216, 0.05)',
-            border: '1px dashed rgba(0, 180, 216, 0.4)',
+            background: 'rgba(56, 139, 253, 0.04)',
+            border: '1px dashed rgba(56, 139, 253, 0.25)',
             borderRadius: '8px',
-            padding: '10px 12px',
-            marginBottom: '14px'
+            padding: '12px 14px',
+            marginBottom: '18px'
           }}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#90e0ef', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Lightbulb size={14} color="#00b4d8" /> Need algorithmic guidance?
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#58a6ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Lightbulb size={14} /> Need algorithmic guidance?
               </div>
-              <small style={{ fontSize: '11px', color: 'var(--mut)' }}>
-                {team?.hintPassesCount > 0 ? `${team.hintPassesCount} Hint Pass available` : 'Cost: 40 ByteCoins from shared budget'}
-              </small>
+              <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '2px' }}>
+                {team?.hintPassesCount > 0 ? `${team.hintPassesCount} Hint Pass available` : '40 ByteCoins from shared budget'}
+              </div>
             </div>
             <button
               type="button"
+              className="btn-blue"
               onClick={handleUnlockHintForProblem}
               disabled={hintLoading || ((team?.balance ?? 1000) < 40 && (team?.hintPassesCount || 0) === 0)}
               style={{
-                background: '#00b4d8',
-                color: '#001a2c',
-                fontWeight: 700,
                 fontSize: '11px',
-                border: 'none',
                 padding: '6px 12px',
-                borderRadius: '5px',
-                cursor: 'pointer'
+                borderRadius: '6px'
               }}
             >
-              {hintLoading ? 'Unlocking...' : (team?.hintPassesCount || 0) > 0 ? 'Use Hint Pass' : 'Unlock Hint (40 BC)'}
+              {hintLoading ? 'Unlocking...' : (team?.hintPassesCount || 0) > 0 ? 'Use Hint Pass' : 'Unlock (40 BC)'}
             </button>
           </div>
         )}
 
         {hintError && (
-          <div style={{ padding: '8px', background: 'var(--red-dim)', border: '1px solid var(--red)', borderRadius: '6px', color: 'var(--red)', fontSize: '11px', marginBottom: '12px' }}>
-            ⚠️ {hintError}
+          <div style={{ padding: '8px 12px', background: 'rgba(248, 81, 73, 0.1)', border: '1px solid rgba(248, 81, 73, 0.3)', borderRadius: '6px', color: '#ff7b72', fontSize: '12px', marginBottom: '14px' }}>
+            {hintError}
           </div>
         )}
 
         {/* Shared Team Workspace Status Banner */}
         {problemStatus?.status === 'SOLVED' && (
           <div style={{
-            padding: '8px 12px',
-            background: 'rgba(0, 255, 157, 0.15)',
-            border: '1px solid var(--neon)',
+            padding: '10px 14px',
+            background: 'rgba(63, 185, 80, 0.1)',
+            border: '1px solid rgba(63, 185, 80, 0.3)',
             borderRadius: '6px',
-            color: 'var(--neon)',
+            color: '#3fb950',
             fontSize: '12px',
-            fontWeight: 700,
-            marginBottom: '10px',
+            fontWeight: 600,
+            marginBottom: '14px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '8px'
           }}>
             <CheckCircle size={16} />
-            <span>SOLVED by {problemStatus.solvedBy} {problemStatus.solvedByName ? `(${problemStatus.solvedByName})` : ''}</span>
+            <span>Solved by {problemStatus.solvedByName || problemStatus.solvedBy}</span>
           </div>
         )}
 
         {problemStatus?.status === 'IN_PROGRESS' && problemStatus.workingBy !== currentMember?.memberId && (
           <div style={{
-            padding: '8px 12px',
-            background: 'rgba(255, 196, 61, 0.15)',
-            border: '1px solid var(--amber)',
+            padding: '10px 14px',
+            background: 'rgba(210, 153, 34, 0.1)',
+            border: '1px solid rgba(210, 153, 34, 0.3)',
             borderRadius: '6px',
-            color: 'var(--amber)',
+            color: '#d29922',
             fontSize: '12px',
-            fontWeight: 700,
-            marginBottom: '10px',
+            fontWeight: 600,
+            marginBottom: '14px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '8px'
           }}>
             <AlertTriangle size={16} />
-            <span>🟡 Teammate {problemStatus.workingBy} is currently working on this problem</span>
+            <span>Teammate {problemStatus.workingBy} is currently editing this problem</span>
           </div>
         )}
 
+        {/* Problem Specification Content */}
         <div style={specSectionStyle}>
-          <div className="lbl" style={labelStyle}>Category</div>
-          <div style={{ color: 'var(--txt)', fontSize: '13px' }}>{problem.cat || 'General'}</div>
+          <div style={labelStyle}>Description</div>
+          <p style={{ margin: '6px 0', whiteSpace: 'pre-line', color: '#c9d1d9', lineHeight: 1.6, fontSize: '13px' }}>
+            {problem.desc}
+          </p>
         </div>
 
         <div style={specSectionStyle}>
-          <div className="lbl" style={labelStyle}>Description</div>
-          <p style={{ margin: '4px 0', whiteSpace: 'pre-line' }}>{problem.desc}</p>
+          <div style={labelStyle}>Constraints</div>
+          <pre style={codeBlockStyle}>{problem.con || 'Standard limits'}</pre>
         </div>
 
         <div style={specSectionStyle}>
-          <div className="lbl" style={labelStyle}>Constraints</div>
-          <pre style={codeBlockStyle}>{problem.con || 'Standard competitive limits'}</pre>
-        </div>
-
-        <div style={specSectionStyle}>
-          <div className="lbl" style={labelStyle}>Sample Input</div>
+          <div style={labelStyle}>Sample Input</div>
           <pre style={codeBlockStyle}>{problem.si || '(None)'}</pre>
         </div>
 
         <div style={specSectionStyle}>
-          <div className="lbl" style={labelStyle}>Sample Output</div>
+          <div style={labelStyle}>Sample Output</div>
           <pre style={codeBlockStyle}>{problem.so || '(None)'}</pre>
         </div>
       </div>
 
-      {/* Right Pane: Code Editor + Runner & Terminal */}
+      {/* Right Pane: Code Editor + Runner & Terminal (Largest Visual Area) */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
-        padding: '12px',
-        gap: '10px',
-        background: 'var(--bg2)'
+        background: '#090d16',
+        padding: '16px 20px',
+        gap: '12px'
       }}>
-        {/* Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Editor Toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <select
             value={lang}
             onChange={(e) => onLangChange(e.target.value)}
-            style={{ width: 'auto', minWidth: '130px' }}
+            style={{
+              width: 'auto',
+              minWidth: '130px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '13px'
+            }}
           >
             <option value="python">Python 3</option>
             <option value="c">C</option>
@@ -433,81 +446,93 @@ export function CodeEditorPane({
             <option value="java">Java</option>
           </select>
 
-          <button onClick={handleReset} title="Reset starter code">
-            <RotateCcw size={14} /> Reset
+          <button className="btn-ghost" onClick={handleReset} title="Reset starter code" style={{ fontSize: '12px' }}>
+            <RotateCcw size={13} /> Reset
           </button>
 
           <button
+            className="btn-ghost"
             onClick={handleLoadSolution}
-            title="Auto-fill verified passing solution for testing"
+            title="Auto-fill passing solution for testing"
             style={{
-              borderColor: 'var(--neon)',
-              color: 'var(--neon)',
-              fontWeight: 600
+              fontSize: '12px',
+              color: '#58a6ff',
+              borderColor: 'rgba(56, 139, 253, 0.3)'
             }}
           >
             ⚡ Load Solution
           </button>
 
           <button
+            className="btn-ghost"
             onClick={() => setAllowPaste(!allowPaste)}
-            title={allowPaste ? "Paste is currently ALLOWED without anti-cheat flags" : "Paste is STRICT (Exam Mode)"}
+            title={allowPaste ? "Paste is allowed" : "Paste is strict (Exam Mode)"}
             style={{
-              borderColor: allowPaste ? 'var(--amber)' : 'var(--bd)',
-              color: allowPaste ? 'var(--amber)' : 'var(--mut)'
+              fontSize: '11px',
+              color: allowPaste ? '#d29922' : 'var(--txt-dim)'
             }}
           >
-            {allowPaste ? '🔓 Paste: Allowed (Dev)' : '🔒 Paste: Strict'}
+            {allowPaste ? '🔓 Paste: Dev' : '🔒 Paste: Strict'}
           </button>
 
           <div style={{ flex: 1 }} />
 
+          {/* Action Buttons */}
           <button
-            className="pri"
+            className="btn-ghost"
             onClick={handleRun}
             disabled={isRunning || isSubmitting || isFrozen}
-            title={isFrozen ? "Screen is frozen due to Sabotage attack" : "Run code against sample test cases"}
-            style={isFrozen ? { opacity: 0.5, cursor: 'not-allowed', background: 'var(--bg3)', borderColor: 'var(--red)', color: 'var(--red)' } : {}}
+            title={isFrozen ? "Screen is frozen" : "Run code against sample test"}
+            style={{
+              padding: '7px 16px',
+              fontSize: '13px',
+              borderRadius: '6px',
+              borderColor: 'rgba(255, 255, 255, 0.15)'
+            }}
           >
-            {isRunning ? <Loader2 size={16} className="spin" /> : isFrozen ? <Zap size={16} color="#ff0055" /> : <Play size={16} />}
+            {isRunning ? <Loader2 size={14} className="spin" /> : isFrozen ? <Zap size={14} color="#ff7b72" /> : <Play size={14} />}
             {isFrozen ? 'Frozen' : 'Run Code'}
           </button>
 
           <button
-            className="ok"
+            className="btn-primary"
             onClick={handleSubmit}
             disabled={isRunning || isSubmitting || isFrozen}
-            title={isFrozen ? "Screen is frozen due to Sabotage attack" : "Submit solution for judging"}
-            style={isFrozen ? { opacity: 0.5, cursor: 'not-allowed', background: 'var(--bg3)', borderColor: 'var(--red)', color: 'var(--red)' } : {}}
+            title={isFrozen ? "Screen is frozen" : "Submit solution for scoring"}
+            style={{
+              padding: '7px 18px',
+              fontSize: '13px',
+              borderRadius: '6px'
+            }}
           >
-            {isSubmitting ? <Loader2 size={16} className="spin" /> : isFrozen ? <Zap size={16} color="#ff0055" /> : <Send size={16} />}
+            {isSubmitting ? <Loader2 size={14} className="spin" /> : isFrozen ? <Zap size={14} /> : <Send size={14} />}
             {isFrozen ? 'Frozen' : 'Submit Solution'}
           </button>
         </div>
 
-        {/* Code Editor with Line Gutter */}
+        {/* Code Editor with Line Number Gutter */}
         <div style={{
           flex: 1,
-          minHeight: '220px',
+          minHeight: '260px',
           display: 'flex',
-          border: '1px solid var(--bd)',
-          borderRadius: '6px',
-          background: '#1a1f2c',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '8px',
+          background: '#0d111c',
           overflow: 'hidden'
         }}>
           <pre
             ref={gutterRef}
             style={{
-              width: '45px',
+              width: '46px',
               textAlign: 'right',
-              padding: '10px 8px 10px 0',
+              padding: '12px 10px 12px 0',
               margin: 0,
-              color: '#60729c',
-              background: '#141824',
+              color: '#484f58',
+              background: 'rgba(0, 0, 0, 0.25)',
               userSelect: 'none',
               overflow: 'hidden',
               font: '13px/20px var(--font-mono)',
-              borderRight: '1px solid #232b40'
+              borderRight: '1px solid rgba(255, 255, 255, 0.06)'
             }}
           >
             {gutterLines}
@@ -531,7 +556,7 @@ export function CodeEditorPane({
               background: 'transparent',
               color: '#f0f6fc',
               font: '13px/20px var(--font-mono)',
-              padding: '10px 12px',
+              padding: '12px 14px',
               resize: 'none',
               outline: 'none',
               tabSize: 4
@@ -548,45 +573,51 @@ export function CodeEditorPane({
             spellCheck="false"
             rows={2}
             style={{
+              width: '100%',
               fontFamily: 'var(--font-mono)',
-              fontSize: '13px',
-              resize: 'vertical'
+              fontSize: '12px',
+              borderRadius: '6px',
+              background: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              resize: 'vertical',
+              padding: '8px 12px'
             }}
           />
         </div>
 
-        {/* Output Window */}
+        {/* Terminal Execution Output Drawer */}
         <div style={{
-          background: '#0d1326',
-          border: '1px solid var(--bd)',
-          borderRadius: '6px',
-          padding: '10px',
+          background: '#070a12',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '8px',
+          padding: '12px 16px',
           minHeight: '120px',
-          maxHeight: '190px',
+          maxHeight: '180px',
           overflowY: 'auto'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            marginBottom: '6px',
-            color: 'var(--teal)',
+            marginBottom: '8px',
+            color: 'var(--txt-muted)',
             fontSize: '11px',
             fontWeight: 700,
-            textTransform: 'uppercase'
+            textTransform: 'uppercase',
+            letterSpacing: '0.8px'
           }}>
-            <Terminal size={14} /> Execution Output
+            <Terminal size={13} /> Execution Output
           </div>
 
           {!outputResult && (
-            <div style={{ color: 'var(--mut)', fontSize: '13px' }}>
-              Run or submit your solution to inspect real-time outputs and grading verdict…
+            <div style={{ color: 'var(--txt-dim)', fontSize: '13px' }}>
+              Run or submit your code to view console output and test verdicts…
             </div>
           )}
 
           {outputResult && outputResult.status === 'QUEUED' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--amber)' }}>
-              <Loader2 size={16} className="spin" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#d29922', fontSize: '13px' }}>
+              <Loader2 size={15} className="spin" />
               <span>{outputResult.message}</span>
             </div>
           )}
@@ -594,17 +625,17 @@ export function CodeEditorPane({
           {outputResult && outputResult.type === 'run' && outputResult.data && (
             <div>
               {outputResult.data.compileError && (
-                <div style={{ color: 'var(--red)', fontWeight: 700, marginBottom: '6px' }}>
+                <div style={{ color: '#ff7b72', fontWeight: 600, marginBottom: '6px' }}>
                   ❌ Compilation Error
                 </div>
               )}
               {outputResult.data.stderr && (
-                <pre style={{ color: 'var(--red)', margin: '4px 0', fontSize: '12px' }}>
+                <pre style={{ color: '#ff7b72', margin: '4px 0', fontSize: '12px' }}>
                   {outputResult.data.stderr}
                 </pre>
               )}
-              <pre style={{ margin: 0, fontSize: '13px', color: '#fff' }}>
-                {outputResult.data.stdout || '(Program completed with no output)'}
+              <pre style={{ margin: 0, fontSize: '13px', color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
+                {outputResult.data.stdout || '(Program exited with no output)'}
               </pre>
             </div>
           )}
@@ -615,39 +646,39 @@ export function CodeEditorPane({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 10px',
+                padding: '6px 12px',
                 borderRadius: '6px',
                 marginBottom: '8px',
-                fontWeight: 700,
-                background: outputResult.data.passed ? 'var(--neon-dim)' : 'var(--red-dim)',
-                color: outputResult.data.passed ? 'var(--neon)' : 'var(--red)',
-                border: `1px solid ${outputResult.data.passed ? 'var(--neon)' : 'var(--red)'}`
+                fontWeight: 600,
+                background: outputResult.data.passed ? 'rgba(63, 185, 80, 0.12)' : 'rgba(248, 81, 73, 0.12)',
+                color: outputResult.data.passed ? '#3fb950' : '#ff7b72',
+                border: `1px solid ${outputResult.data.passed ? 'rgba(63, 185, 80, 0.3)' : 'rgba(248, 81, 73, 0.3)'}`
               }}>
-                {outputResult.data.passed ? <CheckCircle size={18} /> : <XCircle size={18} />}
-                <span>VERDICT: {outputResult.data.verdict}</span>
+                {outputResult.data.passed ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                <span>Verdict: {outputResult.data.verdict}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '12px' }}>
                   {outputResult.data.passed
                     ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} Difficulty Points Awarded`
-                    : `−10 Points Penalty Applied (Passed ${outputResult.data.hiddenPassed} / ${outputResult.data.totalHidden})`}
+                    : `−10 WA Penalty (Passed ${outputResult.data.hiddenPassed} / ${outputResult.data.totalHidden})`}
                 </span>
               </div>
 
               {outputResult.data.details && (
-                <div style={{ fontSize: '12px', color: 'var(--txt)', marginBottom: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginBottom: '4px' }}>
                   {outputResult.data.details}
                 </div>
               )}
 
               {outputResult.data.output && (
-                <pre style={{ margin: 0, fontSize: '12px', color: 'var(--mut)' }}>
-                  Sample run output: {outputResult.data.output}
+                <pre style={{ margin: 0, fontSize: '12px', color: 'var(--txt-dim)', fontFamily: 'var(--font-mono)' }}>
+                  Output: {outputResult.data.output}
                 </pre>
               )}
             </div>
           )}
 
           {outputResult && outputResult.error && (
-            <div style={{ color: 'var(--red)', fontSize: '13px' }}>
+            <div style={{ color: '#ff7b72', fontSize: '13px' }}>
               ⚠ {outputResult.error}
             </div>
           )}
@@ -658,12 +689,12 @@ export function CodeEditorPane({
 }
 
 const specSectionStyle = {
-  marginBottom: '14px'
+  marginBottom: '18px'
 };
 
 const labelStyle = {
   fontSize: '11px',
-  color: 'var(--teal)',
+  color: 'var(--txt-muted)',
   textTransform: 'uppercase',
   letterSpacing: '1px',
   fontWeight: 700,
@@ -671,12 +702,12 @@ const labelStyle = {
 };
 
 const codeBlockStyle = {
-  background: '#090e1f',
-  border: '1px solid var(--bd)',
+  background: 'rgba(255, 255, 255, 0.03)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
   borderRadius: '6px',
   padding: '8px 12px',
   margin: '4px 0 0',
-  font: '13px var(--font-mono)',
+  font: '12px var(--font-mono)',
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
   color: '#c9d1d9'

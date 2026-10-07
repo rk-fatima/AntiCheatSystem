@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, X, AlertTriangle, ShieldCheck, RefreshCw, Snowflake, CheckCircle2 } from 'lucide-react';
+import { Zap, X, AlertTriangle, RefreshCw, Snowflake, CheckCircle2 } from 'lucide-react';
 import { fetchSabotageTargets, useSabotageCard } from '../services/api';
 
 export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSuccess }) {
@@ -34,7 +34,7 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
     }
 
     if (selectedTarget.isFrozen) {
-      setError(`Team "${selectedTarget.name}" is already frozen! Please select another target.`);
+      setError(`Team "${selectedTarget.name}" is already frozen!`);
       return;
     }
 
@@ -49,13 +49,13 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
         targetTeamName: selectedTarget.name
       });
 
-      setSuccessMsg(`⚡ Successfully sabotaged Team "${selectedTarget.name}"! Their coding screen is now frozen for exactly 5 minutes.`);
+      setSuccessMsg(`⚡ Sabotaged Team "${selectedTarget.name}"! Workspace frozen for 5 minutes.`);
       if (onSabotageSuccess) {
         onSabotageSuccess(res);
       }
       setTimeout(() => {
         onClose();
-      }, 2000);
+      }, 1800);
     } catch (err) {
       setError(err.message || 'Failed to activate Sabotage card.');
     } finally {
@@ -68,40 +68,23 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
       <div
         className="box"
         style={{
-          maxWidth: '520px',
+          maxWidth: '500px',
           width: '92%',
-          background: 'var(--bg2)',
-          border: '2px solid #ff0055',
-          boxShadow: '0 0 35px rgba(255, 0, 85, 0.3)',
-          padding: '22px'
+          background: '#0d111c',
+          border: '1px solid rgba(248, 81, 73, 0.35)',
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8), 0 0 25px rgba(248, 81, 73, 0.08)',
+          padding: '24px'
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'rgba(255, 0, 85, 0.15)',
-              border: '1px solid #ff0055',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ff0055'
-            }}>
-              <Zap size={20} />
-            </div>
-            <div>
-              <h3 style={{ margin: 0, color: '#ff4d6d', fontSize: '18px', fontWeight: 800 }}>
-                ⚡ Deploy Sabotage Card
-              </h3>
-              <p style={{ margin: 0, color: 'var(--mut)', fontSize: '11px' }}>
-                Freeze a rival team's workspace for 5 minutes (Cost: 40 ByteCoins)
-              </p>
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap size={20} color="#ff7b72" />
+            <h3 style={{ margin: 0, color: '#ffffff', fontSize: '18px', fontWeight: 700 }}>
+              Deploy Sabotage Card
+            </h3>
           </div>
-          <button onClick={onClose} style={{ padding: '6px' }}>
+          <button className="btn-ghost" onClick={onClose} style={{ padding: '6px' }}>
             <X size={16} />
           </button>
         </div>
@@ -109,56 +92,55 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
         {/* Alerts */}
         {error && (
           <div style={{
-            padding: '10px 12px',
-            borderRadius: '6px',
-            background: 'var(--red-dim)',
-            border: '1px solid var(--red)',
-            color: 'var(--red)',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            background: 'rgba(248, 81, 73, 0.1)',
+            border: '1px solid rgba(248, 81, 73, 0.25)',
+            color: '#ff7b72',
             fontSize: '12px',
             marginBottom: '14px',
-            fontWeight: 600
+            fontWeight: 500
           }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
         {successMsg && (
           <div style={{
-            padding: '10px 12px',
-            borderRadius: '6px',
-            background: 'rgba(57, 255, 20, 0.1)',
-            border: '1px solid var(--neon)',
-            color: 'var(--neon)',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            background: 'rgba(63, 185, 80, 0.1)',
+            border: '1px solid rgba(63, 185, 80, 0.25)',
+            color: '#3fb950',
             fontSize: '12px',
             marginBottom: '14px',
-            fontWeight: 600
+            fontWeight: 500
           }}>
             {successMsg}
           </div>
         )}
 
-        {/* Target List Instructions */}
-        <p style={{ fontSize: '12px', color: 'var(--txt)', margin: '0 0 10px 0' }}>
-          Select the rival team you wish to freeze. Once triggered, all members of that team will be completely locked out of code execution and submissions for 5 minutes.
+        <p style={{ fontSize: '13px', color: 'var(--txt-muted)', margin: '0 0 14px 0', lineHeight: 1.5 }}>
+          Select rival team to freeze. Their coding workspace will be locked for exactly 5 minutes.
         </p>
 
         {/* Targets Roster */}
         <div style={{
           maxHeight: '260px',
           overflowY: 'auto',
-          border: '1px solid var(--bd)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px',
-          background: 'var(--bg)',
-          marginBottom: '16px'
+          background: 'rgba(255, 255, 255, 0.02)',
+          marginBottom: '20px'
         }}>
           {loading ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mut)', fontSize: '13px' }}>
-              <RefreshCw size={16} className="spin" style={{ display: 'inline', marginRight: '6px' }} />
-              Scanning active rival teams...
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--txt-dim)', fontSize: '13px' }}>
+              <RefreshCw size={15} className="spin" style={{ display: 'inline', marginRight: '6px' }} />
+              Loading rival teams...
             </div>
           ) : targets.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mut)', fontSize: '13px' }}>
-              No rival teams are currently registered in the match.
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--txt-dim)', fontSize: '13px' }}>
+              No rival teams found.
             </div>
           ) : (
             targets.map((tgt) => {
@@ -172,30 +154,34 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '12px 14px',
-                    borderBottom: '1px solid var(--bd)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
                     cursor: tgt.isFrozen ? 'not-allowed' : 'pointer',
                     background: isSelected
-                      ? 'rgba(255, 0, 85, 0.12)'
+                      ? 'rgba(248, 81, 73, 0.12)'
                       : tgt.isFrozen
-                      ? 'rgba(0, 180, 216, 0.05)'
+                      ? 'rgba(255, 255, 255, 0.01)'
                       : 'transparent',
-                    borderLeft: isSelected ? '4px solid #ff0055' : '4px solid transparent',
-                    opacity: tgt.isFrozen ? 0.6 : 1,
-                    transition: 'all 0.15s ease'
+                    transition: 'background 0.15s ease'
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <b style={{ color: isSelected ? '#ff4d6d' : 'var(--txt)', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      border: isSelected ? '4px solid #ff7b72' : '2px solid var(--txt-dim)',
+                      background: isSelected ? '#0d111c' : 'transparent',
+                      flexShrink: 0
+                    }} />
+
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
                         {tgt.name}
-                      </b>
-                      <span style={{ fontSize: '10px', color: 'var(--mut)', fontFamily: 'var(--font-mono)' }}>
-                        ID: {tgt.id}
-                      </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '1px' }}>
+                        ID: {tgt.teamId}
+                      </div>
                     </div>
-                    <small style={{ color: 'var(--mut)', fontSize: '11px' }}>
-                      Team Size: {tgt.size || 1} Member(s)
-                    </small>
                   </div>
 
                   <div>
@@ -204,30 +190,27 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
-                        padding: '3px 8px',
-                        borderRadius: '12px',
                         fontSize: '11px',
-                        fontWeight: 700,
-                        background: 'rgba(0, 180, 216, 0.15)',
-                        border: '1px solid #00b4d8',
-                        color: '#00b4d8'
+                        fontWeight: 600,
+                        color: '#58a6ff',
+                        background: 'rgba(56, 139, 253, 0.1)',
+                        border: '1px solid rgba(56, 139, 253, 0.25)',
+                        padding: '2px 8px',
+                        borderRadius: '4px'
                       }}>
-                        <Snowflake size={11} /> Frozen ({tgt.remainingSeconds}s)
+                        <Snowflake size={12} /> Frozen ({tgt.frozenMinutesRemaining}m)
                       </span>
                     ) : (
                       <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 8px',
-                        borderRadius: '12px',
                         fontSize: '11px',
-                        fontWeight: 700,
-                        background: 'rgba(57, 255, 20, 0.1)',
-                        border: '1px solid var(--neon)',
-                        color: 'var(--neon)'
+                        fontWeight: 600,
+                        color: '#3fb950',
+                        background: 'rgba(63, 185, 80, 0.1)',
+                        border: '1px solid rgba(63, 185, 80, 0.25)',
+                        padding: '2px 8px',
+                        borderRadius: '4px'
                       }}>
-                        ● Playing
+                        Playing
                       </span>
                     )}
                   </div>
@@ -237,48 +220,22 @@ export function SabotageTargetModal({ team, currentMember, onClose, onSabotageSu
           )}
         </div>
 
-        {/* Confirmation Summary */}
-        {selectedTarget && (
-          <div style={{
-            background: 'rgba(255, 0, 85, 0.08)',
-            border: '1px solid rgba(255, 0, 85, 0.3)',
-            borderRadius: '6px',
-            padding: '10px 12px',
-            marginBottom: '16px',
-            fontSize: '12px',
-            color: '#ffccd5'
-          }}>
-            🎯 <b>Target Selected:</b> Team <b style={{ color: '#fff' }}>{selectedTarget.name}</b>
-            <div style={{ fontSize: '11px', color: 'var(--mut)', marginTop: '2px' }}>
-              40 ByteCoins will be deducted from your team's shared balance.
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
+        {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button type="button" onClick={onClose} disabled={submitting}>
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={submitting}>
             Cancel
           </button>
           <button
             type="button"
+            className="btn-danger"
             onClick={handleConfirmSabotage}
             disabled={submitting || !selectedTarget || selectedTarget.isFrozen}
             style={{
-              background: '#ff0055',
-              color: '#fff',
-              border: 'none',
-              padding: '10px 18px',
-              fontWeight: 700,
-              fontSize: '13px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
+              padding: '8px 18px',
+              borderRadius: '6px'
             }}
           >
-            <Zap size={15} />
-            {submitting ? 'Freezing Target...' : 'Confirm 5-Minute Sabotage'}
+            {submitting ? 'Freezing...' : 'Freeze Workspace (5 min)'}
           </button>
         </div>
       </div>

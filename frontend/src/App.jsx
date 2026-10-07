@@ -250,41 +250,75 @@ export function App() {
 
       {/* Main Workspace Layout */}
       <main style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* Left Sidebar: Shared Team Active Workspace */}
+        {/* Left Sidebar: IDE Project Navigator */}
         <aside style={{
-          width: '260px',
-          background: 'var(--bg2)',
-          borderRight: '1px solid var(--bd)',
-          overflowY: 'auto',
-          padding: '14px',
+          width: '236px',
+          background: 'rgba(8, 12, 22, 0.95)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
-          flexShrink: 0
+          flexShrink: 0,
+          userSelect: 'none'
         }}>
-          {/* Workspace Title */}
-          <div style={{ marginBottom: '8px', borderBottom: '1px solid var(--bd)', paddingBottom: '8px' }}>
-            <h3 style={{
-              margin: '0 0 2px',
-              fontSize: '12px',
-              color: 'var(--teal)',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
+          {/* Sidebar Header: Team Identity */}
+          <div style={{
+            padding: '16px 14px 12px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+          }}>
+            <div style={{
+              fontSize: '14px',
               fontWeight: 800,
+              color: '#ffffff',
+              letterSpacing: '0.4px',
+              marginBottom: '2px'
+            }}>
+              {team?.name || 'TEAM WORKSPACE'}
+            </div>
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              justifyContent: 'space-between',
+              fontSize: '12px',
+              color: 'var(--txt-muted)'
             }}>
-              <Users size={14} color="var(--teal)" />
-              {team?.name || 'TEAM'} — WORKSPACE
-            </h3>
-            <small style={{ color: 'var(--mut)', fontSize: '11px' }}>
-              Shared across {team?.size || team?.members?.length || 1} team members
-            </small>
+              <span>Shared Workspace</span>
+              <span style={{
+                fontSize: '11px',
+                color: 'var(--txt-dim)',
+                background: 'rgba(255, 255, 255, 0.04)',
+                padding: '1px 6px',
+                borderRadius: '4px'
+              }}>
+                {(team?.members?.length || team?.size || 1)} Member{(team?.members?.length || team?.size || 1) !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
 
-          {/* List of problems in shared workspace */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
+          {/* Problem Tree List */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px'
+          }}>
+            {/* Section: UNLOCKED */}
+            <div style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '1px',
+              color: 'var(--txt-dim)',
+              padding: '6px 8px 4px',
+              textTransform: 'uppercase',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span>UNLOCKED</span>
+              <span style={{ fontSize: '10px' }}>{(team?.unlocked || []).length}</span>
+            </div>
+
             {(team?.unlocked || []).map((id) => {
               const prob = problems.find(p => p.id === id);
               const isSolved = (team?.solved || []).includes(id);
@@ -296,96 +330,148 @@ export function App() {
                   key={id}
                   onClick={() => handleSelectProblem(id)}
                   style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: isActive ? 'var(--teal)' : (isSolved ? 'var(--neon)' : 'var(--bd)'),
-                    borderLeft: isSolved ? '4px solid var(--neon)' : (isActive ? '4px solid var(--teal)' : '1px solid var(--bd)'),
-                    background: isActive ? 'var(--bg3)' : 'var(--bg4)',
-                    boxShadow: isActive ? '0 0 10px #14d9c433' : 'none',
+                    padding: '6px 10px',
+                    borderRadius: '5px',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    fontSize: '13px',
+                    color: isActive ? '#58a6ff' : (isSolved ? '#e6edf3' : 'var(--txt)'),
+                    background: isActive ? 'rgba(56, 139, 253, 0.12)' : 'transparent',
+                    borderLeft: isActive ? '2px solid #58a6ff' : '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'background 0.12s ease',
+                    minWidth: 0
                   }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.background = 'transparent';
+                  }}
+                  title={`${id} — ${prob?.title || id}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                    <b style={{ fontSize: '13px', color: isActive ? 'var(--teal)' : 'var(--txt)' }}>
-                      {id} — {prob?.title || id}
-                    </b>
-                    <span className={`badge ${prob?.diff || 'Easy'}`} style={{ fontSize: '9px', padding: '1px 5px' }}>
-                      {prob?.diff || 'Easy'}
-                    </span>
-                  </div>
-
-                  {/* Real-time Status Badges */}
-                  {isSolved ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      color: 'var(--neon)',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      marginTop: '4px'
-                    }}>
-                      <CheckCircle2 size={13} />
-                      <span>SOLVED {statusInfo?.solvedBy ? `by ${statusInfo.solvedBy}` : ''}</span>
-                    </div>
-                  ) : statusInfo?.status === 'IN_PROGRESS' ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      color: 'var(--amber)',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      marginTop: '4px'
-                    }}>
-                      <AlertTriangle size={13} />
-                      <span>IN PROGRESS ({statusInfo.workingBy})</span>
-                    </div>
-                  ) : (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      color: 'var(--mut)',
-                      fontSize: '11px',
-                      marginTop: '4px'
-                    }}>
-                      <Unlock size={12} color="var(--teal)" />
-                      <span>UNLOCKED</span>
-                    </div>
-                  )}
+                  <span style={{
+                    fontSize: '12px',
+                    color: isSolved ? '#3fb950' : '#58a6ff',
+                    flexShrink: 0
+                  }}>
+                    {isSolved ? '✓' : '●'}
+                  </span>
+                  <span style={{
+                    fontWeight: 500,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1
+                  }}>
+                    {id} &nbsp;{prob?.title || id}
+                  </span>
                 </div>
               );
             })}
 
             {(!team?.unlocked || team.unlocked.length === 0) && (
               <div style={{
-                color: 'var(--mut)',
                 fontSize: '12px',
-                padding: '16px 8px',
-                textAlign: 'center',
-                background: 'var(--bg3)',
-                borderRadius: '6px',
-                border: '1px dashed var(--bd)'
+                color: 'var(--txt-dim)',
+                padding: '8px 10px',
+                fontStyle: 'italic'
               }}>
-                No problems unlocked yet.
-                <div style={{ fontSize: '11px', marginTop: '4px' }}>
-                  Use the Auction Catalog to purchase problems using your ₹1,000 team budget.
-                </div>
+                No unlocked problems yet
               </div>
             )}
+
+            {/* Subtle Divider between UNLOCKED and LOCKED */}
+            <div style={{
+              margin: '10px 6px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+            }} />
+
+            {/* Section: LOCKED */}
+            <div style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '1px',
+              color: 'var(--txt-dim)',
+              padding: '4px 8px 4px',
+              textTransform: 'uppercase',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span>LOCKED</span>
+              <span style={{ fontSize: '10px' }}>
+                {problems.filter(p => !(team?.unlocked || []).includes(p.id)).length}
+              </span>
+            </div>
+
+            {problems.filter(p => !(team?.unlocked || []).includes(p.id)).map((prob) => {
+              return (
+                <div
+                  key={prob.id}
+                  onClick={() => setCurrentProblemId(null)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: 'var(--txt-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'background 0.12s ease',
+                    minWidth: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                    e.currentTarget.style.color = '#c9d1d9';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'var(--txt-muted)';
+                  }}
+                  title={`Locked: ${prob.id} — ${prob.title}. Click to open catalog`}
+                >
+                  <span style={{
+                    fontSize: '11px',
+                    color: 'var(--txt-dim)',
+                    flexShrink: 0
+                  }}>
+                    🔒
+                  </span>
+                  <span style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1
+                  }}>
+                    {prob.id} &nbsp;{prob.title}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Button to switch back to catalog */}
-          <button
-            className={currentProblemId ? "" : "pri"}
-            onClick={() => setCurrentProblemId(null)}
-            style={{ width: '100%', marginTop: 'auto', padding: '10px', fontWeight: 700 }}
-          >
-            🔓 Problem Catalog ({problems.length})
-          </button>
+          {/* Bottom Catalog Action */}
+          <div style={{
+            padding: '10px 12px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+          }}>
+            <button
+              className={!currentProblemId ? "btn-primary" : "btn-ghost"}
+              onClick={() => setCurrentProblemId(null)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                justifyContent: 'center'
+              }}
+            >
+              Problem Catalog ({problems.length})
+            </button>
+          </div>
         </aside>
 
         {/* Center / Right Content: Editor OR Problem Catalog */}

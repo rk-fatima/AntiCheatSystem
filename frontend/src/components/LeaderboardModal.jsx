@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, X, RefreshCw } from 'lucide-react';
+import { Trophy, X } from 'lucide-react';
 import { fetchLeaderboard } from '../services/api';
 
 export function LeaderboardModal({ onClose }) {
@@ -26,26 +26,28 @@ export function LeaderboardModal({ onClose }) {
 
   return (
     <div className="ov" style={{ zIndex: 950 }}>
-      <div className="box" style={{ maxWidth: '680px' }}>
+      <div className="box" style={{ maxWidth: '640px', padding: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Trophy size={22} color="var(--neon)" />
-            <h2 style={{ margin: 0, color: 'var(--teal)', fontSize: '20px' }}>
+            <Trophy size={20} color="#bc8cff" />
+            <h2 style={{ margin: 0, color: '#ffffff', fontSize: '18px', fontWeight: 700 }}>
               Live Contest Leaderboard
             </h2>
           </div>
-          <button onClick={onClose}><X size={18} /></button>
+          <button className="btn-ghost" onClick={onClose} style={{ padding: '6px' }}>
+            <X size={16} />
+          </button>
         </div>
 
-        {/* Scoring Rules Banner */}
+        {/* Scoring Rules Strip */}
         <div style={{
-          background: 'rgba(20, 217, 196, 0.08)',
-          border: '1px solid rgba(20, 217, 196, 0.3)',
-          borderRadius: '6px',
+          background: 'rgba(255, 255, 255, 0.025)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRadius: '8px',
           padding: '8px 12px',
-          marginBottom: '14px',
+          marginBottom: '16px',
           fontSize: '12px',
-          color: 'var(--txt)',
+          color: 'var(--txt-muted)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -53,27 +55,27 @@ export function LeaderboardModal({ onClose }) {
           gap: '6px'
         }}>
           <div>
-            <b>Scoring:</b> Easy: <span style={{ color: 'var(--neon)', fontWeight: 700 }}>200 pts</span> • Medium: <span style={{ color: 'var(--amber)', fontWeight: 700 }}>300 pts</span> • Hard: <span style={{ color: 'var(--red)', fontWeight: 700 }}>400 pts</span>
+            <span>Scoring: Easy (200) • Medium (300) • Hard (400)</span>
           </div>
-          <div style={{ color: '#ff758f', fontWeight: 700 }}>
-            Penalty: −10 pts per Wrong Submission
+          <div style={{ color: '#ff7b72' }}>
+            −10 pts per Wrong Submission
           </div>
         </div>
 
         <div style={{
           maxHeight: '440px',
           overflowY: 'auto',
-          border: '1px solid var(--bd)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px'
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--bd)', color: 'var(--mut)' }}>
-                <th style={{ padding: '10px 14px', width: '60px' }}>Rank</th>
-                <th style={{ padding: '10px 14px' }}>Team</th>
-                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Solved</th>
-                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Wrong (WA)</th>
-                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Contest Score</th>
+              <tr style={{ background: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--txt-dim)' }}>
+                <th style={{ padding: '10px 14px', width: '60px', fontWeight: 600 }}>Rank</th>
+                <th style={{ padding: '10px 14px', fontWeight: 600 }}>Team</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>Solved</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>Wrong (WA)</th>
+                <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>Score</th>
               </tr>
             </thead>
             <tbody>
@@ -81,23 +83,23 @@ export function LeaderboardModal({ onClose }) {
                 const rank = idx + 1;
                 return (
                   <tr key={team.name} style={{
-                    borderBottom: '1px solid var(--bd)',
-                    background: rank === 1 ? 'rgba(57, 255, 20, 0.05)' : 'transparent'
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                    background: rank === 1 ? 'rgba(56, 139, 253, 0.04)' : 'transparent'
                   }}>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: rank <= 3 ? 'var(--neon)' : 'var(--txt)' }}>
+                    <td style={{ padding: '12px 14px', fontWeight: 700, color: rank <= 3 ? '#ffffff' : 'var(--txt-dim)' }}>
                       #{rank}
                     </td>
-                    <td style={{ padding: '10px 14px', fontWeight: 600 }}>
+                    <td style={{ padding: '12px 14px', fontWeight: 600, color: '#ffffff' }}>
                       {team.name}
-                      {team.isLocked && <span style={{ color: 'var(--red)', fontSize: '11px', marginLeft: '6px' }}>(Locked)</span>}
+                      {team.isLocked && <span style={{ color: '#ff7b72', fontSize: '11px', marginLeft: '6px' }}>(Locked)</span>}
                     </td>
-                    <td style={{ padding: '10px 14px', textAlign: 'center', color: 'var(--teal)' }}>
+                    <td style={{ padding: '12px 14px', textAlign: 'center', color: '#58a6ff', fontWeight: 600 }}>
                       {team.solvedCount}
                     </td>
-                    <td style={{ padding: '10px 14px', textAlign: 'center', color: 'var(--mut)' }}>
+                    <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--txt-dim)' }}>
                       {team.wrongAttempts}
                     </td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: 'var(--neon)' }}>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
                       {team.score} pts
                     </td>
                   </tr>
@@ -105,7 +107,7 @@ export function LeaderboardModal({ onClose }) {
               })}
               {leaderboard.length === 0 && (
                 <tr>
-                  <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--mut)' }}>
+                  <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--txt-dim)' }}>
                     No submissions yet. Be the first to solve!
                   </td>
                 </tr>
