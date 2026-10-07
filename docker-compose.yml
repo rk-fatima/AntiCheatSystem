@@ -1,0 +1,60 @@
+services:
+  # 1. Reverse Proxy & Edge Cache (Handles 500+ Concurrent HTTP Connections)
+  proxy:
+    image: nginx:alpine
+    container_name: qubit_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    restart: always
+
+  # 2. Clustered API Server & Telemetry Hub
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qubit_backend
+    environment:
+      - PORT=8765
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://qubit:qubit_pass@db:5432/qubit_db
+      - REDIS_URL=redis://redis:6379
+      - ADMIN_PIN=qubit
+      - MAX_FLAGS=3
+      - WORKER_CONCURRENCY=8
+    ports:
+      - "8765:8765"
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  # 3. Persistent Database (PostgreSQL)
+  db:
+    image: postgres:16-alpine
+    container_name: qubit_postgres
+    environment:
+      - POSTGRES_USER=qubit
+      - POSTGRES_PASSWORD=qubit_pass
+      - POSTGRES_DB=qubit_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: always
+
+  # 4. Message Broker & Priority Submission Queue (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: qubit_redis
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    restart: always
+
+volumes:
+  pgdata:

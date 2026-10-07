@@ -382,7 +382,7 @@
       "diff": "Easy",
       "pts": 100,
       "cat": "Arrays / Boyer-Moore",
-      "desc": "Given N and an array of N numbers, print the majority element that appears more than \u230aN / 2\u230b times.",
+      "desc": "Given N and an array of N numbers, print the majority element that appears more than ⌊N / 2⌋ times.",
       "con": "1 <= N <= 5 * 10^4",
       "si": "3\n3 2 3",
       "so": "3",
@@ -1278,7 +1278,7 @@
     {
       "id": "M15",
       "key": "TWOSUMSORTED",
-      "title": "Two Sum II \u2013 Input Array Is Sorted",
+      "title": "Two Sum II – Input Array Is Sorted",
       "diff": "Medium",
       "pts": 150,
       "cat": "Two Pointers / Binary Search",
@@ -1395,5 +1395,956 @@
       "ht": "2 2\n1 2\n3 4\n---\n2.50000\n===\n0 1\n\n1\n---\n1.00000",
       "origId": "LC4"
     }
-  ]
+  ],
+  "teams": {
+    "TestTeam": {
+      "name": "TestTeam",
+      "balance": 0,
+      "unlocked": [],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791378640365-yq9pnk",
+          "teamName": "TestTeam",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Simulated exit",
+          "timestamp": 1791378640365,
+          "isoTime": "2026-10-07T13:10:40.365Z"
+        }
+      ],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-07T13:10:40.236Z"
+    },
+    "qubit": {
+      "name": "qubit",
+      "balance": 0,
+      "unlocked": [],
+      "solved": [],
+      "score": 100,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791378992407-8uwkek",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791378992407,
+          "isoTime": "2026-10-07T13:16:32.407Z"
+        },
+        {
+          "id": "1791379025460-q7zhum",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379025460,
+          "isoTime": "2026-10-07T13:17:05.460Z"
+        },
+        {
+          "id": "1791379028343-rw8ysh",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379028344,
+          "isoTime": "2026-10-07T13:17:08.344Z"
+        },
+        {
+          "id": "1791379052192-ucwdnm",
+          "teamName": "qubit",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791379052192,
+          "isoTime": "2026-10-07T13:17:32.192Z"
+        },
+        {
+          "id": "1791379106172-ckj5xp",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379106172,
+          "isoTime": "2026-10-07T13:18:26.172Z"
+        },
+        {
+          "id": "1791379172291-ymblh8",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379172291,
+          "isoTime": "2026-10-07T13:19:32.291Z"
+        },
+        {
+          "id": "1791379210587-l7j0bd",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379210587,
+          "isoTime": "2026-10-07T13:20:10.587Z"
+        },
+        {
+          "id": "1791379227665-yxlc6e",
+          "teamName": "qubit",
+          "event": "EXTERNAL_PASTE_ATTEMPT",
+          "details": "Blocked attempt to paste external code (213 characters).",
+          "timestamp": 1791379227665,
+          "isoTime": "2026-10-07T13:20:27.665Z"
+        },
+        {
+          "id": "1791379241881-9eemaj",
+          "teamName": "qubit",
+          "event": "EXTERNAL_PASTE_ATTEMPT",
+          "details": "Blocked attempt to paste external code (213 characters).",
+          "timestamp": 1791379241881,
+          "isoTime": "2026-10-07T13:20:41.881Z"
+        },
+        {
+          "id": "1791379252311-kqp3p8",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379252311,
+          "isoTime": "2026-10-07T13:20:52.311Z"
+        },
+        {
+          "id": "1791379428782-karz8z",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379428782,
+          "isoTime": "2026-10-07T13:23:48.782Z"
+        },
+        {
+          "id": "1791379575898-n1pqcc",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379575898,
+          "isoTime": "2026-10-07T13:26:15.898Z"
+        },
+        {
+          "id": "1791379590532-g8sjux",
+          "teamName": "qubit",
+          "event": "EXTERNAL_PASTE_ATTEMPT",
+          "details": "Blocked attempt to paste external code (213 characters).",
+          "timestamp": 1791379590532,
+          "isoTime": "2026-10-07T13:26:30.532Z"
+        },
+        {
+          "id": "1791379601607-kf1goi",
+          "teamName": "qubit",
+          "event": "EXTERNAL_PASTE_ATTEMPT",
+          "details": "Blocked attempt to paste external code (213 characters).",
+          "timestamp": 1791379601607,
+          "isoTime": "2026-10-07T13:26:41.607Z"
+        },
+        {
+          "id": "1791379660964-5fx24r",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379660964,
+          "isoTime": "2026-10-07T13:27:40.964Z"
+        },
+        {
+          "id": "1791379706107-ii4bxe",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379706107,
+          "isoTime": "2026-10-07T13:28:26.107Z"
+        },
+        {
+          "id": "1791379785292-okl6u5",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379785292,
+          "isoTime": "2026-10-07T13:29:45.292Z"
+        },
+        {
+          "id": "1791379823125-ge9c9o",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791379823125,
+          "isoTime": "2026-10-07T13:30:23.125Z"
+        },
+        {
+          "id": "1791380495897-ewl634",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791380495897,
+          "isoTime": "2026-10-07T13:41:35.897Z"
+        },
+        {
+          "id": "1791382018694-bwk8c9",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791382018694,
+          "isoTime": "2026-10-07T14:06:58.694Z"
+        },
+        {
+          "id": "1791382196277-51xrom",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791382196277,
+          "isoTime": "2026-10-07T14:09:56.277Z"
+        },
+        {
+          "id": "1791382370435-9r6jqm",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791382370435,
+          "isoTime": "2026-10-07T14:12:50.435Z"
+        },
+        {
+          "id": "1791382374693-o4gt81",
+          "teamName": "qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791382374693,
+          "isoTime": "2026-10-07T14:12:54.693Z"
+        },
+        {
+          "id": "1791382497449-uxplqp",
+          "teamName": "qubit",
+          "event": "TAB_SWITCH",
+          "details": "Switched away from browser tab or minimized window.",
+          "timestamp": 1791382497449,
+          "isoTime": "2026-10-07T14:14:57.449Z"
+        }
+      ],
+      "isLocked": true,
+      "lockReason": "Flag threshold exceeded (24 violations detected). Organiser review required.",
+      "attempts": [
+        {
+          "problemId": "P1",
+          "timestamp": 1791379649149,
+          "verdict": "ACCEPTED",
+          "passed": true
+        },
+        {
+          "problemId": "P1",
+          "timestamp": 1791379694130,
+          "verdict": "ACCEPTED",
+          "passed": true
+        },
+        {
+          "problemId": "P1",
+          "timestamp": 1791379726173,
+          "verdict": "ACCEPTED",
+          "passed": true
+        }
+      ],
+      "createdAt": "2026-10-07T13:16:24.103Z"
+    },
+    "Qubit": {
+      "name": "Qubit",
+      "balance": 0,
+      "unlocked": [
+        "LC1",
+        "LC20"
+      ],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791380586199-ddmcnf",
+          "teamName": "Qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791380586199,
+          "isoTime": "2026-10-07T13:43:06.199Z"
+        },
+        {
+          "id": "1791380633197-d1olfk",
+          "teamName": "Qubit",
+          "event": "INVALID_KEY_ATTEMPT",
+          "details": "Attempted invalid key: TWOSUM",
+          "timestamp": 1791380633197,
+          "isoTime": "2026-10-07T13:43:53.197Z"
+        },
+        {
+          "id": "1791380646436-yykjhg",
+          "teamName": "Qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791380646436,
+          "isoTime": "2026-10-07T13:44:06.436Z"
+        },
+        {
+          "id": "1791380660569-5efap4",
+          "teamName": "Qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791380660569,
+          "isoTime": "2026-10-07T13:44:20.569Z"
+        },
+        {
+          "id": "1791380690075-422490",
+          "teamName": "Qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791380690075,
+          "isoTime": "2026-10-07T13:44:50.075Z"
+        },
+        {
+          "id": "1791380969850-y1jcn5",
+          "teamName": "Qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791380969850,
+          "isoTime": "2026-10-07T13:49:29.850Z"
+        },
+        {
+          "id": "1791381132167-615fh8",
+          "teamName": "Qubit",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381132167,
+          "isoTime": "2026-10-07T13:52:12.167Z"
+        }
+      ],
+      "isLocked": true,
+      "lockReason": "Flag threshold exceeded (7 violations detected). Organiser review required.",
+      "attempts": [],
+      "createdAt": "2026-10-07T13:42:45.048Z"
+    },
+    "ABCD": {
+      "name": "ABCD",
+      "balance": 0,
+      "unlocked": [],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791381218020-d393qx",
+          "teamName": "ABCD",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381218021,
+          "isoTime": "2026-10-07T13:53:38.021Z"
+        },
+        {
+          "id": "1791381220863-kj4ez5",
+          "teamName": "ABCD",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381220863,
+          "isoTime": "2026-10-07T13:53:40.863Z"
+        },
+        {
+          "id": "1791381230943-eukycc",
+          "teamName": "ABCD",
+          "event": "TAB_SWITCH",
+          "details": "Switched away from browser tab or minimized window.",
+          "timestamp": 1791381230943,
+          "isoTime": "2026-10-07T13:53:50.943Z"
+        },
+        {
+          "id": "1791381460888-35egwc",
+          "teamName": "ABCD",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381460888,
+          "isoTime": "2026-10-07T13:57:40.888Z"
+        },
+        {
+          "id": "1791381522565-tl4a4a",
+          "teamName": "ABCD",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381522565,
+          "isoTime": "2026-10-07T13:58:42.565Z"
+        },
+        {
+          "id": "1791381593752-6febmf",
+          "teamName": "ABCD",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381593752,
+          "isoTime": "2026-10-07T13:59:53.752Z"
+        },
+        {
+          "id": "1791381641221-14khw7",
+          "teamName": "ABCD",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381641221,
+          "isoTime": "2026-10-07T14:00:41.221Z"
+        },
+        {
+          "id": "1791381674286-b8oeeu",
+          "teamName": "ABCD",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791381674286,
+          "isoTime": "2026-10-07T14:01:14.286Z"
+        }
+      ],
+      "isLocked": true,
+      "lockReason": "Flag threshold exceeded (8 violations detected). Organiser review required.",
+      "attempts": [],
+      "createdAt": "2026-10-07T13:52:42.029Z"
+    },
+    "DemoTeam": {
+      "name": "DemoTeam",
+      "balance": 850,
+      "unlocked": [
+        "LC2"
+      ],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-07T13:57:34.322Z"
+    },
+    "ABCDE": {
+      "name": "ABCDE",
+      "balance": 800,
+      "unlocked": [
+        "LC1",
+        "LC9"
+      ],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791381738553-an896q",
+          "teamName": "ABCDE",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381738553,
+          "isoTime": "2026-10-07T14:02:18.553Z"
+        },
+        {
+          "id": "1791381751319-ovj35v",
+          "teamName": "ABCDE",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381751319,
+          "isoTime": "2026-10-07T14:02:31.319Z"
+        },
+        {
+          "id": "1791381759738-mlv8xb",
+          "teamName": "ABCDE",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381759738,
+          "isoTime": "2026-10-07T14:02:39.738Z"
+        },
+        {
+          "id": "1791381834627-4ko0c3",
+          "teamName": "ABCDE",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381834627,
+          "isoTime": "2026-10-07T14:03:54.627Z"
+        },
+        {
+          "id": "1791381844029-9jr2tp",
+          "teamName": "ABCDE",
+          "event": "INVALID_KEY_ATTEMPT",
+          "details": "Attempted invalid key: LC!",
+          "timestamp": 1791381844029,
+          "isoTime": "2026-10-07T14:04:04.029Z"
+        },
+        {
+          "id": "1791381901462-uvzzdv",
+          "teamName": "ABCDE",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381901462,
+          "isoTime": "2026-10-07T14:05:01.462Z"
+        },
+        {
+          "id": "1791381946056-dxiy3a",
+          "teamName": "ABCDE",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791381946056,
+          "isoTime": "2026-10-07T14:05:46.056Z"
+        },
+        {
+          "id": "1791381956198-a575eq",
+          "teamName": "ABCDE",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791381956198,
+          "isoTime": "2026-10-07T14:05:56.198Z"
+        }
+      ],
+      "isLocked": true,
+      "lockReason": "Flag threshold exceeded (8 violations detected). Organiser review required.",
+      "attempts": [],
+      "createdAt": "2026-10-07T14:01:22.396Z"
+    },
+    "TestUnlock": {
+      "name": "TestUnlock",
+      "balance": 550,
+      "unlocked": [
+        "E1",
+        "M1",
+        "H1"
+      ],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-07T14:14:04.348Z"
+    },
+    "QWERTY": {
+      "name": "QWERTY",
+      "balance": 1000,
+      "unlocked": [],
+      "solved": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791382576431-eha66q",
+          "teamName": "QWERTY",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791382576431,
+          "isoTime": "2026-10-07T14:16:16.431Z"
+        },
+        {
+          "id": "1791382587662-8z3tsn",
+          "teamName": "QWERTY",
+          "event": "TAB_SWITCH",
+          "details": "Switched away from browser tab or minimized window.",
+          "timestamp": 1791382587662,
+          "isoTime": "2026-10-07T14:16:27.662Z"
+        }
+      ],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-07T14:15:09.059Z"
+    }
+  },
+  "submissions": [],
+  "telemetry": [
+    {
+      "id": "1791382587662-8z3tsn",
+      "teamName": "QWERTY",
+      "event": "TAB_SWITCH",
+      "details": "Switched away from browser tab or minimized window.",
+      "timestamp": 1791382587662,
+      "isoTime": "2026-10-07T14:16:27.662Z"
+    },
+    {
+      "id": "1791382576431-eha66q",
+      "teamName": "QWERTY",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791382576431,
+      "isoTime": "2026-10-07T14:16:16.431Z"
+    },
+    {
+      "id": "1791382497449-uxplqp",
+      "teamName": "qubit",
+      "event": "TAB_SWITCH",
+      "details": "Switched away from browser tab or minimized window.",
+      "timestamp": 1791382497449,
+      "isoTime": "2026-10-07T14:14:57.449Z"
+    },
+    {
+      "id": "1791382374693-o4gt81",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791382374693,
+      "isoTime": "2026-10-07T14:12:54.693Z"
+    },
+    {
+      "id": "1791382370435-9r6jqm",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791382370435,
+      "isoTime": "2026-10-07T14:12:50.435Z"
+    },
+    {
+      "id": "1791382196277-51xrom",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791382196277,
+      "isoTime": "2026-10-07T14:09:56.277Z"
+    },
+    {
+      "id": "1791382018694-bwk8c9",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791382018694,
+      "isoTime": "2026-10-07T14:06:58.694Z"
+    },
+    {
+      "id": "1791381956198-a575eq",
+      "teamName": "ABCDE",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791381956198,
+      "isoTime": "2026-10-07T14:05:56.198Z"
+    },
+    {
+      "id": "1791381946056-dxiy3a",
+      "teamName": "ABCDE",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381946056,
+      "isoTime": "2026-10-07T14:05:46.056Z"
+    },
+    {
+      "id": "1791381901462-uvzzdv",
+      "teamName": "ABCDE",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381901462,
+      "isoTime": "2026-10-07T14:05:01.462Z"
+    },
+    {
+      "id": "1791381844029-9jr2tp",
+      "teamName": "ABCDE",
+      "event": "INVALID_KEY_ATTEMPT",
+      "details": "Attempted invalid key: LC!",
+      "timestamp": 1791381844029,
+      "isoTime": "2026-10-07T14:04:04.029Z"
+    },
+    {
+      "id": "1791381834627-4ko0c3",
+      "teamName": "ABCDE",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381834627,
+      "isoTime": "2026-10-07T14:03:54.627Z"
+    },
+    {
+      "id": "1791381759738-mlv8xb",
+      "teamName": "ABCDE",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381759738,
+      "isoTime": "2026-10-07T14:02:39.738Z"
+    },
+    {
+      "id": "1791381751319-ovj35v",
+      "teamName": "ABCDE",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381751319,
+      "isoTime": "2026-10-07T14:02:31.319Z"
+    },
+    {
+      "id": "1791381738553-an896q",
+      "teamName": "ABCDE",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381738553,
+      "isoTime": "2026-10-07T14:02:18.553Z"
+    },
+    {
+      "id": "1791381674286-b8oeeu",
+      "teamName": "ABCD",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791381674286,
+      "isoTime": "2026-10-07T14:01:14.286Z"
+    },
+    {
+      "id": "1791381641221-14khw7",
+      "teamName": "ABCD",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381641221,
+      "isoTime": "2026-10-07T14:00:41.221Z"
+    },
+    {
+      "id": "1791381593752-6febmf",
+      "teamName": "ABCD",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381593752,
+      "isoTime": "2026-10-07T13:59:53.752Z"
+    },
+    {
+      "id": "1791381522565-tl4a4a",
+      "teamName": "ABCD",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381522565,
+      "isoTime": "2026-10-07T13:58:42.565Z"
+    },
+    {
+      "id": "1791381460888-35egwc",
+      "teamName": "ABCD",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381460888,
+      "isoTime": "2026-10-07T13:57:40.888Z"
+    },
+    {
+      "id": "1791381230943-eukycc",
+      "teamName": "ABCD",
+      "event": "TAB_SWITCH",
+      "details": "Switched away from browser tab or minimized window.",
+      "timestamp": 1791381230943,
+      "isoTime": "2026-10-07T13:53:50.943Z"
+    },
+    {
+      "id": "1791381220863-kj4ez5",
+      "teamName": "ABCD",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381220863,
+      "isoTime": "2026-10-07T13:53:40.863Z"
+    },
+    {
+      "id": "1791381218020-d393qx",
+      "teamName": "ABCD",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381218021,
+      "isoTime": "2026-10-07T13:53:38.021Z"
+    },
+    {
+      "id": "1791381132167-615fh8",
+      "teamName": "Qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791381132167,
+      "isoTime": "2026-10-07T13:52:12.167Z"
+    },
+    {
+      "id": "1791380969850-y1jcn5",
+      "teamName": "Qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791380969850,
+      "isoTime": "2026-10-07T13:49:29.850Z"
+    },
+    {
+      "id": "1791380690075-422490",
+      "teamName": "Qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791380690075,
+      "isoTime": "2026-10-07T13:44:50.075Z"
+    },
+    {
+      "id": "1791380660569-5efap4",
+      "teamName": "Qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791380660569,
+      "isoTime": "2026-10-07T13:44:20.569Z"
+    },
+    {
+      "id": "1791380646436-yykjhg",
+      "teamName": "Qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791380646436,
+      "isoTime": "2026-10-07T13:44:06.436Z"
+    },
+    {
+      "id": "1791380633197-d1olfk",
+      "teamName": "Qubit",
+      "event": "INVALID_KEY_ATTEMPT",
+      "details": "Attempted invalid key: TWOSUM",
+      "timestamp": 1791380633197,
+      "isoTime": "2026-10-07T13:43:53.197Z"
+    },
+    {
+      "id": "1791380586199-ddmcnf",
+      "teamName": "Qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791380586199,
+      "isoTime": "2026-10-07T13:43:06.199Z"
+    },
+    {
+      "id": "1791380495897-ewl634",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791380495897,
+      "isoTime": "2026-10-07T13:41:35.897Z"
+    },
+    {
+      "id": "1791379823125-ge9c9o",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379823125,
+      "isoTime": "2026-10-07T13:30:23.125Z"
+    },
+    {
+      "id": "1791379785292-okl6u5",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379785292,
+      "isoTime": "2026-10-07T13:29:45.292Z"
+    },
+    {
+      "id": "1791379706107-ii4bxe",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379706107,
+      "isoTime": "2026-10-07T13:28:26.107Z"
+    },
+    {
+      "id": "1791379660964-5fx24r",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379660964,
+      "isoTime": "2026-10-07T13:27:40.964Z"
+    },
+    {
+      "id": "1791379601607-kf1goi",
+      "teamName": "qubit",
+      "event": "EXTERNAL_PASTE_ATTEMPT",
+      "details": "Blocked attempt to paste external code (213 characters).",
+      "timestamp": 1791379601607,
+      "isoTime": "2026-10-07T13:26:41.607Z"
+    },
+    {
+      "id": "1791379590532-g8sjux",
+      "teamName": "qubit",
+      "event": "EXTERNAL_PASTE_ATTEMPT",
+      "details": "Blocked attempt to paste external code (213 characters).",
+      "timestamp": 1791379590532,
+      "isoTime": "2026-10-07T13:26:30.532Z"
+    },
+    {
+      "id": "1791379575898-n1pqcc",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379575898,
+      "isoTime": "2026-10-07T13:26:15.898Z"
+    },
+    {
+      "id": "1791379428782-karz8z",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379428782,
+      "isoTime": "2026-10-07T13:23:48.782Z"
+    },
+    {
+      "id": "1791379252311-kqp3p8",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379252311,
+      "isoTime": "2026-10-07T13:20:52.311Z"
+    },
+    {
+      "id": "1791379241881-9eemaj",
+      "teamName": "qubit",
+      "event": "EXTERNAL_PASTE_ATTEMPT",
+      "details": "Blocked attempt to paste external code (213 characters).",
+      "timestamp": 1791379241881,
+      "isoTime": "2026-10-07T13:20:41.881Z"
+    },
+    {
+      "id": "1791379227665-yxlc6e",
+      "teamName": "qubit",
+      "event": "EXTERNAL_PASTE_ATTEMPT",
+      "details": "Blocked attempt to paste external code (213 characters).",
+      "timestamp": 1791379227665,
+      "isoTime": "2026-10-07T13:20:27.665Z"
+    },
+    {
+      "id": "1791379210587-l7j0bd",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379210587,
+      "isoTime": "2026-10-07T13:20:10.587Z"
+    },
+    {
+      "id": "1791379172291-ymblh8",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379172291,
+      "isoTime": "2026-10-07T13:19:32.291Z"
+    },
+    {
+      "id": "1791379106172-ckj5xp",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379106172,
+      "isoTime": "2026-10-07T13:18:26.172Z"
+    },
+    {
+      "id": "1791379052192-ucwdnm",
+      "teamName": "qubit",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791379052192,
+      "isoTime": "2026-10-07T13:17:32.192Z"
+    },
+    {
+      "id": "1791379028343-rw8ysh",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379028344,
+      "isoTime": "2026-10-07T13:17:08.344Z"
+    },
+    {
+      "id": "1791379025460-q7zhum",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791379025460,
+      "isoTime": "2026-10-07T13:17:05.460Z"
+    },
+    {
+      "id": "1791378992407-8uwkek",
+      "teamName": "qubit",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791378992407,
+      "isoTime": "2026-10-07T13:16:32.407Z"
+    },
+    {
+      "id": "1791378640365-yq9pnk",
+      "teamName": "TestTeam",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Simulated exit",
+      "timestamp": 1791378640365,
+      "isoTime": "2026-10-07T13:10:40.365Z"
+    }
+  ],
+  "config": {
+    "adminPin": "qubit",
+    "maxFlags": 3,
+    "executionTimeoutMs": 3000
+  }
 }

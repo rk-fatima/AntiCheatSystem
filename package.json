@@ -1,0 +1,11 @@
+{
+  "name": "qubit-anticheat-system",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node backend/server.js",
+    "build": "cd frontend && npm run build",
+    "dev:backend": "node --watch backend/server.js",
+    "dev:frontend": "cd frontend && npm run dev"
+  }
+}
