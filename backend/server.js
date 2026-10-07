@@ -309,20 +309,13 @@ app.post('/api/team/login', (req, res) => {
     return res.status(400).json({ error: 'Team name cannot be blank.' });
   }
 
-  const team = db.getTeam(teamName);
-  if (!team) {
-    return res.status(404).json({ error: `Team "${teamName}" is not registered. Please register your team first.` });
+  try {
+    const { team, member } = db.loginOrInitTeam(teamName, memberId);
+    broadcastToProctors({ type: 'TEAM_UPDATED', team });
+    res.json({ team, member });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-
-  let selectedMember = null;
-  if (memberId && team.members) {
-    selectedMember = team.members.find(m => m.memberId === memberId) || null;
-  }
-  if (!selectedMember && team.members && team.members.length > 0) {
-    selectedMember = team.members[0];
-  }
-
-  res.json({ team, member: selectedMember });
 });
 
 app.get('/api/team/:name', (req, res) => {

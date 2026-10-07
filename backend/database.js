@@ -262,16 +262,64 @@ class Database {
     return this.state.teams[k] || Object.values(this.state.teams).find(t => t.name.toLowerCase() === k.toLowerCase()) || null;
   }
 
-  getOrCreateTeam(teamName) {
-    let team = this.getTeam(teamName);
-    if (!team && teamName) {
-      try {
-        team = this.registerTeam({ name: teamName, size: 1, members: [{ name: teamName }] });
-      } catch (e) {
-        team = this.getTeam(teamName);
-      }
+  loginOrInitTeam(teamName, memberId) {
+    const normalized = (teamName || '').trim();
+    if (!normalized) {
+      throw new Error('Team name cannot be blank.');
     }
-    return team;
+
+    let team = this.getTeam(normalized);
+    if (!team) {
+      // Auto-initialize team from Google Forms identity
+      const defaultMembers = [
+        { memberId: `${normalized}-01`, name: 'Member 1', isCaptain: true },
+        { memberId: `${normalized}-02`, name: 'Member 2', isCaptain: false },
+        { memberId: `${normalized}-03`, name: 'Member 3', isCaptain: false }
+      ];
+
+      team = {
+        id: normalized,
+        name: normalized,
+        size: 3,
+        captainId: `${normalized}-01`,
+        captainName: 'Member 1',
+        members: defaultMembers,
+        balance: this.state.config.initialTeamBalance || 1000,
+        unlocked: [],
+        solved: [],
+        problemStatuses: {},
+        transactions: [],
+        score: 0,
+        wrong: 0,
+        violations: [],
+        isLocked: false,
+        lockReason: "",
+        attempts: [],
+        createdAt: new Date().toISOString()
+      };
+
+      this.state.teams[normalized] = team;
+      this.save();
+    }
+
+    // Determine the active member
+    let member = null;
+    const targetId = (memberId || '').trim().toLowerCase();
+    if (targetId && team.members) {
+      member = team.members.find(m => m.memberId.toLowerCase() === targetId);
+    }
+    if (!member && targetId) {
+      member = team.members.find(m => m.memberId.toLowerCase().endsWith(targetId));
+    }
+    if (!member) {
+      member = team.members[0] || { memberId: `${normalized}-01`, name: 'Member 1' };
+    }
+
+    return { team, member };
+  }
+
+  getOrCreateTeam(teamName) {
+    return this.loginOrInitTeam(teamName).team;
   }
 
   getAllTeams() {
