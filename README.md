@@ -1,6 +1,56 @@
-# Qubit AntiCheat & Contest System 🚀
+# Qubit AntiCheat & Contest Examination Platform 🚀
 
-A scalable, secure, and production-ready online coding examination platform engineered to comfortably support **500+ concurrent contestants** with real-time proctoring and automated code grading.
+A scalable, secure, and production-ready online coding examination platform engineered to comfortably support **500+ concurrent contestants** with real-time proctoring, an auction-based problem economy, and automated multi-language code grading.
+
+---
+
+## 📁 Project Directory Structure
+
+```text
+AntiCheatSystem/
+├── .gitignore                   # Ignores node_modules, build artifacts, OS files
+├── README.md                    # Platform documentation & deployment guide
+├── database.sql                 # PostgreSQL production schema & performance indexes
+├── docker-compose.yml           # Multi-container orchestration (Nginx, API, DB, Redis)
+├── nginx.conf                   # Reverse proxy, gzip, WebSocket & submission rate-limiting
+├── package.json                 # Root npm scripts (start, build, dev:backend, dev:frontend)
+├── qubit-problems.json          # Root mirror of the 93-problem catalog
+│
+├── frontend/                    # High-Performance React 18 + Vite SPA
+│   ├── package.json             # Frontend dependencies (React, Lucide-react, Vite)
+│   ├── vite.config.js           # Vite dev proxy configuration (/api & /ws)
+│   ├── index.html               # SPA entry point with Google Fonts
+│   └── src/
+│       ├── main.jsx             # React DOM root mounting
+│       ├── index.css            # Cyberpunk dark mode design system & scrollbars
+│       ├── App.jsx              # Master application controller & state manager
+│       │
+│       ├── components/          # Modular React UI Components
+│       │   ├── Header.jsx       # Real-time stats, team badge, fullscreen & proctor shortcuts
+│       │   ├── ProblemCatalog.jsx # 93-problem auction catalog with 1-click unlock & search
+│       │   ├── CodeEditorPane.jsx # Line gutter editor, stdin, live terminal & solution loader
+│       │   ├── GateModal.jsx    # Mandatory fullscreen exam entrance modal
+│       │   ├── LockOverlay.jsx  # Anti-cheat lockout screen with organiser PIN unlock
+│       │   ├── ProctorDashboard.jsx # Real-time judge monitor for 500 teams & remote unlock
+│       │   └── LeaderboardModal.jsx # Live ranked scoreboard sorted by points and penalties
+│       │
+│       ├── hooks/
+│       │   └── useAntiCheat.js  # Telemetry hook (fullscreen, blur, tab switch, paste guard)
+│       │
+│       └── services/
+│           └── api.js           # Asynchronous REST & WebSocket client service
+│
+└── backend/                     # Asynchronous Queue & Sandboxed Execution Server
+    ├── package.json             # Express, WebSocket, CORS dependencies
+    ├── Dockerfile               # Multi-compiler container (Node.js, GCC, G++, OpenJDK, Python)
+    ├── server.js                # Express REST API, static SPA server & WebSocket hub
+    ├── database.js              # In-memory + atomic JSON store & flexible problem lookup
+    ├── queue.js                 # Concurrency-limited asynchronous submission queue
+    ├── runner.js                # Native sandboxed execution engine (Python, C, C++, Java)
+    └── data/
+        ├── qubit-problems.json  # Master bank of 93 problems (Easy, Medium, Hard)
+        └── store.json           # Atomic database store (teams, balances, audit logs)
+```
 
 ---
 
@@ -14,9 +64,9 @@ The original single-file prototype (`qubit-auctioneer (2).html`) suffered from c
 
 ---
 
-## 🏗️ New Architecture Overview
+## 🏗️ System Architecture
 
-```
+```text
                       [ 500 Contestants (React.js SPA) ]
                                       │
                          HTTPS & WebSockets (WSS)
@@ -41,16 +91,30 @@ The original single-file prototype (`qubit-auctioneer (2).html`) suffered from c
 
 ---
 
+## 💰 Auction Economy & Problem Hierarchy
+
+Each team starts with an auction balance to unlock problems:
+* **Initial Team Budget**: **1,000 points**
+* **Problem Tiers & Costs**:
+  * 🟢 **Easy (`E1` – `E71`)**: **100 points**
+  * 🟡 **Medium (`M1` – `M21`)**: **150 points**
+  * 🔴 **Hard (`H1`)**: **200 points**
+* **Dynamic Deduction**: Unlocking any problem deducts its cost from the team balance in real time. Unlocked problems appear immediately in the **Active Workspace** sidebar.
+
+---
+
 ## ⚡ Key Improvements
 
-### 1. High-Performance React.js Frontend (Replacing Static HTML)
-* **Sub-50ms Initial Load**: Built with **Vite + React 18**, producing optimized, minified, gzip-compressed chunks (`~58 KB` total bundle size).
+### 1. High-Performance React.js Frontend
+* **Sub-50ms Initial Load**: Built with **Vite + React 18**, producing optimized, minified, gzip-compressed chunks (`~59 KB` total bundle size).
 * **Cyberpunk Exam UI**: Dark mode theme with glowing neon indicators, stat counters, and responsive split-pane layout.
 * **Custom Code Editor**:
   * Line number gutter synchronized with scrolling.
   * Tab key support (4-space indentation).
   * Starter templates for **Python 3, C, C++, and Java**.
   * Dynamic execution terminal showing live worker queue progress (`QUEUED` ➔ `RUNNING` ➔ `RESULT`).
+  * **⚡ Load Solution Button**: Instant 1-click test solution auto-fill for testing.
+  * **🔓 Paste Toggle (Dev / Exam)**: Flexible testing toggle for proctors and contestants.
 
 ### 2. Multi-Layer Anti-Cheat Proctoring Engine (`useAntiCheat`)
 * **Fullscreen Lockdown**: Automatically prompts for fullscreen and logs any departures.
@@ -78,42 +142,23 @@ The original single-file prototype (`qubit-auctioneer (2).html`) suffered from c
 
 ## 🚀 Quickstart Guide
 
-### Method 1: Local Development (Fastest)
+### Method 1: Local Development
 
 #### 1. Start the Backend API & Runner:
 ```bash
-cd backend
-npm install
 npm start
 ```
-*The server will start on `http://localhost:8765`.*
+*The server will start on `http://localhost:8765` and serve both the API and the React build.*
 
-#### 2. Start the React Frontend:
+#### 2. (Optional) Run Vite in Development Mode:
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev:frontend
 ```
 *Open `http://localhost:3000` in your browser.*
 
 ---
 
-### Method 2: Single-Command Production Build
-
-You can build the React frontend and let the backend serve it as a production SPA:
-
-```bash
-# 1. Build React production bundle
-cd frontend && npm run build && cd ..
-
-# 2. Run backend server (serves both API and React frontend)
-npm start
-```
-*Access the application at `http://localhost:8765`.*
-
----
-
-### Method 3: Multi-Node Docker Deployment (500 Concurrent Users)
+### Method 2: Multi-Node Docker Deployment (500 Concurrent Users)
 
 To deploy with Nginx, PostgreSQL, Redis, and Sandboxed Workers:
 
@@ -128,11 +173,4 @@ docker compose up -d --build
 ## 🔑 Default Credentials
 
 * **Organiser PIN**: `qubit`
-* **Default Problem Unlock Keys**:
-  * `ALPHA1` — Sum of Array (Easy, 100 pts)
-  * `BRAVO2` — Palindrome Check (Medium, 200 pts)
-  * `CHARLIE3` — Continuous Subarray Sum (Easy, 100 pts)
-  * `DELTA4` — Valid Anagram (Easy, 150 pts)
-  * `ECHO5` — The Bounded Auctioneer (Medium, 250 pts)
-  * `FOXTROT6` — Longest Non-Repeating Substring (Medium, 300 pts)
-  * `GOLF7` — Minimum Bid Adjustments (Hard, 500 pts)
+* **Default Problem Unlock Keys**: Type problem IDs (`E1`, `M1`, `H1`), numbers (`1`, `20`), or names (`Two Sum`, `Add Two Numbers`).
