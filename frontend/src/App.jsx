@@ -378,79 +378,9 @@ export function App() {
                 padding: '8px 10px',
                 fontStyle: 'italic'
               }}>
-                No unlocked problems yet
+                No unlocked problems yet.
               </div>
             )}
-
-            {/* Subtle Divider between UNLOCKED and LOCKED */}
-            <div style={{
-              margin: '10px 6px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.06)'
-            }} />
-
-            {/* Section: LOCKED */}
-            <div style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              letterSpacing: '1px',
-              color: 'var(--txt-dim)',
-              padding: '4px 8px 4px',
-              textTransform: 'uppercase',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <span>LOCKED</span>
-              <span style={{ fontSize: '10px' }}>
-                {problems.filter(p => !(team?.unlocked || []).includes(p.id)).length}
-              </span>
-            </div>
-
-            {problems.filter(p => !(team?.unlocked || []).includes(p.id)).map((prob) => {
-              return (
-                <div
-                  key={prob.id}
-                  onClick={() => setCurrentProblemId(null)}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: 'var(--txt-muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'background 0.12s ease',
-                    minWidth: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                    e.currentTarget.style.color = '#c9d1d9';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--txt-muted)';
-                  }}
-                  title={`Locked: ${prob.id} — ${prob.title}. Click to open catalog`}
-                >
-                  <span style={{
-                    fontSize: '11px',
-                    color: 'var(--txt-dim)',
-                    flexShrink: 0
-                  }}>
-                    🔒
-                  </span>
-                  <span style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    flex: 1
-                  }}>
-                    {prob.id} &nbsp;{prob.title}
-                  </span>
-                </div>
-              );
-            })}
           </div>
 
           {/* Bottom Catalog Action */}
