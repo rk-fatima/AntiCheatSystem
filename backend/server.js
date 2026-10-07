@@ -573,6 +573,15 @@ app.post('/api/submissions/submit', (req, res) => {
           type: 'TEAM_UPDATED',
           team: updatedTeam
         });
+        if (job.submission) {
+          broadcastToProctors({
+            type: 'SUBMISSION_RECORDED',
+            submission: job.submission
+          });
+        }
+        broadcastToAll({
+          type: 'LEADERBOARD_UPDATED'
+        });
       }
     }
   });
@@ -591,10 +600,21 @@ app.get('/api/submissions/status/:id', (req, res) => {
     type: job.type,
     status: job.status,
     result: job.result,
+    submission: job.submission || null,
     error: job.error,
     createdAt: job.createdAt,
     completedAt: job.completedAt
   });
+});
+
+app.get('/api/submissions', (req, res) => {
+  const { teamName } = req.query;
+  const submissions = teamName ? db.getTeamSubmissions(teamName) : db.getAllSubmissions();
+  res.json({ submissions });
+});
+
+app.get('/api/submissions/team/:name', (req, res) => {
+  res.json({ submissions: db.getTeamSubmissions(req.params.name) });
 });
 
 // --- PROCTOR & ADMIN APIS ---
@@ -647,11 +667,12 @@ app.get('/api/leaderboard', (req, res) => {
       name: t.name,
       captainName: t.captainName,
       size: t.size,
-      score: t.score,
-      solvedCount: t.solved.length,
-      wrongAttempts: t.wrong,
+      score: t.score || 0,
+      solvedCount: (t.solved || []).length,
+      wrongAttempts: t.wrong || 0,
+      problemWrong: t.problemWrong || {},
       violationsCount: (t.violations || []).length,
-      isLocked: t.isLocked
+      isLocked: Boolean(t.isLocked)
     }))
     .sort((a, b) => b.score - a.score || a.wrongAttempts - b.wrongAttempts);
 

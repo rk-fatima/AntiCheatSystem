@@ -250,13 +250,31 @@ export function CodeEditorPane({
         padding: '18px',
         background: 'var(--bg)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0, color: 'var(--teal)', fontSize: '20px' }}>
             {problem.id} — {problem.title}
           </h2>
-          <span className={`badge ${problem.diff}`}>{problem.diff}</span>
-          <span style={{ color: 'var(--mut)', fontSize: '13px', marginLeft: 'auto' }}>
-            {problem.pts} pts
+          <span className={`badge ${problem.diff}`}>
+            {problem.diff} ({problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts)
+          </span>
+
+          {/* Wrong submissions counter & penalty */}
+          {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions || 0) > 0 && (
+            <span style={{
+              background: 'rgba(255, 0, 85, 0.12)',
+              border: '1px solid rgba(255, 0, 85, 0.3)',
+              color: '#ff758f',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: 700
+            }}>
+              ⚠️ {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions)} WA (−{(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions) * 10} pts)
+            </span>
+          )}
+
+          <span style={{ color: 'var(--neon)', fontSize: '13px', marginLeft: 'auto', fontWeight: 700 }}>
+            {problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts
           </span>
         </div>
 
@@ -609,8 +627,8 @@ export function CodeEditorPane({
                 <span>VERDICT: {outputResult.data.verdict}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '12px' }}>
                   {outputResult.data.passed
-                    ? `${problem.pts} / ${problem.pts} Points Awarded`
-                    : `Hidden Tests Passed: ${outputResult.data.hiddenPassed} / ${outputResult.data.totalHidden}`}
+                    ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} Difficulty Points Awarded`
+                    : `−10 Points Penalty Applied (Passed ${outputResult.data.hiddenPassed} / ${outputResult.data.totalHidden})`}
                 </span>
               </div>
 

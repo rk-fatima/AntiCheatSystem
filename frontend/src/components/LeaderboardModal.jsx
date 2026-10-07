@@ -37,6 +37,29 @@ export function LeaderboardModal({ onClose }) {
           <button onClick={onClose}><X size={18} /></button>
         </div>
 
+        {/* Scoring Rules Banner */}
+        <div style={{
+          background: 'rgba(20, 217, 196, 0.08)',
+          border: '1px solid rgba(20, 217, 196, 0.3)',
+          borderRadius: '6px',
+          padding: '8px 12px',
+          marginBottom: '14px',
+          fontSize: '12px',
+          color: 'var(--txt)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '6px'
+        }}>
+          <div>
+            <b>Scoring:</b> Easy: <span style={{ color: 'var(--neon)', fontWeight: 700 }}>200 pts</span> • Medium: <span style={{ color: 'var(--amber)', fontWeight: 700 }}>300 pts</span> • Hard: <span style={{ color: 'var(--red)', fontWeight: 700 }}>400 pts</span>
+          </div>
+          <div style={{ color: '#ff758f', fontWeight: 700 }}>
+            Penalty: −10 pts per Wrong Submission
+          </div>
+        </div>
+
         <div style={{
           maxHeight: '440px',
           overflowY: 'auto',
@@ -49,8 +72,8 @@ export function LeaderboardModal({ onClose }) {
                 <th style={{ padding: '10px 14px', width: '60px' }}>Rank</th>
                 <th style={{ padding: '10px 14px' }}>Team</th>
                 <th style={{ padding: '10px 14px', textAlign: 'center' }}>Solved</th>
-                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Wrong</th>
-                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Score</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Wrong (WA)</th>
+                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Contest Score</th>
               </tr>
             </thead>
             <tbody>

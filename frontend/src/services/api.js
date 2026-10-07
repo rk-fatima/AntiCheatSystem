@@ -270,3 +270,10 @@ export async function fetchSabotageTargets(excludeTeam = '') {
   if (!res.ok) return { targets: [] };
   return res.json();
 }
+
+export async function fetchSubmissions(teamName = null) {
+  const url = teamName ? `${API_BASE}/submissions?teamName=${encodeURIComponent(teamName)}` : `${API_BASE}/submissions`;
+  const res = await fetch(url);
+  if (!res.ok) return { submissions: [] };
+  return res.json();
+}

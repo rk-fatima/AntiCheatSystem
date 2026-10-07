@@ -99,23 +99,19 @@ class ExecutionQueue {
           job.result = grade;
           job.status = 'COMPLETED';
 
-          // Update team stats in database
-          const team = db.getTeam(job.teamName);
-          if (team) {
-            team.attempts.push({
-              problemId: job.problemId,
-              memberId: job.memberId || 'UNKNOWN',
-              timestamp: Date.now(),
-              verdict: grade.verdict,
-              passed: grade.passed
-            });
+          // Process submission result, award difficulty score or deduct 10 penalty, track per-problem wrong counts, and log audit record
+          const processResult = db.processSubmissionResult({
+            teamName: job.teamName,
+            memberId: job.memberId,
+            problemId: job.problemId,
+            verdict: grade.verdict,
+            passed: grade.passed,
+            details: grade.details
+          });
 
-            if (grade.passed) {
-              db.recordSolve(job.teamName, job.memberId, job.problemId, Number(problem.pts) || 100);
-            } else {
-              team.wrong++;
-              db.updateTeam(team);
-            }
+          if (processResult) {
+            job.submission = processResult.subRecord;
+            job.team = processResult.team;
           }
         }
       }

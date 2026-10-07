@@ -145,6 +145,19 @@ class Database {
     this.save();
   }
 
+  // --- PROBLEM DIFFICULTY POINTS CONFIGURATION ---
+  // Easy problem → 200 points
+  // Medium problem → 300 points
+  // Hard problem → 400 points
+  getProblemDifficultyPoints(prob) {
+    if (!prob) return 200;
+    const diff = typeof prob === 'string' ? prob : (prob.diff || 'Easy');
+    const d = String(diff).trim().toLowerCase();
+    if (d === 'hard') return 400;
+    if (d === 'medium') return 300;
+    return 200; // Easy is default: 200
+  }
+
   seedProblems() {
     try {
       const dataProblemPath = path.join(__dirname, 'data', 'qubit-problems.json');
@@ -157,6 +170,7 @@ class Database {
         if (parsed.problems && Array.isArray(parsed.problems)) {
           const problemMap = new Map();
           for (const prob of parsed.problems) {
+            prob.pts = this.getProblemDifficultyPoints(prob);
             problemMap.set(prob.id, prob);
           }
           this.state.problems = Array.from(problemMap.values());
@@ -178,6 +192,7 @@ class Database {
       id: p.id,
       title: p.title,
       diff: p.diff,
+      pts: this.getProblemDifficultyPoints(p),
       cat: p.cat,
       desc: p.desc,
       con: p.con,
@@ -189,7 +204,11 @@ class Database {
   }
 
   getFullProblem(id) {
-    return this.state.problems.find(p => p.id === id);
+    const prob = this.state.problems.find(p => p.id === id);
+    if (prob) {
+      prob.pts = this.getProblemDifficultyPoints(prob);
+    }
+    return prob;
   }
 
   findProblemByKey(key) {
@@ -538,30 +557,129 @@ class Database {
     return team;
   }
 
-  recordSolve(teamName, memberId, problemId, pts = 100) {
+  // --- CONTEST SUBMISSIONS & SCORING RULES ---
+  // Easy problem → 200 points
+  // Medium problem → 300 points
+  // Hard problem → 400 points
+  // Every Wrong Answer submission → −10 points (applies independently)
+  // When eventually accepted → award full difficulty score
+  // Final problem score = Difficulty Points − (Number of Wrong Submissions × 10)
+  // Record: Team ID, Member ID, Problem ID, result, penalty, timestamp
+  // ByteCoins/balance is NOT touched (separate currencies)
+  processSubmissionResult({ teamName, memberId, problemId, verdict, passed, details = '' }) {
     const team = this.getTeam(teamName);
     if (!team) return null;
+
+    const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId) || {
+      id: problemId,
+      title: problemId,
+      diff: 'Easy'
+    };
+
+    const diffPoints = this.getProblemDifficultyPoints(problem);
+
+    if (!team.problemWrong) team.problemWrong = {};
     if (!team.problemStatuses) team.problemStatuses = {};
+    if (!team.attempts) team.attempts = [];
 
     const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId,
-      name: memberId
+      memberId: memberId || `${team.name}-01`,
+      name: memberId || 'Team Member'
     };
 
-    if (!team.solved.includes(problemId)) {
-      team.solved.push(problemId);
-      team.score += Number(pts) || 0;
+    const now = Date.now();
+    let penalty = 0;
+    let awardedPoints = 0;
+    const isAlreadySolved = (team.solved || []).includes(problem.id);
+
+    if (passed) {
+      if (!isAlreadySolved) {
+        team.solved.push(problem.id);
+        awardedPoints = diffPoints;
+        team.score = (team.score || 0) + diffPoints;
+      }
+
+      const wrongCount = team.problemWrong[problem.id] || 0;
+      const finalProblemScore = diffPoints - (wrongCount * 10);
+
+      team.problemStatuses[problem.id] = {
+        ...team.problemStatuses[problem.id],
+        status: 'SOLVED',
+        solvedBy: member.memberId,
+        solvedByName: member.name,
+        solvedAt: new Date(now).toISOString(),
+        difficultyPoints: diffPoints,
+        wrongSubmissions: wrongCount,
+        penaltyDeduction: wrongCount * 10,
+        finalProblemScore: finalProblemScore
+      };
+    } else {
+      // Wrong answer or runtime error
+      // Penalty applies if problem not already solved
+      if (!isAlreadySolved) {
+        penalty = -10;
+        team.score = (team.score || 0) - 10;
+        team.wrong = (team.wrong || 0) + 1;
+        team.problemWrong[problem.id] = (team.problemWrong[problem.id] || 0) + 1;
+      }
+
+      const wrongCount = team.problemWrong[problem.id] || 0;
+
+      if (!team.problemStatuses[problem.id] || team.problemStatuses[problem.id].status !== 'SOLVED') {
+        team.problemStatuses[problem.id] = {
+          ...team.problemStatuses[problem.id],
+          status: 'IN_PROGRESS',
+          workingBy: member.memberId,
+          workingByName: member.name,
+          updatedAt: new Date(now).toISOString(),
+          difficultyPoints: diffPoints,
+          wrongSubmissions: wrongCount,
+          penaltyDeduction: wrongCount * 10
+        };
+      }
     }
 
-    team.problemStatuses[problemId] = {
-      status: 'SOLVED',
-      solvedBy: member.memberId,
-      solvedByName: member.name,
-      solvedAt: new Date().toISOString()
+    // Required audit log fields: Team ID, Member ID, Problem ID, result, penalty, timestamp
+    const subRecord = {
+      id: `SUB-${now}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      teamId: team.name,
+      teamName: team.name,
+      memberId: member.memberId,
+      memberName: member.name,
+      problemId: problem.id,
+      problemTitle: problem.title,
+      difficulty: problem.diff,
+      difficultyPoints: diffPoints,
+      result: verdict || (passed ? 'ACCEPTED' : 'WRONG_ANSWER'),
+      verdict: verdict || (passed ? 'ACCEPTED' : 'WRONG_ANSWER'),
+      passed: Boolean(passed),
+      penalty: penalty, // -10 or 0
+      awardedPoints: awardedPoints,
+      wrongCountOnProblem: team.problemWrong[problem.id] || 0,
+      totalTeamWrong: team.wrong || 0,
+      currentTeamScore: team.score,
+      details: details || '',
+      timestamp: now,
+      isoTime: new Date(now).toISOString()
     };
 
+    team.attempts.unshift(subRecord);
+    this.recordSubmission(subRecord);
     this.updateTeam(team);
-    return team;
+    this.save();
+
+    return { team, subRecord };
+  }
+
+  recordSolve(teamName, memberId, problemId, pts = null) {
+    const res = this.processSubmissionResult({
+      teamName,
+      memberId,
+      problemId,
+      verdict: 'ACCEPTED',
+      passed: true
+    });
+    return res ? res.team : null;
   }
 
   // --- TELEMETRY & AUDIT LOGS ---
@@ -617,6 +735,7 @@ class Database {
     team.unlocked = [];
     team.solved = [];
     team.problemStatuses = {};
+    team.problemWrong = {};
     team.transactions = [];
     team.score = 0;
     team.wrong = 0;
@@ -932,6 +1051,18 @@ class Database {
 
   getSubmission(id) {
     return this.state.submissions.find(s => s.id === id);
+  }
+
+  getAllSubmissions() {
+    return this.state.submissions || [];
+  }
+
+  getTeamSubmissions(teamName) {
+    if (!teamName) return this.getAllSubmissions();
+    const target = teamName.trim().toLowerCase();
+    return (this.state.submissions || []).filter(
+      s => (s.teamName || s.teamId || '').toLowerCase() === target
+    );
   }
 
   getAllTransactions() {

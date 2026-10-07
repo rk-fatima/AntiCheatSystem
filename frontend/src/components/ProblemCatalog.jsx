@@ -145,6 +145,35 @@ export function ProblemCatalog({
           onOpenProblem={onSelectProblem}
         />
 
+        {/* Contest Scoring & Separate Currencies Notice Banner */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--bg2)',
+          border: '1px solid var(--bd)',
+          borderRadius: '8px',
+          padding: '10px 16px',
+          marginBottom: '16px',
+          fontSize: '12px',
+          flexWrap: 'wrap',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, color: 'var(--teal)', textTransform: 'uppercase' }}>🏆 Contest Scoring:</span>
+            <span>Easy: <b style={{ color: 'var(--neon)' }}>200 pts</b></span>
+            <span>•</span>
+            <span>Medium: <b style={{ color: 'var(--amber)' }}>300 pts</b></span>
+            <span>•</span>
+            <span>Hard: <b style={{ color: 'var(--red)' }}>400 pts</b></span>
+            <span>•</span>
+            <span style={{ color: '#ff758f', fontWeight: 700 }}>Wrong Submission: −10 pts penalty</span>
+          </div>
+          <div style={{ color: 'var(--mut)', fontSize: '11px' }}>
+            Contest Points (Leaderboard) & ByteCoins (Auction Budget) are separate
+          </div>
+        </div>
+
         {/* Quick Winning Bid Input Bar */}
         <div style={{
           display: 'flex',
@@ -270,52 +299,78 @@ export function ProblemCatalog({
                   )}
 
                   <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      fontWeight: 700,
-                      fontSize: '15px',
-                      color: isUnlocked ? 'var(--txt)' : '#c9d1d9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      flexWrap: 'wrap'
-                    }}>
-                      <span>{prob.id} — {prob.title}</span>
-                      <span className={`badge ${prob.diff}`}>{prob.diff}</span>
+                    {(() => {
+                      const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
+                      const wrongCount = team?.problemWrong?.[prob.id] ?? statusInfo?.wrongSubmissions ?? 0;
+                      const problemScore = statusInfo?.finalProblemScore ?? (diffPoints - (wrongCount * 10));
 
-                      {/* Solved attribution */}
-                      {isSolved && (
-                        <span style={{
-                          display: 'inline-flex',
+                      return (
+                        <div style={{
+                          fontWeight: 700,
+                          fontSize: '15px',
+                          color: isUnlocked ? 'var(--txt)' : '#c9d1d9',
+                          display: 'flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          background: 'rgba(0, 255, 157, 0.15)',
-                          color: 'var(--neon)',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 700
+                          gap: '8px',
+                          flexWrap: 'wrap'
                         }}>
-                          ✅ SOLVED {statusInfo?.solvedBy ? `by ${statusInfo.solvedBy}` : ''}
-                        </span>
-                      )}
+                          <span>{prob.id} — {prob.title}</span>
+                          <span className={`badge ${prob.diff}`}>{prob.diff} ({diffPoints} pts)</span>
 
-                      {/* In-progress attribution */}
-                      {!isSolved && statusInfo?.status === 'IN_PROGRESS' && (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          background: 'rgba(255, 196, 61, 0.15)',
-                          color: 'var(--amber)',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 700
-                        }}>
-                          🟡 IN PROGRESS ({statusInfo.workingBy})
-                        </span>
-                      )}
-                    </div>
+                          {/* Solved attribution & net problem score */}
+                          {isSolved && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'rgba(0, 255, 157, 0.15)',
+                              color: 'var(--neon)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700
+                            }}>
+                              ✅ SOLVED {statusInfo?.solvedBy ? `by ${statusInfo.solvedBy}` : ''} • Score: {problemScore} pts {wrongCount > 0 ? `(${diffPoints} - ${wrongCount * 10})` : ''}
+                            </span>
+                          )}
+
+                          {/* In-progress attribution */}
+                          {!isSolved && statusInfo?.status === 'IN_PROGRESS' && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'rgba(255, 196, 61, 0.15)',
+                              color: 'var(--amber)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700
+                            }}>
+                              🟡 IN PROGRESS ({statusInfo.workingBy})
+                            </span>
+                          )}
+
+                          {/* Wrong submissions penalty indicator */}
+                          {!isSolved && wrongCount > 0 && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'rgba(255, 0, 85, 0.12)',
+                              border: '1px solid rgba(255, 0, 85, 0.3)',
+                              color: '#ff758f',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700
+                            }}>
+                              ⚠️ {wrongCount} WA (-{wrongCount * 10} pts)
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <div style={{ fontSize: '12px', color: 'var(--mut)', marginTop: '3px' }}>
                       {prob.cat || 'Algorithms'}
