@@ -1397,7 +1397,77 @@
     }
   ],
   "problemPrices": {},
-  "teams": {},
+  "teams": {
+    "Synora": {
+      "id": "Synora",
+      "name": "Synora",
+      "size": 2,
+      "captainId": "Synora-001-M01",
+      "captainName": "Salman",
+      "members": [
+        {
+          "memberId": "Synora-001-M01",
+          "name": "Salman",
+          "rollNo": "",
+          "phone": "",
+          "email": "",
+          "college": "",
+          "isCaptain": true
+        },
+        {
+          "memberId": "Synora-001-M02",
+          "name": "Sreethan",
+          "rollNo": "",
+          "phone": "",
+          "email": "",
+          "college": "",
+          "isCaptain": false
+        }
+      ],
+      "balance": 1000,
+      "unlocked": [],
+      "solved": [],
+      "problemStatuses": {},
+      "transactions": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-07T19:09:14.855Z"
+    },
+    "VisionX": {
+      "id": "VisionX",
+      "name": "VisionX",
+      "size": 1,
+      "captainId": "VisionX-001-M01",
+      "captainName": "Rukhsaar",
+      "members": [
+        {
+          "memberId": "VisionX-001-M01",
+          "name": "Rukhsaar",
+          "rollNo": "",
+          "phone": "",
+          "email": "",
+          "college": "",
+          "isCaptain": true
+        }
+      ],
+      "balance": 1000,
+      "unlocked": [],
+      "solved": [],
+      "problemStatuses": {},
+      "transactions": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-07T19:09:14.855Z"
+    }
+  },
   "transactions": [],
   "submissions": [],
   "telemetry": [],
