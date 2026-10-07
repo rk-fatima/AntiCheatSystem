@@ -461,7 +461,7 @@ export function ProblemCatalog({
                   disabled={loading || projectedRemaining < 0}
                   style={{ flex: 2, padding: '10px', fontWeight: 700 }}
                 >
-                  {loading ? 'Unlocking...' : 'Confirm & Unlock for Team'}
+                  {loading ? 'Unlocking...' : 'Confirm'}
                 </button>
               </div>
             </div>
