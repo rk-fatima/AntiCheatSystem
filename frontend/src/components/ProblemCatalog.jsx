@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Lock, Unlock, CheckCircle2, Search, X, Gavel, KeyRound, AlertCircle, Sparkles } from 'lucide-react';
+import { Lock, Search, X } from 'lucide-react';
 import { PowerCardsSection } from './PowerCardsSection';
-import { UnifiedUnlockModal } from './UnifiedUnlockModal';
 
 export function ProblemCatalog({
   problems = [],
@@ -12,57 +11,11 @@ export function ProblemCatalog({
   currentMember,
   team,
   onTeamUpdated,
-  onSelectProblem,
-  onPurchaseProblem
+  onSelectProblem
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [diffFilter, setDiffFilter] = useState('ALL');
-  const [selectedBidProblem, setSelectedBidProblem] = useState(null);
   const [notification, setNotification] = useState(null);
-
-  const handleOpenBidModal = (prob) => {
-    const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
-    setSelectedBidProblem({
-      type: 'PROBLEM',
-      id: prob.id,
-      key: prob.key,
-      title: `${prob.id} — ${prob.title}`,
-      subtitle: `${prob.diff} · ${diffPoints} pts`,
-      diff: prob.diff,
-      pts: diffPoints,
-      defaultBid: 0
-    });
-    setNotification(null);
-  };
-
-  const handleOpenQuickUnlockModal = () => {
-    setSelectedBidProblem({
-      type: 'PROBLEM',
-      isQuickUnlock: true,
-      title: 'Problem by ID',
-      subtitle: 'Record winning bid & verify key',
-      defaultBid: 0
-    });
-    setNotification(null);
-  };
-
-  const handleUnlockProblemSuccess = async ({ target, password, bidAmount, customProblemId }) => {
-    const probId = target.isQuickUnlock ? customProblemId : target.id;
-    if (!probId) return;
-    try {
-      const res = await onPurchaseProblem(probId, bidAmount, password);
-      setNotification({
-        success: true,
-        text: `Unlocked "${probId}" for ₹${bidAmount}. Remaining Team Balance: ₹${res?.team?.balance ?? teamBalance}.`
-      });
-      setSelectedBidProblem(null);
-    } catch (err) {
-      setNotification({
-        success: false,
-        text: err.message || 'Unlock failed.'
-      });
-    }
-  };
 
   const filteredProblems = problems.filter((prob) => {
     const matchesSearch =
@@ -187,16 +140,6 @@ export function ProblemCatalog({
               );
             })}
           </div>
-
-          {/* Quick Unlock Action Trigger */}
-          <button
-            className="btn-ghost"
-            onClick={handleOpenQuickUnlockModal}
-            title="Record winning bid by Problem ID"
-            style={{ fontSize: '12px', padding: '7px 12px', borderRadius: '8px' }}
-          >
-            <Gavel size={14} /> Record Winning Bid
-          </button>
         </div>
 
         {/* 3. PROBLEM LIST (Whitespace over borders) */}
@@ -299,7 +242,7 @@ export function ProblemCatalog({
                   </div>
                 </div>
 
-                {/* Right: Clean Action Button */}
+                {/* Right: Clean Action Button / Lock Status (Admin Controlled) */}
                 <div style={{ flexShrink: 0 }}>
                   {isUnlocked ? (
                     <button
@@ -315,17 +258,20 @@ export function ProblemCatalog({
                       Open →
                     </button>
                   ) : (
-                    <button
-                      className="btn-ghost"
-                      onClick={() => handleOpenBidModal(prob)}
-                      style={{
-                        padding: '6px 14px',
-                        fontSize: '13px',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      Unlock →
-                    </button>
+                    <span style={{
+                      fontSize: '12px',
+                      color: 'var(--txt-dim)',
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      userSelect: 'none'
+                    }}>
+                      <Lock size={12} /> Locked
+                    </span>
                   )}
                 </div>
               </div>
@@ -343,17 +289,6 @@ export function ProblemCatalog({
             </div>
           )}
         </div>
-
-        {/* Unified Password Verification Modal for Problems */}
-        <UnifiedUnlockModal
-          isOpen={Boolean(selectedBidProblem)}
-          onClose={() => setSelectedBidProblem(null)}
-          target={selectedBidProblem}
-          team={team}
-          currentMember={currentMember}
-          teamBalance={teamBalance}
-          onUnlockSuccess={handleUnlockProblemSuccess}
-        />
       </div>
     </div>
   );

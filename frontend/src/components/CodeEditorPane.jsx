@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Send, RotateCcw, Loader2, CheckCircle, AlertTriangle, XCircle, Terminal, Lightbulb, Zap, Snowflake, Lock, Unlock } from 'lucide-react';
 import { useHintPass } from '../services/api';
-import { UnifiedUnlockModal } from './UnifiedUnlockModal';
 
 const STARTER_TEMPLATES = {
   python: `import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # TODO: parse input, solve, print output\n    print()\n\nif __name__ == "__main__":\n    main()\n`,
@@ -45,11 +44,12 @@ export function CodeEditorPane({
   const [allowPaste, setAllowPaste] = useState(false);
   const [hintLoading, setHintLoading] = useState(false);
   const [hintError, setHintError] = useState('');
-  const [showHintUnlockModal, setShowHintUnlockModal] = useState(false);
 
   const isFrozen = Boolean(team?.frozenUntil && team.frozenUntil > Date.now());
+  const isHintCardUnlocked = Boolean(team?.unlockedCards?.includes('HINT') || team?.hintUnlocked);
+  const hasHintPass = (team?.hintPassesCount || 0) > 0;
 
-  const handleHintUnlockSuccess = async () => {
+  const handleUseHintPassDirect = async () => {
     if (!problem?.id || !team?.name) return;
     setHintLoading(true);
     setHintError('');
@@ -62,7 +62,6 @@ export function CodeEditorPane({
       if (onTeamUpdated && res.team) {
         onTeamUpdated(res.team);
       }
-      setShowHintUnlockModal(false);
     } catch (err) {
       setHintError(err.message || 'Failed to unlock hint.');
     } finally {
@@ -371,22 +370,41 @@ export function CodeEditorPane({
                 <Lock size={14} /> Locked Algorithmic Hint
               </div>
               <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '2px' }}>
-                Password verification required to reveal official algorithmic strategy
+                {isHintCardUnlocked && hasHintPass
+                  ? `Your team has ${team.hintPassesCount} Hint Pass available.`
+                  : 'Hint is locked by Administrator. Admin unlock or unlocked Hint Pass required.'}
               </div>
             </div>
-            <button
-              type="button"
-              className="btn-blue"
-              onClick={() => setShowHintUnlockModal(true)}
-              style={{
+            {isHintCardUnlocked && hasHintPass ? (
+              <button
+                type="button"
+                className="btn-blue"
+                onClick={handleUseHintPassDirect}
+                disabled={hintLoading}
+                style={{
+                  fontSize: '11px',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontWeight: 600
+                }}
+              >
+                {hintLoading ? 'Revealing...' : `💡 Use Hint Pass (${team.hintPassesCount})`}
+              </button>
+            ) : (
+              <span style={{
                 fontSize: '11px',
-                padding: '6px 14px',
+                color: 'var(--txt-dim)',
+                padding: '5px 10px',
                 borderRadius: '6px',
-                fontWeight: 600
-              }}
-            >
-              <Lock size={12} /> Enter Password
-            </button>
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Lock size={12} /> Locked (Admin Control)
+              </span>
+            )}
           </div>
         )}
 
@@ -860,24 +878,6 @@ export function CodeEditorPane({
           )}
         </div>
       </div>
-
-      {/* Unified Password Verification Modal for Problem Hint */}
-      <UnifiedUnlockModal
-        isOpen={showHintUnlockModal}
-        onClose={() => setShowHintUnlockModal(false)}
-        target={{
-          type: 'PROBLEM_HINT',
-          id: problem.id,
-          key: problem.key,
-          problemId: problem.id,
-          title: `Hint: ${problem.title}`,
-          subtitle: `Algorithmic strategy for ${problem.id}`
-        }}
-        team={team}
-        currentMember={currentMember}
-        teamBalance={team?.balance ?? 1000}
-        onUnlockSuccess={handleHintUnlockSuccess}
-      />
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Lightbulb, Zap, Coins, Check, X, ShieldAlert, Lock, Unlock } from 'lucide-react';
-import { purchaseHintPass, purchaseSabotageCard, useHintPass, unlockCard } from '../services/api';
+import { purchaseHintPass, purchaseSabotageCard, useHintPass } from '../services/api';
 import { SabotageTargetModal } from './SabotageTargetModal';
-import { UnifiedUnlockModal } from './UnifiedUnlockModal';
 
 export function PowerCardsSection({
   team,
@@ -17,7 +16,6 @@ export function PowerCardsSection({
   const [showHintModal, setShowHintModal] = useState(false);
   const [selectedHintProblemId, setSelectedHintProblemId] = useState('');
   const [notification, setNotification] = useState(null);
-  const [unlockModalTarget, setUnlockModalTarget] = useState(null);
   const [recentUnlockedCard, setRecentUnlockedCard] = useState(null);
 
   const teamBalance = team?.balance ?? 1000;
@@ -27,32 +25,6 @@ export function PowerCardsSection({
 
   const isHintUnlocked = Boolean(team?.unlockedCards?.includes('HINT') || team?.hintUnlocked);
   const isSabotageUnlocked = Boolean(team?.unlockedCards?.includes('SABOTAGE') || team?.sabotageUnlocked);
-
-  const handleUnlockCardSuccess = async ({ target, password }) => {
-    try {
-      const res = await unlockCard({
-        teamName: team.name,
-        memberId: currentMember?.memberId,
-        cardType: target.type,
-        password
-      });
-      setRecentUnlockedCard(target.type);
-      setNotification({
-        type: 'success',
-        message: target.type === 'SABOTAGE'
-          ? '⚡ Sabotage Card unlocked! Rival targeting and workspace freeze controls are now active.'
-          : '💡 Hint Pass unlocked! Strategic algorithmic hints are now available.'
-      });
-      if (onTeamUpdated && res.team) {
-        onTeamUpdated(res.team);
-      }
-    } catch (err) {
-      setNotification({
-        type: 'error',
-        message: err.message || 'Failed to unlock card.'
-      });
-    }
-  };
 
   const unlockedWithoutHints = unlockedProblems.filter(
     (p) => !team?.revealedHints || !team.revealedHints[p.id]
@@ -315,7 +287,7 @@ export function PowerCardsSection({
               }}>
                 <Lock size={16} color="#58a6ff" style={{ margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
                 <div style={{ fontSize: '12px', color: 'var(--txt-muted)', lineHeight: 1.4 }}>
-                  Card abilities encrypted. Password verification required before hints can be viewed or used.
+                  Hint Pass is locked by Administrator. Only the Competition Admin can unlock access from the Admin Dashboard.
                 </div>
               </div>
             )}
@@ -326,21 +298,20 @@ export function PowerCardsSection({
             {!isHintUnlocked ? (
               <button
                 type="button"
-                className="btn-blue"
-                onClick={() => setUnlockModalTarget({
-                  type: 'HINT',
-                  title: 'Hint Pass',
-                  subtitle: 'Strategic assistance · 40 ByteCoins'
-                })}
+                className="btn-ghost"
+                disabled
                 style={{
                   width: '100%',
                   padding: '10px 14px',
                   fontSize: '13px',
                   borderRadius: '8px',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  opacity: 0.65,
+                  cursor: 'not-allowed',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
                 }}
               >
-                <Lock size={14} /> Enter Password to Unlock
+                <Lock size={14} /> Locked (Admin Control)
               </button>
             ) : hintPassesCount > 0 ? (
               <>
@@ -500,7 +471,7 @@ export function PowerCardsSection({
               }}>
                 <Lock size={16} color="#ff7b72" style={{ margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
                 <div style={{ fontSize: '12px', color: 'var(--txt-muted)', lineHeight: 1.4 }}>
-                  Card abilities encrypted. Password verification required before rival workspaces can be targeted.
+                  Sabotage Card is locked by Administrator. Only the Competition Admin can unlock access from the Admin Dashboard.
                 </div>
               </div>
             )}
@@ -511,21 +482,20 @@ export function PowerCardsSection({
             {!isSabotageUnlocked ? (
               <button
                 type="button"
-                className="btn-danger"
-                onClick={() => setUnlockModalTarget({
-                  type: 'SABOTAGE',
-                  title: 'Sabotage Card',
-                  subtitle: 'Freeze rival workspace for 5m · 40 ByteCoins'
-                })}
+                className="btn-ghost"
+                disabled
                 style={{
                   width: '100%',
                   padding: '10px 14px',
                   fontSize: '13px',
                   borderRadius: '8px',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  opacity: 0.65,
+                  cursor: 'not-allowed',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
                 }}
               >
-                <Lock size={14} /> Enter Password to Unlock
+                <Lock size={14} /> Locked (Admin Control)
               </button>
             ) : sabotageCardsCount > 0 ? (
               <>
@@ -666,17 +636,6 @@ export function PowerCardsSection({
           </div>
         </div>
       )}
-
-      {/* Unified Password Verification Modal */}
-      <UnifiedUnlockModal
-        isOpen={Boolean(unlockModalTarget)}
-        onClose={() => setUnlockModalTarget(null)}
-        target={unlockModalTarget}
-        team={team}
-        currentMember={currentMember}
-        teamBalance={teamBalance}
-        onUnlockSuccess={handleUnlockCardSuccess}
-      />
     </section>
   );
 }

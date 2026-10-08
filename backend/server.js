@@ -702,6 +702,135 @@ app.get('/api/leaderboard', (req, res) => {
   res.json({ leaderboard: teams });
 });
 
+// --- DEDICATED ADMIN DASHBOARD APIS ---
+app.post('/api/admin/login', (req, res) => {
+  const { adminId, password } = req.body;
+  if (adminId === 'Qubit123' && password === 'Abcd.01@#') {
+    return res.json({
+      success: true,
+      token: 'qubit-admin-auth-token-valid',
+      admin: { id: 'Qubit123', role: 'HEAD_ADMINISTRATOR' }
+    });
+  }
+  return res.status(401).json({ error: 'Invalid Admin ID or Password. Access denied.' });
+});
+
+// Admin Problem Unlock
+app.post('/api/admin/problems/unlock', (req, res) => {
+  const { teamName, problemId } = req.body;
+  try {
+    const result = db.adminUnlockProblem(teamName, problemId);
+    if (result.teams) {
+      result.teams.forEach(t => {
+        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
+      });
+    }
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Problem Lock
+app.post('/api/admin/problems/lock', (req, res) => {
+  const { teamName, problemId } = req.body;
+  try {
+    const result = db.adminLockProblem(teamName, problemId);
+    if (result.teams) {
+      result.teams.forEach(t => {
+        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
+      });
+    }
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Card Unlock (Hint or Sabotage)
+app.post('/api/admin/cards/unlock', (req, res) => {
+  const { teamName, cardType } = req.body;
+  try {
+    const result = db.adminUnlockCard(teamName, cardType);
+    if (result.teams) {
+      result.teams.forEach(t => {
+        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
+      });
+    }
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Card Lock (Hint or Sabotage)
+app.post('/api/admin/cards/lock', (req, res) => {
+  const { teamName, cardType } = req.body;
+  try {
+    const result = db.adminLockCard(teamName, cardType);
+    if (result.teams) {
+      result.teams.forEach(t => {
+        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
+      });
+    }
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Grant Card Pass / Inventory
+app.post('/api/admin/cards/grant', (req, res) => {
+  const { teamName, cardType, amount } = req.body;
+  try {
+    const result = db.adminGrantCardPass(teamName, cardType, amount || 1);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Reveal Problem Hint
+app.post('/api/admin/hints/reveal', (req, res) => {
+  const { teamName, problemId } = req.body;
+  try {
+    const result = db.adminRevealProblemHint(teamName, problemId);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Clear Sabotage Freeze
+app.post('/api/admin/sabotage/unfreeze', (req, res) => {
+  const { teamName } = req.body;
+  try {
+    const result = db.adminClearFreeze(teamName);
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Full Overview
+app.get('/api/admin/overview', (req, res) => {
+  const teams = db.getAllTeams();
+  const problems = db.getAllProblems();
+  res.json({
+    teams,
+    problems,
+    transactions: db.getAllTransactions(),
+    submissions: db.getAllSubmissions().slice(0, 100)
+  });
+});
+
 // SPA Fallback
 if (fs.existsSync(FRONTEND_DIST)) {
   app.get('*', (req, res) => {

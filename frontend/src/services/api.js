@@ -892,3 +892,276 @@ export async function fetchSubmissions(teamName = null) {
   } catch (e) {}
   return { submissions: [] };
 }
+
+// --- DEDICATED ADMIN DASHBOARD SERVICES ---
+const ADMIN_SESSION_KEY = 'qubit_admin_session_auth';
+
+export async function adminLogin(adminId, password) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, password })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      sessionStorage.setItem(ADMIN_SESSION_KEY, data.token || 'admin-auth-valid');
+      return { success: true, admin: data.admin };
+    }
+    const err = await res.json().catch(() => ({}));
+    if (err.error) throw new Error(err.error);
+  } catch (e) {
+    if (e.message && e.message.includes('Invalid Admin ID')) throw e;
+  }
+
+  // Fallback local auth for static hosting
+  if (adminId === 'Qubit123' && password === 'Abcd.01@#') {
+    sessionStorage.setItem(ADMIN_SESSION_KEY, 'admin-auth-valid');
+    return { success: true, admin: { id: 'Qubit123', name: 'Administrator' } };
+  }
+  throw new Error('Invalid Admin ID or Password. Access denied.');
+}
+
+export function isAdminAuthenticated() {
+  try {
+    return Boolean(sessionStorage.getItem(ADMIN_SESSION_KEY));
+  } catch (e) {
+    return false;
+  }
+}
+
+export function adminLogout() {
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  } catch (e) {}
+}
+
+export async function adminUnlockProblem({ teamName, problemId }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/problems/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, problemId })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  const teamsToUpdate = [];
+  if (!teamName || teamName.toUpperCase() === 'ALL') {
+    teamsToUpdate.push(...Object.values(store.teams));
+  } else {
+    const key = (teamName || '').trim().toUpperCase();
+    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
+  }
+
+  for (const t of teamsToUpdate) {
+    if (!t.unlocked) t.unlocked = [];
+    if (!t.unlocked.includes(problemId)) {
+      t.unlocked.push(problemId);
+    }
+    if (!t.problemStatuses) t.problemStatuses = {};
+    if (!t.problemStatuses[problemId] || t.problemStatuses[problemId].status !== 'SOLVED') {
+      t.problemStatuses[problemId] = {
+        status: 'UNLOCKED',
+        unlockedBy: 'ADMIN',
+        unlockedByName: 'Administrator',
+        unlockedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  saveFallbackStore(store);
+  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+}
+
+export async function adminLockProblem({ teamName, problemId }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/problems/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, problemId })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  const teamsToUpdate = [];
+  if (!teamName || teamName.toUpperCase() === 'ALL') {
+    teamsToUpdate.push(...Object.values(store.teams));
+  } else {
+    const key = (teamName || '').trim().toUpperCase();
+    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
+  }
+
+  for (const t of teamsToUpdate) {
+    if (t.unlocked) {
+      t.unlocked = t.unlocked.filter(id => id !== problemId);
+    }
+    if (t.problemStatuses && t.problemStatuses[problemId] && t.problemStatuses[problemId].status !== 'SOLVED') {
+      delete t.problemStatuses[problemId];
+    }
+  }
+
+  saveFallbackStore(store);
+  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+}
+
+export async function adminUnlockCard({ teamName, cardType }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/cards/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, cardType })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const type = String(cardType || '').trim().toUpperCase();
+  const store = getFallbackStore();
+  const teamsToUpdate = [];
+  if (!teamName || teamName.toUpperCase() === 'ALL') {
+    teamsToUpdate.push(...Object.values(store.teams));
+  } else {
+    const key = (teamName || '').trim().toUpperCase();
+    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
+  }
+
+  for (const t of teamsToUpdate) {
+    if (!t.unlockedCards) t.unlockedCards = [];
+    if (!t.unlockedCards.includes(type)) t.unlockedCards.push(type);
+    if (type === 'HINT') {
+      t.hintUnlocked = true;
+      if (!t.hintPassesCount || t.hintPassesCount < 1) t.hintPassesCount = 1;
+    } else if (type === 'SABOTAGE') {
+      t.sabotageUnlocked = true;
+      if (!t.sabotageCardsCount || t.sabotageCardsCount < 1) t.sabotageCardsCount = 1;
+    }
+  }
+
+  saveFallbackStore(store);
+  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+}
+
+export async function adminLockCard({ teamName, cardType }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/cards/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, cardType })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const type = String(cardType || '').trim().toUpperCase();
+  const store = getFallbackStore();
+  const teamsToUpdate = [];
+  if (!teamName || teamName.toUpperCase() === 'ALL') {
+    teamsToUpdate.push(...Object.values(store.teams));
+  } else {
+    const key = (teamName || '').trim().toUpperCase();
+    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
+  }
+
+  for (const t of teamsToUpdate) {
+    if (t.unlockedCards) {
+      t.unlockedCards = t.unlockedCards.filter(c => c !== type);
+    }
+    if (type === 'HINT') t.hintUnlocked = false;
+    if (type === 'SABOTAGE') t.sabotageUnlocked = false;
+  }
+
+  saveFallbackStore(store);
+  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+}
+
+export async function adminGrantCardPass({ teamName, cardType, amount = 1 }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/cards/grant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, cardType, amount })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const type = String(cardType || '').trim().toUpperCase();
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key] || store.teams['SYNORA'];
+
+  if (!team.unlockedCards) team.unlockedCards = [];
+  if (!team.unlockedCards.includes(type)) team.unlockedCards.push(type);
+
+  if (type === 'HINT') {
+    team.hintUnlocked = true;
+    team.hintPassesCount = (team.hintPassesCount || 0) + amount;
+  } else if (type === 'SABOTAGE') {
+    team.sabotageUnlocked = true;
+    team.sabotageCardsCount = (team.sabotageCardsCount || 0) + amount;
+  }
+
+  saveFallbackStore(store);
+  return { success: true, team };
+}
+
+export async function adminRevealProblemHint({ teamName, problemId }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/hints/reveal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, problemId })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key] || store.teams['SYNORA'];
+
+  const hint = PREDEFINED_HINTS[problemId] || 'Algorithmic strategy unlocked by Administrator.';
+  if (!team.revealedHints) team.revealedHints = {};
+  team.revealedHints[problemId] = {
+    hint,
+    revealedBy: 'ADMIN',
+    revealedByName: 'Administrator',
+    revealedAt: new Date().toISOString()
+  };
+
+  saveFallbackStore(store);
+  return { success: true, team, hint };
+}
+
+export async function adminClearFreeze({ teamName }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/sabotage/unfreeze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key] || store.teams['SYNORA'];
+  team.frozenUntil = null;
+  team.frozenBy = null;
+  saveFallbackStore(store);
+  return { success: true, team };
+}
+
+export async function fetchAdminOverview() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/overview`);
+    if (res.ok) return await res.json();
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  return {
+    teams: Object.values(store.teams),
+    problems: fallbackProblemsData.problems || [],
+    transactions: [],
+    submissions: []
+  };
+}

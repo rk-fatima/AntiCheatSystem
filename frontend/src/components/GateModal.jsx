@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, Maximize2, Search, Check, RefreshCw, AlertCircle, Crown, Lock } from 'lucide-react';
 import { getTeamStatus, loginTeam } from '../services/api';
 
-export function GateModal({ onTeamSessionReady }) {
+export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
   const [teamInput, setTeamInput] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [verifiedTeam, setVerifiedTeam] = useState(null);
@@ -421,6 +421,28 @@ export function GateModal({ onTeamSessionReady }) {
           <Maximize2 size={15} />
           {submitting ? 'Entering Workspace...' : 'Enter Shared Workspace in Fullscreen'}
         </button>
+
+        {onOpenAdmin && (
+          <div style={{ textAlign: 'center', marginTop: '14px' }}>
+            <button
+              type="button"
+              onClick={onOpenAdmin}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--txt-dim)',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 8px'
+              }}
+            >
+              <Lock size={11} /> Admin Portal
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

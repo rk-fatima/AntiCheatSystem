@@ -1,7 +1,7 @@
 import React from 'react';
-import { Trophy, ShieldAlert, CheckCircle2, Coins, Settings, BarChart2, Maximize, Crown, Users, Receipt, Flag } from 'lucide-react';
+import { Trophy, ShieldAlert, CheckCircle2, Coins, Settings, BarChart2, Maximize, Crown, Users, Receipt, Flag, Shield } from 'lucide-react';
 
-export function Header({ team, currentMember, onOpenProctor, onOpenLeaderboard, onOpenTransactions, onToggleFullscreen }) {
+export function Header({ team, currentMember, onOpenProctor, onOpenLeaderboard, onOpenTransactions, onToggleFullscreen, onOpenAdmin }) {
   const flagsCount = team?.violations?.length || 0;
   const isHighRisk = flagsCount >= 3;
 
@@ -166,6 +166,16 @@ export function Header({ team, currentMember, onOpenProctor, onOpenLeaderboard, 
           >
             <Settings size={14} />
           </button>
+          {onOpenAdmin && (
+            <button
+              className="btn-ghost"
+              onClick={onOpenAdmin}
+              title="Admin Portal (ID & Password Required)"
+              style={{ padding: '6px', color: '#58a6ff' }}
+            >
+              <Shield size={14} />
+            </button>
+          )}
         </div>
       </div>
     </header>

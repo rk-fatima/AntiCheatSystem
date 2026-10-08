@@ -203,6 +203,10 @@ class Database {
     }));
   }
 
+  getAllProblems() {
+    return this.getPublicProblems();
+  }
+
   getFullProblem(id) {
     const prob = this.state.problems.find(p => p.id === id);
     if (prob) {
@@ -1118,6 +1122,174 @@ class Database {
 
   getAllTransactions() {
     return this.state.transactions || [];
+  }
+
+  // --- DEDICATED ADMIN MANAGEMENT METHODS ---
+  adminUnlockProblem(teamName, problemId) {
+    const teamsToUpdate = [];
+    if (!teamName || teamName.toUpperCase() === 'ALL') {
+      teamsToUpdate.push(...Object.values(this.state.teams));
+    } else {
+      const team = this.getTeam(teamName);
+      if (team) teamsToUpdate.push(team);
+    }
+
+    if (teamsToUpdate.length === 0) {
+      throw new Error(`Team "${teamName}" not found.`);
+    }
+
+    for (const team of teamsToUpdate) {
+      if (!team.unlocked) team.unlocked = [];
+      if (!team.unlocked.includes(problemId)) {
+        team.unlocked.push(problemId);
+      }
+      if (!team.problemStatuses) team.problemStatuses = {};
+      if (!team.problemStatuses[problemId] || team.problemStatuses[problemId].status !== 'SOLVED') {
+        team.problemStatuses[problemId] = {
+          status: 'UNLOCKED',
+          unlockedBy: 'ADMIN',
+          unlockedByName: 'Administrator',
+          unlockedAt: new Date().toISOString()
+        };
+      }
+    }
+
+    this.save();
+    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+  }
+
+  adminLockProblem(teamName, problemId) {
+    const teamsToUpdate = [];
+    if (!teamName || teamName.toUpperCase() === 'ALL') {
+      teamsToUpdate.push(...Object.values(this.state.teams));
+    } else {
+      const team = this.getTeam(teamName);
+      if (team) teamsToUpdate.push(team);
+    }
+
+    if (teamsToUpdate.length === 0) {
+      throw new Error(`Team "${teamName}" not found.`);
+    }
+
+    for (const team of teamsToUpdate) {
+      if (team.unlocked) {
+        team.unlocked = team.unlocked.filter(id => id !== problemId);
+      }
+      if (team.problemStatuses && team.problemStatuses[problemId] && team.problemStatuses[problemId].status !== 'SOLVED') {
+        delete team.problemStatuses[problemId];
+      }
+    }
+
+    this.save();
+    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+  }
+
+  adminUnlockCard(teamName, cardType) {
+    const type = String(cardType || '').trim().toUpperCase();
+    const teamsToUpdate = [];
+    if (!teamName || teamName.toUpperCase() === 'ALL') {
+      teamsToUpdate.push(...Object.values(this.state.teams));
+    } else {
+      const team = this.getTeam(teamName);
+      if (team) teamsToUpdate.push(team);
+    }
+
+    if (teamsToUpdate.length === 0) {
+      throw new Error(`Team "${teamName}" not found.`);
+    }
+
+    for (const team of teamsToUpdate) {
+      if (!team.unlockedCards) team.unlockedCards = [];
+      if (!team.unlockedCards.includes(type)) {
+        team.unlockedCards.push(type);
+      }
+      if (type === 'HINT') {
+        team.hintUnlocked = true;
+        if (!team.hintPassesCount || team.hintPassesCount < 1) {
+          team.hintPassesCount = 1;
+        }
+      } else if (type === 'SABOTAGE') {
+        team.sabotageUnlocked = true;
+        if (!team.sabotageCardsCount || team.sabotageCardsCount < 1) {
+          team.sabotageCardsCount = 1;
+        }
+      }
+    }
+
+    this.save();
+    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+  }
+
+  adminLockCard(teamName, cardType) {
+    const type = String(cardType || '').trim().toUpperCase();
+    const teamsToUpdate = [];
+    if (!teamName || teamName.toUpperCase() === 'ALL') {
+      teamsToUpdate.push(...Object.values(this.state.teams));
+    } else {
+      const team = this.getTeam(teamName);
+      if (team) teamsToUpdate.push(team);
+    }
+
+    if (teamsToUpdate.length === 0) {
+      throw new Error(`Team "${teamName}" not found.`);
+    }
+
+    for (const team of teamsToUpdate) {
+      if (team.unlockedCards) {
+        team.unlockedCards = team.unlockedCards.filter(c => c !== type);
+      }
+      if (type === 'HINT') team.hintUnlocked = false;
+      if (type === 'SABOTAGE') team.sabotageUnlocked = false;
+    }
+
+    this.save();
+    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+  }
+
+  adminGrantCardPass(teamName, cardType, amount = 1) {
+    const type = String(cardType || '').trim().toUpperCase();
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error(`Team "${teamName}" not found.`);
+
+    if (!team.unlockedCards) team.unlockedCards = [];
+    if (!team.unlockedCards.includes(type)) team.unlockedCards.push(type);
+
+    if (type === 'HINT') {
+      team.hintUnlocked = true;
+      team.hintPassesCount = (team.hintPassesCount || 0) + amount;
+    } else if (type === 'SABOTAGE') {
+      team.sabotageUnlocked = true;
+      team.sabotageCardsCount = (team.sabotageCardsCount || 0) + amount;
+    }
+
+    this.save();
+    return { success: true, team };
+  }
+
+  adminRevealProblemHint(teamName, problemId) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error(`Team "${teamName}" not found.`);
+
+    const hint = getPredefinedHint(problemId);
+    if (!team.revealedHints) team.revealedHints = {};
+    team.revealedHints[problemId] = {
+      hint,
+      revealedBy: 'ADMIN',
+      revealedByName: 'Administrator',
+      revealedAt: new Date().toISOString()
+    };
+
+    this.save();
+    return { success: true, team, hint };
+  }
+
+  adminClearFreeze(teamName) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error(`Team "${teamName}" not found.`);
+    team.frozenUntil = null;
+    team.frozenBy = null;
+    this.save();
+    return { success: true, team };
   }
 }
 

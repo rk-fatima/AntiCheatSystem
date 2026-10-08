@@ -8,6 +8,8 @@ import { ProctorDashboard } from './components/ProctorDashboard';
 import { LeaderboardModal } from './components/LeaderboardModal';
 import { TransactionsModal } from './components/TransactionsModal';
 import { SabotageFreezeOverlay } from './components/SabotageFreezeOverlay';
+import { AdminLogin } from './components/AdminLogin';
+import { AdminDashboard } from './components/AdminDashboard';
 import { useAntiCheat } from './hooks/useAntiCheat';
 import {
   fetchProblems,
@@ -15,7 +17,9 @@ import {
   purchaseProblem,
   notifyMemberWorking,
   runCodeAsync,
-  submitCodeAsync
+  submitCodeAsync,
+  isAdminAuthenticated,
+  adminLogout
 } from './services/api';
 import { CheckCircle2, AlertTriangle, Unlock, Lock, Users, Sparkles } from 'lucide-react';
 
@@ -38,6 +42,22 @@ export function App() {
   const [showProctor, setShowProctor] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
+
+  const [viewMode, setViewMode] = useState(() => (window.location.hash.includes('admin') ? 'admin' : 'workspace'));
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => isAdminAuthenticated());
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash.includes('admin')) {
+        setViewMode('admin');
+        setIsAdminLoggedIn(isAdminAuthenticated());
+      } else {
+        setViewMode('workspace');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const socketRef = useRef(null);
 
@@ -238,6 +258,37 @@ export function App() {
   const activeProblem = problems.find(p => p.id === currentProblemId);
   const activeProblemStatus = activeProblem ? (team?.problemStatuses?.[activeProblem.id] || null) : null;
 
+  // Dedicated Admin Dashboard View Route
+  if (viewMode === 'admin') {
+    if (isAdminLoggedIn) {
+      return (
+        <AdminDashboard
+          onLogout={() => {
+            adminLogout();
+            setIsAdminLoggedIn(false);
+            window.location.hash = '';
+            setViewMode('workspace');
+          }}
+          onSwitchToWorkspace={() => {
+            window.location.hash = '';
+            setViewMode('workspace');
+          }}
+        />
+      );
+    }
+    return (
+      <AdminLogin
+        onLoginSuccess={() => {
+          setIsAdminLoggedIn(true);
+        }}
+        onBackToWorkspace={() => {
+          window.location.hash = '';
+          setViewMode('workspace');
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {/* Top Navigation Header */}
@@ -248,6 +299,11 @@ export function App() {
         onOpenLeaderboard={() => setShowLeaderboard(true)}
         onOpenTransactions={() => setShowTransactions(true)}
         onToggleFullscreen={enterFullscreen}
+        onOpenAdmin={() => {
+          window.location.hash = '#admin';
+          setViewMode('admin');
+          setIsAdminLoggedIn(isAdminAuthenticated());
+        }}
       />
 
       {/* Main Workspace Layout */}
@@ -442,7 +498,14 @@ export function App() {
 
       {/* Mandatory Exam Entrance Gate (Team Registration & Member Selection) */}
       {!isExamStarted && (
-        <GateModal onTeamSessionReady={handleTeamSessionReady} />
+        <GateModal
+          onTeamSessionReady={handleTeamSessionReady}
+          onOpenAdmin={() => {
+            window.location.hash = '#admin';
+            setViewMode('admin');
+            setIsAdminLoggedIn(isAdminAuthenticated());
+          }}
+        />
       )}
 
       {/* Sabotage Freeze Overlay (5-minute full screen lockout with real-time countdown) */}
