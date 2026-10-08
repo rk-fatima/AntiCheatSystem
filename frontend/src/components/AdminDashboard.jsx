@@ -33,6 +33,7 @@ import {
   adminClearFreeze,
   adminLogout
 } from '../services/api';
+import { ProctorDashboard } from './ProctorDashboard';
 
 export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage'
@@ -42,6 +43,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [loading, setLoading] = useState(false);
   const [selectedTeamName, setSelectedTeamName] = useState('ALL');
   const [notification, setNotification] = useState(null);
+  const [showProctorStation, setShowProctorStation] = useState(false);
 
   // Leaderboard filters & sorting
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
@@ -319,6 +321,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
         {/* Global Controls & Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Organiser & Proctor Control Station (Pricing, Team Monitor, Audit Logs) */}
+          <button
+            className="btn-primary"
+            onClick={() => setShowProctorStation(true)}
+            title="Open Organiser & Proctor Control Station (Dynamic Pricing, Live Monitor & Audit Logs)"
+            style={{ fontSize: '12px', padding: '6px 14px', gap: '6px', boxShadow: '0 2px 10px rgba(88, 166, 255, 0.2)' }}
+          >
+            <Shield size={13} />
+            <span>Pricing & Proctor Station</span>
+          </button>
+
           {/* Refresh Button */}
           <button
             className="btn-ghost"
@@ -467,6 +480,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             {[
               { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
               { id: 'problems', label: 'Problems', icon: Lock },
+              { id: 'pricing', label: 'Dynamic Pricing & Proctor', icon: Shield },
               { id: 'hints', label: 'Hints', icon: Lightbulb },
               { id: 'sabotage', label: 'Sabotage', icon: Zap }
             ].map(tab => {
@@ -1291,6 +1305,16 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               })}
             </div>
           </div>
+        )}
+
+        {/* TAB 5: DYNAMIC PRICING & ORGANISER PROCTOR STATION */}
+        {activeTab === 'pricing' && (
+          <ProctorDashboard onClose={() => setActiveTab('leaderboard')} />
+        )}
+
+        {/* Modal display when opened via top Pricing & Proctor Station button */}
+        {showProctorStation && activeTab !== 'pricing' && (
+          <ProctorDashboard onClose={() => setShowProctorStation(false)} />
         )}
       </div>
     </div>

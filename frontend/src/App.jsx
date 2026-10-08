@@ -4,7 +4,6 @@ import { ProblemCatalog } from './components/ProblemCatalog';
 import { CodeEditorPane } from './components/CodeEditorPane';
 import { GateModal } from './components/GateModal';
 import { LockOverlay } from './components/LockOverlay';
-import { ProctorDashboard } from './components/ProctorDashboard';
 import { LeaderboardModal } from './components/LeaderboardModal';
 import { TransactionsModal } from './components/TransactionsModal';
 import { SabotageFreezeOverlay } from './components/SabotageFreezeOverlay';
@@ -39,7 +38,6 @@ export function App() {
   const [currentProblemId, setCurrentProblemId] = useState(null);
   const [lang, setLang] = useState('python');
   const [codeMap, setCodeMap] = useState({});
-  const [showProctor, setShowProctor] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
 
@@ -295,7 +293,6 @@ export function App() {
       <Header
         team={team}
         currentMember={currentMember}
-        onOpenProctor={() => setShowProctor(true)}
         onOpenLeaderboard={() => setShowLeaderboard(true)}
         onOpenTransactions={() => setShowTransactions(true)}
         onToggleFullscreen={enterFullscreen}
@@ -525,11 +522,6 @@ export function App() {
           reason={team.lockReason}
           onUnlocked={(unlockedTeam) => setTeam(unlockedTeam)}
         />
-      )}
-
-      {/* Proctor / Judge Live Control Console */}
-      {showProctor && (
-        <ProctorDashboard onClose={() => setShowProctor(false)} />
       )}
 
       {/* Live Ranked Scoreboard */}
