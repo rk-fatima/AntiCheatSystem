@@ -78,9 +78,6 @@ export function ProblemCatalog({
     return matchesSearch && matchesDiff;
   });
 
-  const currentBidNum = parseInt(bidAmountInput, 10) || 0;
-  const projectedRemaining = (teamBalance ?? 1000) - currentBidNum;
-
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '32px 24px' }}>
       <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
