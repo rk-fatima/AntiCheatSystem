@@ -34,7 +34,7 @@ export function PowerCardsSection({
     if (!canAfford) {
       setNotification({
         type: 'error',
-        message: `Insufficient ByteCoins! Hint Pass costs 40 ByteCoins, but team only has ${teamBalance} ByteCoins.`
+        message: 'Insufficient balance to purchase Hint Pass.'
       });
       return;
     }
@@ -48,7 +48,7 @@ export function PowerCardsSection({
       });
       setNotification({
         type: 'success',
-        message: `💡 Hint Pass purchased! Added to inventory. Remaining balance: ${res.team.balance} ByteCoins.`
+        message: '💡 Hint Pass purchased! Added to inventory.'
       });
       if (onTeamUpdated) onTeamUpdated(res.team);
     } catch (err) {
@@ -87,7 +87,7 @@ export function PowerCardsSection({
     if (!canAfford) {
       setNotification({
         type: 'error',
-        message: `Insufficient ByteCoins! Sabotage Card costs 40 ByteCoins, but team only has ${teamBalance} ByteCoins.`
+        message: 'Insufficient balance to purchase Sabotage Card.'
       });
       return;
     }
@@ -101,7 +101,7 @@ export function PowerCardsSection({
       });
       setNotification({
         type: 'success',
-        message: `⚡ Sabotage Card purchased! Added to inventory. Remaining balance: ${res.team.balance} ByteCoins.`
+        message: '⚡ Sabotage Card purchased! Added to inventory.'
       });
       if (onTeamUpdated) onTeamUpdated(res.team);
     } catch (err) {
@@ -191,7 +191,8 @@ export function PowerCardsSection({
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: isHintUnlocked ? 'space-between' : 'center',
+            minHeight: '210px',
             boxShadow: isHintUnlocked ? '0 8px 32px rgba(0, 0, 0, 0.35)' : '0 8px 24px rgba(0, 0, 0, 0.4)',
             transition: 'border-color 0.2s ease, transform 0.2s ease'
           }}
@@ -204,162 +205,159 @@ export function PowerCardsSection({
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          <div>
-            {/* Top Row: Icon + Inventory Tag */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+          {!isHintUnlocked ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '30px 16px',
+              gap: '14px'
+            }}>
               <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: 'rgba(56, 139, 253, 0.15)',
-                border: '1px solid rgba(56, 139, 253, 0.35)',
+                width: '50px',
+                height: '50px',
+                borderRadius: '12px',
+                background: 'rgba(56, 139, 253, 0.12)',
+                border: '1px solid rgba(56, 139, 253, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#58a6ff'
+                color: '#58a6ff',
+                boxShadow: '0 4px 18px rgba(56, 139, 253, 0.15)'
               }}>
-                {isHintUnlocked ? <Lightbulb size={22} /> : <Lock size={20} />}
+                <Lock size={24} />
               </div>
 
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: isHintUnlocked ? (hintPassesCount > 0 ? '#58a6ff' : 'var(--txt-dim)') : 'var(--txt-muted)',
-                background: isHintUnlocked ? (hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.12)' : 'rgba(255, 255, 255, 0.04)') : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${isHintUnlocked ? (hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.3)' : 'rgba(255, 255, 255, 0.08)') : 'rgba(255, 255, 255, 0.1)'}`,
-                padding: '3px 10px',
-                borderRadius: '12px',
+              <h3 style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '0.2px'
+              }}>
+                Hint Pass
+              </h3>
+
+              <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#58a6ff',
+                background: 'rgba(56, 139, 253, 0.1)',
+                border: '1px solid rgba(56, 139, 253, 0.25)',
+                padding: '5px 14px',
+                borderRadius: '20px'
               }}>
-                {isHintUnlocked ? `${hintPassesCount} Available` : <><Lock size={10} /> Locked Card</>}
-              </span>
+                <Lock size={12} />
+                <span>Locked</span>
+              </div>
             </div>
+          ) : (
+            <>
+              <div>
+                {/* Top Row: Icon + Inventory Tag */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    background: 'rgba(56, 139, 253, 0.15)',
+                    border: '1px solid rgba(56, 139, 253, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#58a6ff'
+                  }}>
+                    <Lightbulb size={22} />
+                  </div>
 
-            {/* Title & Subtitle */}
-            <h3 style={{
-              margin: '0 0 4px',
-              fontSize: '18px',
-              fontWeight: 700,
-              color: '#ffffff',
-              letterSpacing: '0.2px'
-            }}>
-              Hint Pass
-            </h3>
-            <div style={{
-              fontSize: '13px',
-              color: 'var(--txt-muted)',
-              marginBottom: '16px'
-            }}>
-              Strategic assistance
-            </div>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: hintPassesCount > 0 ? '#58a6ff' : 'var(--txt-dim)',
+                    background: hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                    border: `1px solid ${hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    padding: '3px 10px',
+                    borderRadius: '12px'
+                  }}>
+                    {hintPassesCount} Available
+                  </span>
+                </div>
 
-            {/* Price Tag */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: '6px',
-              marginBottom: '18px'
-            }}>
-              <span style={{
-                fontSize: '22px',
-                fontWeight: 800,
-                color: '#ffffff',
-                fontFamily: 'var(--font-mono)'
-              }}>
-                40
-              </span>
-              <span style={{ fontSize: '13px', color: '#58a6ff', fontWeight: 600 }}>
-                ByteCoins
-              </span>
-            </div>
-
-            {/* Masked notice when locked */}
-            {!isHintUnlocked && (
-              <div style={{
-                background: 'rgba(0, 0, 0, 0.35)',
-                border: '1px dashed rgba(56, 139, 253, 0.25)',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                <Lock size={16} color="#58a6ff" style={{ margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
-                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', lineHeight: 1.4 }}>
-                  Hint Pass is locked by Administrator. Only the Competition Admin can unlock access from the Admin Dashboard.
+                {/* Title & Subtitle */}
+                <h3 style={{
+                  margin: '0 0 4px',
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  letterSpacing: '0.2px'
+                }}>
+                  Hint Pass
+                </h3>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'var(--txt-muted)',
+                  marginBottom: '16px'
+                }}>
+                  Strategic assistance
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Action Row */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            {!isHintUnlocked ? (
-              <button
-                type="button"
-                className="btn-ghost"
-                disabled
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '13px',
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                  opacity: 0.65,
-                  cursor: 'not-allowed',
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
-                }}
-              >
-                <Lock size={14} /> Locked (Admin Control)
-              </button>
-            ) : hintPassesCount > 0 ? (
-              <>
-                <button
-                  type="button"
-                  className="btn-blue"
-                  onClick={() => setShowHintModal(true)}
-                  style={{
-                    flex: 1,
-                    padding: '9px 14px',
-                    fontSize: '13px',
-                    borderRadius: '8px'
-                  }}
-                >
-                  <Check size={14} /> Use Hint
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={handlePurchaseHintPass}
-                  disabled={loadingHint || !canAfford}
-                  style={{
-                    padding: '9px 14px',
-                    fontSize: '13px',
-                    borderRadius: '8px'
-                  }}
-                  title="Purchase additional Hint Pass (40 ByteCoins)"
-                >
-                  + Buy
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn-blue"
-                onClick={handlePurchaseHintPass}
-                disabled={loadingHint || !canAfford}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '13px',
-                  borderRadius: '8px'
-                }}
-              >
-                {loadingHint ? 'Purchasing...' : canAfford ? 'Purchase' : 'Insufficient ByteCoins'}
-              </button>
-            )}
-          </div>
+              {/* Action Row */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                {hintPassesCount > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-blue"
+                      onClick={() => setShowHintModal(true)}
+                      style={{
+                        flex: 1,
+                        padding: '9px 14px',
+                        fontSize: '13px',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <Check size={14} /> Use Hint
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={handlePurchaseHintPass}
+                      disabled={loadingHint || !canAfford}
+                      style={{
+                        padding: '9px 14px',
+                        fontSize: '13px',
+                        borderRadius: '8px'
+                      }}
+                      title="Purchase additional Hint Pass"
+                    >
+                      + Buy
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-blue"
+                    onClick={handlePurchaseHintPass}
+                    disabled={loadingHint || !canAfford}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      fontSize: '13px',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    {loadingHint ? 'Purchasing...' : canAfford ? 'Purchase' : 'Unavailable'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ============================================================ */}
@@ -375,7 +373,8 @@ export function PowerCardsSection({
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: isSabotageUnlocked ? 'space-between' : 'center',
+            minHeight: '210px',
             boxShadow: isSabotageUnlocked ? '0 8px 32px rgba(0, 0, 0, 0.35)' : '0 8px 24px rgba(0, 0, 0, 0.4)',
             transition: 'border-color 0.2s ease, transform 0.2s ease'
           }}
@@ -388,165 +387,162 @@ export function PowerCardsSection({
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          <div>
-            {/* Top Row: Icon + Inventory Tag */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+          {!isSabotageUnlocked ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '30px 16px',
+              gap: '14px'
+            }}>
               <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: 'rgba(248, 81, 73, 0.15)',
-                border: '1px solid rgba(248, 81, 73, 0.35)',
+                width: '50px',
+                height: '50px',
+                borderRadius: '12px',
+                background: 'rgba(248, 81, 73, 0.12)',
+                border: '1px solid rgba(248, 81, 73, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#ff7b72'
+                color: '#ff7b72',
+                boxShadow: '0 4px 18px rgba(248, 81, 73, 0.15)'
               }}>
-                {isSabotageUnlocked ? <Zap size={22} /> : <Lock size={20} />}
+                <Lock size={24} />
               </div>
 
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: isSabotageUnlocked ? (sabotageCardsCount > 0 ? '#ff7b72' : 'var(--txt-dim)') : 'var(--txt-muted)',
-                background: isSabotageUnlocked ? (sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.12)' : 'rgba(255, 255, 255, 0.04)') : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${isSabotageUnlocked ? (sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.3)' : 'rgba(255, 255, 255, 0.08)') : 'rgba(255, 255, 255, 0.1)'}`,
-                padding: '3px 10px',
-                borderRadius: '12px',
+              <h3 style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '0.2px'
+              }}>
+                Sabotage Card
+              </h3>
+
+              <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: '#ff7b72',
+                background: 'rgba(248, 81, 73, 0.1)',
+                border: '1px solid rgba(248, 81, 73, 0.25)',
+                padding: '5px 14px',
+                borderRadius: '20px'
               }}>
-                {isSabotageUnlocked ? `${sabotageCardsCount} Available` : <><Lock size={10} /> Locked Card</>}
-              </span>
+                <Lock size={12} />
+                <span>Locked</span>
+              </div>
             </div>
+          ) : (
+            <>
+              <div>
+                {/* Top Row: Icon + Inventory Tag */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    background: 'rgba(248, 81, 73, 0.15)',
+                    border: '1px solid rgba(248, 81, 73, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ff7b72'
+                  }}>
+                    <Zap size={22} />
+                  </div>
 
-            {/* Title & Subtitle */}
-            <h3 style={{
-              margin: '0 0 4px',
-              fontSize: '18px',
-              fontWeight: 700,
-              color: '#ffffff',
-              letterSpacing: '0.2px'
-            }}>
-              Sabotage Card
-            </h3>
-            <div style={{
-              fontSize: '13px',
-              color: 'var(--txt-muted)',
-              marginBottom: '16px'
-            }}>
-              Freeze rival workspace
-            </div>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: sabotageCardsCount > 0 ? '#ff7b72' : 'var(--txt-dim)',
+                    background: sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                    border: `1px solid ${sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    padding: '3px 10px',
+                    borderRadius: '12px'
+                  }}>
+                    {sabotageCardsCount} Available
+                  </span>
+                </div>
 
-            {/* Price Tag */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: '6px',
-              marginBottom: '18px'
-            }}>
-              <span style={{
-                fontSize: '22px',
-                fontWeight: 800,
-                color: '#ffffff',
-                fontFamily: 'var(--font-mono)'
-              }}>
-                40
-              </span>
-              <span style={{ fontSize: '13px', color: '#ff7b72', fontWeight: 600 }}>
-                ByteCoins
-              </span>
-            </div>
-
-            {/* Masked notice when locked */}
-            {!isSabotageUnlocked && (
-              <div style={{
-                background: 'rgba(0, 0, 0, 0.35)',
-                border: '1px dashed rgba(248, 81, 73, 0.25)',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                marginBottom: '16px',
-                textAlign: 'center'
-              }}>
-                <Lock size={16} color="#ff7b72" style={{ margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
-                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', lineHeight: 1.4 }}>
-                  Sabotage Card is locked by Administrator. Only the Competition Admin can unlock access from the Admin Dashboard.
+                {/* Title & Subtitle */}
+                <h3 style={{
+                  margin: '0 0 4px',
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  letterSpacing: '0.2px'
+                }}>
+                  Sabotage Card
+                </h3>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'var(--txt-muted)',
+                  marginBottom: '16px'
+                }}>
+                  Freeze rival workspace
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Action Row */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            {!isSabotageUnlocked ? (
-              <button
-                type="button"
-                className="btn-ghost"
-                disabled
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '13px',
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                  opacity: 0.65,
-                  cursor: 'not-allowed',
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
-                }}
-              >
-                <Lock size={14} /> Locked (Admin Control)
-              </button>
-            ) : sabotageCardsCount > 0 ? (
-              <>
-                <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={() => setShowSabotageModal(true)}
-                  style={{
-                    flex: 1,
-                    padding: '9px 14px',
-                    fontSize: '13px',
-                    borderRadius: '8px'
-                  }}
-                >
-                  <Zap size={14} /> Use Sabotage
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={handlePurchaseSabotage}
-                  disabled={loadingSabotage || !canAfford}
-                  style={{
-                    padding: '9px 14px',
-                    fontSize: '13px',
-                    borderRadius: '8px'
-                  }}
-                  title="Purchase additional Sabotage Card (40 ByteCoins)"
-                >
-                  + Buy
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={handlePurchaseSabotage}
-                disabled={loadingSabotage || !canAfford}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '13px',
-                  borderRadius: '8px',
-                  background: canAfford ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                  color: canAfford ? '#ff7b72' : 'var(--txt-dim)',
-                  border: `1px solid ${canAfford ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`
-                }}
-              >
-                {loadingSabotage ? 'Purchasing...' : canAfford ? 'Purchase' : 'Insufficient ByteCoins'}
-              </button>
-            )}
-          </div>
+              {/* Action Row */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                {sabotageCardsCount > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={() => setShowSabotageModal(true)}
+                      style={{
+                        flex: 1,
+                        padding: '9px 14px',
+                        fontSize: '13px',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <Zap size={14} /> Use Sabotage
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={handlePurchaseSabotage}
+                      disabled={loadingSabotage || !canAfford}
+                      style={{
+                        padding: '9px 14px',
+                        fontSize: '13px',
+                        borderRadius: '8px'
+                      }}
+                      title="Purchase additional Sabotage Card"
+                    >
+                      + Buy
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    onClick={handlePurchaseSabotage}
+                    disabled={loadingSabotage || !canAfford}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      fontSize: '13px',
+                      borderRadius: '8px',
+                      background: canAfford ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                      color: canAfford ? '#ff7b72' : 'var(--txt-dim)',
+                      border: `1px solid ${canAfford ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`
+                    }}
+                  >
+                    {loadingSabotage ? 'Purchasing...' : canAfford ? 'Purchase' : 'Unavailable'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
