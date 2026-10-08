@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Lightbulb, Zap, Coins, Check, X, ShieldAlert } from 'lucide-react';
-import { purchaseHintPass, purchaseSabotageCard, useHintPass } from '../services/api';
+import { Lightbulb, Zap, Coins, Check, X, ShieldAlert, Lock, Unlock } from 'lucide-react';
+import { purchaseHintPass, purchaseSabotageCard, useHintPass, unlockCard } from '../services/api';
 import { SabotageTargetModal } from './SabotageTargetModal';
+import { UnifiedUnlockModal } from './UnifiedUnlockModal';
 
 export function PowerCardsSection({
   team,
@@ -16,11 +17,42 @@ export function PowerCardsSection({
   const [showHintModal, setShowHintModal] = useState(false);
   const [selectedHintProblemId, setSelectedHintProblemId] = useState('');
   const [notification, setNotification] = useState(null);
+  const [unlockModalTarget, setUnlockModalTarget] = useState(null);
+  const [recentUnlockedCard, setRecentUnlockedCard] = useState(null);
 
   const teamBalance = team?.balance ?? 1000;
   const hintPassesCount = team?.hintPassesCount || 0;
   const sabotageCardsCount = team?.sabotageCardsCount || 0;
   const canAfford = teamBalance >= 40;
+
+  const isHintUnlocked = Boolean(team?.unlockedCards?.includes('HINT') || team?.hintUnlocked);
+  const isSabotageUnlocked = Boolean(team?.unlockedCards?.includes('SABOTAGE') || team?.sabotageUnlocked);
+
+  const handleUnlockCardSuccess = async ({ target, password }) => {
+    try {
+      const res = await unlockCard({
+        teamName: team.name,
+        memberId: currentMember?.memberId,
+        cardType: target.type,
+        password
+      });
+      setRecentUnlockedCard(target.type);
+      setNotification({
+        type: 'success',
+        message: target.type === 'SABOTAGE'
+          ? '⚡ Sabotage Card unlocked! Rival targeting and workspace freeze controls are now active.'
+          : '💡 Hint Pass unlocked! Strategic algorithmic hints are now available.'
+      });
+      if (onTeamUpdated && res.team) {
+        onTeamUpdated(res.team);
+      }
+    } catch (err) {
+      setNotification({
+        type: 'error',
+        message: err.message || 'Failed to unlock card.'
+      });
+    }
+  };
 
   const unlockedWithoutHints = unlockedProblems.filter(
     (p) => !team?.revealedHints || !team.revealedHints[p.id]
@@ -178,16 +210,17 @@ export function PowerCardsSection({
         {/* 1. BLUE — HINT PASS                                          */}
         {/* ============================================================ */}
         <div
+          className={recentUnlockedCard === 'HINT' ? 'card-unlocked-reveal' : ''}
           style={{
             background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.85) 100%)',
-            border: '1px solid rgba(56, 139, 253, 0.25)',
+            border: `1px solid ${isHintUnlocked ? 'rgba(56, 139, 253, 0.3)' : 'rgba(56, 139, 253, 0.2)'}`,
             borderRadius: '14px',
             padding: '24px 22px',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+            boxShadow: isHintUnlocked ? '0 8px 32px rgba(0, 0, 0, 0.35)' : '0 8px 24px rgba(0, 0, 0, 0.4)',
             transition: 'border-color 0.2s ease, transform 0.2s ease'
           }}
           onMouseEnter={(e) => {
@@ -195,7 +228,7 @@ export function PowerCardsSection({
             e.currentTarget.style.transform = 'translateY(-2px)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(56, 139, 253, 0.25)';
+            e.currentTarget.style.borderColor = isHintUnlocked ? 'rgba(56, 139, 253, 0.3)' : 'rgba(56, 139, 253, 0.2)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
@@ -213,19 +246,22 @@ export function PowerCardsSection({
                 justifyContent: 'center',
                 color: '#58a6ff'
               }}>
-                <Lightbulb size={22} />
+                {isHintUnlocked ? <Lightbulb size={22} /> : <Lock size={20} />}
               </div>
 
               <span style={{
                 fontSize: '11px',
                 fontWeight: 600,
-                color: hintPassesCount > 0 ? '#58a6ff' : 'var(--txt-dim)',
-                background: hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-                border: `1px solid ${hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                color: isHintUnlocked ? (hintPassesCount > 0 ? '#58a6ff' : 'var(--txt-dim)') : 'var(--txt-muted)',
+                background: isHintUnlocked ? (hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.12)' : 'rgba(255, 255, 255, 0.04)') : 'rgba(255, 255, 255, 0.05)',
+                border: `1px solid ${isHintUnlocked ? (hintPassesCount > 0 ? 'rgba(56, 139, 253, 0.3)' : 'rgba(255, 255, 255, 0.08)') : 'rgba(255, 255, 255, 0.1)'}`,
                 padding: '3px 10px',
-                borderRadius: '12px'
+                borderRadius: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
               }}>
-                {hintPassesCount} Available
+                {isHintUnlocked ? `${hintPassesCount} Available` : <><Lock size={10} /> Locked Card</>}
               </span>
             </div>
 
@@ -266,11 +302,47 @@ export function PowerCardsSection({
                 ByteCoins
               </span>
             </div>
+
+            {/* Masked notice when locked */}
+            {!isHintUnlocked && (
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.35)',
+                border: '1px dashed rgba(56, 139, 253, 0.25)',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                <Lock size={16} color="#58a6ff" style={{ margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
+                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', lineHeight: 1.4 }}>
+                  Card abilities encrypted. Password verification required before hints can be viewed or used.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Row */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            {hintPassesCount > 0 ? (
+            {!isHintUnlocked ? (
+              <button
+                type="button"
+                className="btn-blue"
+                onClick={() => setUnlockModalTarget({
+                  type: 'HINT',
+                  title: 'Hint Pass',
+                  subtitle: 'Strategic assistance · 40 ByteCoins'
+                })}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  borderRadius: '8px',
+                  fontWeight: 600
+                }}
+              >
+                <Lock size={14} /> Enter Password to Unlock
+              </button>
+            ) : hintPassesCount > 0 ? (
               <>
                 <button
                   type="button"
@@ -323,16 +395,17 @@ export function PowerCardsSection({
         {/* 2. RED — SABOTAGE CARD                                       */}
         {/* ============================================================ */}
         <div
+          className={recentUnlockedCard === 'SABOTAGE' ? 'card-unlocked-reveal' : ''}
           style={{
             background: 'linear-gradient(180deg, rgba(180, 25, 60, 0.12) 0%, rgba(20, 10, 16, 0.85) 100%)',
-            border: '1px solid rgba(248, 81, 73, 0.25)',
+            border: `1px solid ${isSabotageUnlocked ? 'rgba(248, 81, 73, 0.3)' : 'rgba(248, 81, 73, 0.2)'}`,
             borderRadius: '14px',
             padding: '24px 22px',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+            boxShadow: isSabotageUnlocked ? '0 8px 32px rgba(0, 0, 0, 0.35)' : '0 8px 24px rgba(0, 0, 0, 0.4)',
             transition: 'border-color 0.2s ease, transform 0.2s ease'
           }}
           onMouseEnter={(e) => {
@@ -340,7 +413,7 @@ export function PowerCardsSection({
             e.currentTarget.style.transform = 'translateY(-2px)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(248, 81, 73, 0.25)';
+            e.currentTarget.style.borderColor = isSabotageUnlocked ? 'rgba(248, 81, 73, 0.3)' : 'rgba(248, 81, 73, 0.2)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
@@ -358,19 +431,22 @@ export function PowerCardsSection({
                 justifyContent: 'center',
                 color: '#ff7b72'
               }}>
-                <Zap size={22} />
+                {isSabotageUnlocked ? <Zap size={22} /> : <Lock size={20} />}
               </div>
 
               <span style={{
                 fontSize: '11px',
                 fontWeight: 600,
-                color: sabotageCardsCount > 0 ? '#ff7b72' : 'var(--txt-dim)',
-                background: sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-                border: `1px solid ${sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                color: isSabotageUnlocked ? (sabotageCardsCount > 0 ? '#ff7b72' : 'var(--txt-dim)') : 'var(--txt-muted)',
+                background: isSabotageUnlocked ? (sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.12)' : 'rgba(255, 255, 255, 0.04)') : 'rgba(255, 255, 255, 0.05)',
+                border: `1px solid ${isSabotageUnlocked ? (sabotageCardsCount > 0 ? 'rgba(248, 81, 73, 0.3)' : 'rgba(255, 255, 255, 0.08)') : 'rgba(255, 255, 255, 0.1)'}`,
                 padding: '3px 10px',
-                borderRadius: '12px'
+                borderRadius: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
               }}>
-                {sabotageCardsCount} Available
+                {isSabotageUnlocked ? `${sabotageCardsCount} Available` : <><Lock size={10} /> Locked Card</>}
               </span>
             </div>
 
@@ -411,11 +487,47 @@ export function PowerCardsSection({
                 ByteCoins
               </span>
             </div>
+
+            {/* Masked notice when locked */}
+            {!isSabotageUnlocked && (
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.35)',
+                border: '1px dashed rgba(248, 81, 73, 0.25)',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                <Lock size={16} color="#ff7b72" style={{ margin: '0 auto 6px', display: 'block', opacity: 0.8 }} />
+                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', lineHeight: 1.4 }}>
+                  Card abilities encrypted. Password verification required before rival workspaces can be targeted.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Row */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            {sabotageCardsCount > 0 ? (
+            {!isSabotageUnlocked ? (
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => setUnlockModalTarget({
+                  type: 'SABOTAGE',
+                  title: 'Sabotage Card',
+                  subtitle: 'Freeze rival workspace for 5m · 40 ByteCoins'
+                })}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  borderRadius: '8px',
+                  fontWeight: 600
+                }}
+              >
+                <Lock size={14} /> Enter Password to Unlock
+              </button>
+            ) : sabotageCardsCount > 0 ? (
               <>
                 <button
                   type="button"
@@ -554,6 +666,17 @@ export function PowerCardsSection({
           </div>
         </div>
       )}
+
+      {/* Unified Password Verification Modal */}
+      <UnifiedUnlockModal
+        isOpen={Boolean(unlockModalTarget)}
+        onClose={() => setUnlockModalTarget(null)}
+        target={unlockModalTarget}
+        team={team}
+        currentMember={currentMember}
+        teamBalance={teamBalance}
+        onUnlockSuccess={handleUnlockCardSuccess}
+      />
     </section>
   );
 }

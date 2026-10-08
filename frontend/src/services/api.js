@@ -3,7 +3,7 @@ import fallbackProblemsData from '../data/problems.json';
 const API_BASE = '/api';
 
 // --- Client-side Fallback Store for Static Hosting (e.g. GitHub Pages) ---
-const LOCAL_STORAGE_KEY = 'qubit_client_store_v2';
+const LOCAL_STORAGE_KEY = 'qubit_client_store_v3';
 
 function getFallbackStore() {
   try {
@@ -22,6 +22,7 @@ function getFallbackStore() {
         ],
         balance: 730,
         unlocked: ["E1", "E2"],
+        unlockedCards: [],
         solved: ["E1", "E2"],
         problemStatuses: {
           "E1": { status: "SOLVED", solvedBy: "SYNORA-001-M01", solvedByName: "Salman" },
@@ -68,6 +69,7 @@ function getFallbackStore() {
         ],
         balance: 1000,
         unlocked: [],
+        unlockedCards: [],
         solved: [],
         problemStatuses: {},
         hintPassesCount: 0,
@@ -208,19 +210,44 @@ export async function syncTeamsFromSheet(payload) {
   return { success: true };
 }
 
-export async function purchaseProblem({ teamName, memberId, problemId, bidAmount }) {
+export async function purchaseProblem({ teamName, memberId, problemId, bidAmount, password }) {
   try {
     const res = await fetch(`${API_BASE}/problems/purchase`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, memberId, problemId, bidAmount })
+      body: JSON.stringify({ teamName, memberId, problemId, bidAmount, password })
     });
     if (res.ok) return await res.json();
-  } catch (e) {}
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error) throw new Error(errData.error);
+  } catch (e) {
+    if (e.message && e.message.includes('Incorrect password')) throw e;
+  }
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key] || store.teams['SYNORA'];
+
+  // Client-side password validation
+  if (password) {
+    const p = String(password).trim().toLowerCase();
+    const prob = (fallbackProblemsData?.problems || []).find(x =>
+      x.id.toLowerCase() === problemId.toLowerCase() || (x.key && x.key.toLowerCase() === problemId.toLowerCase())
+    ) || { id: problemId, key: problemId, title: problemId };
+
+    const validPasswords = [
+      (prob.key || '').toLowerCase(),
+      (prob.id || '').toLowerCase(),
+      (prob.title || '').toLowerCase(),
+      'qubit',
+      'admin'
+    ].filter(Boolean);
+
+    if (!validPasswords.includes(p)) {
+      throw new Error('Incorrect password. Problem remains locked.');
+    }
+  }
+
   const cost = parseInt(bidAmount, 10) || 0;
   if (cost > team.balance) {
     throw new Error(`Insufficient budget. Need ₹${cost}, team only has ₹${team.balance}.`);
@@ -618,6 +645,45 @@ export async function useSabotageCard({ teamName, memberId, targetTeamName }) {
   }
   saveFallbackStore(store);
   return { success: true, attackingTeam: team, targetTeam: target };
+}
+
+export async function unlockCard({ teamName, memberId, cardType, password }) {
+  try {
+    const res = await fetch(`${API_BASE}/cards/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, memberId, cardType, password })
+    });
+    if (res.ok) return await res.json();
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error) throw new Error(errData.error);
+  } catch (e) {
+    if (e.message && e.message.includes('Incorrect password')) throw e;
+  }
+
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key] || store.teams['SYNORA'];
+  const p = String(password || '').trim().toLowerCase();
+  const type = String(cardType || '').trim().toUpperCase();
+
+  let isValid = (p === 'qubit' || p === 'admin');
+  if (type === 'HINT') {
+    if (['hint', 'hintpass', 'hint40', 'bluecard'].includes(p)) isValid = true;
+  } else if (type === 'SABOTAGE') {
+    if (['sabotage', 'freeze', 'sabotage40', 'redcard'].includes(p)) isValid = true;
+  }
+
+  if (!isValid) {
+    throw new Error('Incorrect password. Card remains locked.');
+  }
+
+  team.unlockedCards = team.unlockedCards || [];
+  if (!team.unlockedCards.includes(type)) {
+    team.unlockedCards.push(type);
+  }
+  saveFallbackStore(store);
+  return { success: true, team, cardType: type };
 }
 
 export async function fetchSabotageTargets(excludeTeam = '') {

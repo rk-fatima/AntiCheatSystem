@@ -1424,7 +1424,7 @@
           "college": ""
         }
       ],
-      "balance": 610,
+      "balance": 490,
       "unlocked": [
         "E1",
         "E2"
@@ -1466,9 +1466,53 @@
         }
       },
       "revealedHints": {},
-      "hintPassesCount": 4,
-      "sabotageCardsCount": 0,
+      "hintPassesCount": 6,
+      "sabotageCardsCount": 1,
       "transactions": [
+        {
+          "id": "TXN-SABOTAGE-1791438437401-C3KH",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "type": "SABOTAGE_CARD",
+          "cardType": "SABOTAGE_CARD",
+          "cost": 40,
+          "price": 40,
+          "purchasedBy": "SYNORA-001-M01",
+          "purchasedByName": "Salman",
+          "remainingBalance": 490,
+          "timestamp": 1791438437401,
+          "isoTime": "2026-10-08T05:47:17.401Z"
+        },
+        {
+          "id": "TXN-HINT-1791436964476-5QFW",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "type": "HINT_PASS",
+          "cardType": "HINT_PASS",
+          "cost": 40,
+          "price": 40,
+          "problemId": null,
+          "purchasedBy": "SYNORA-001-M01",
+          "purchasedByName": "Salman",
+          "remainingBalance": 530,
+          "timestamp": 1791436964476,
+          "isoTime": "2026-10-08T05:22:44.476Z"
+        },
+        {
+          "id": "TXN-HINT-1791436743093-EYZL",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "type": "HINT_PASS",
+          "cardType": "HINT_PASS",
+          "cost": 40,
+          "price": 40,
+          "problemId": null,
+          "purchasedBy": "SYNORA-001-M01",
+          "purchasedByName": "Salman",
+          "remainingBalance": 570,
+          "timestamp": 1791436743093,
+          "isoTime": "2026-10-08T05:19:03.093Z"
+        },
         {
           "id": "TXN-HINT-1791430613754-REQ0",
           "teamId": "Synora",
@@ -1924,6 +1968,78 @@
           "details": "Window lost focus (switched to external application).",
           "timestamp": 1791433142060,
           "isoTime": "2026-10-08T04:19:02.060Z"
+        },
+        {
+          "id": "1791436764535-aty9bf",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791436764535,
+          "isoTime": "2026-10-08T05:19:24.535Z"
+        },
+        {
+          "id": "1791436972212-idheaf",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791436972212,
+          "isoTime": "2026-10-08T05:22:52.212Z"
+        },
+        {
+          "id": "1791437003292-6j547t",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791437003292,
+          "isoTime": "2026-10-08T05:23:23.292Z"
+        },
+        {
+          "id": "1791437248386-cdx6t3",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791437248386,
+          "isoTime": "2026-10-08T05:27:28.386Z"
+        },
+        {
+          "id": "1791437529255-099efi",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791437529256,
+          "isoTime": "2026-10-08T05:32:09.256Z"
+        },
+        {
+          "id": "1791437543100-c4zbcy",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791437543100,
+          "isoTime": "2026-10-08T05:32:23.100Z"
+        },
+        {
+          "id": "1791437737440-4ukj2e",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "TAB_SWITCH",
+          "details": "Switched away from browser tab or minimized window.",
+          "timestamp": 1791437737440,
+          "isoTime": "2026-10-08T05:35:37.440Z"
+        },
+        {
+          "id": "1791438441955-vvqst3",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791438441955,
+          "isoTime": "2026-10-08T05:47:21.955Z"
         }
       ],
       "isLocked": false,
@@ -2066,7 +2182,8 @@
       "problemWrong": {
         "E1": 2,
         "E2": 1
-      }
+      },
+      "unlockedCards": []
     },
     "VisionX": {
       "id": "VisionX",
@@ -2106,6 +2223,50 @@
     }
   },
   "transactions": [
+    {
+      "id": "TXN-SABOTAGE-1791438437401-C3KH",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "type": "SABOTAGE_CARD",
+      "cardType": "SABOTAGE_CARD",
+      "cost": 40,
+      "price": 40,
+      "purchasedBy": "SYNORA-001-M01",
+      "purchasedByName": "Salman",
+      "remainingBalance": 490,
+      "timestamp": 1791438437401,
+      "isoTime": "2026-10-08T05:47:17.401Z"
+    },
+    {
+      "id": "TXN-HINT-1791436964476-5QFW",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "type": "HINT_PASS",
+      "cardType": "HINT_PASS",
+      "cost": 40,
+      "price": 40,
+      "problemId": null,
+      "purchasedBy": "SYNORA-001-M01",
+      "purchasedByName": "Salman",
+      "remainingBalance": 530,
+      "timestamp": 1791436964476,
+      "isoTime": "2026-10-08T05:22:44.476Z"
+    },
+    {
+      "id": "TXN-HINT-1791436743093-EYZL",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "type": "HINT_PASS",
+      "cardType": "HINT_PASS",
+      "cost": 40,
+      "price": 40,
+      "problemId": null,
+      "purchasedBy": "SYNORA-001-M01",
+      "purchasedByName": "Salman",
+      "remainingBalance": 570,
+      "timestamp": 1791436743093,
+      "isoTime": "2026-10-08T05:19:03.093Z"
+    },
     {
       "id": "TXN-HINT-1791430613754-REQ0",
       "teamId": "Synora",
@@ -2388,6 +2549,78 @@
     }
   ],
   "telemetry": [
+    {
+      "id": "1791438441955-vvqst3",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791438441955,
+      "isoTime": "2026-10-08T05:47:21.955Z"
+    },
+    {
+      "id": "1791437737440-4ukj2e",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "TAB_SWITCH",
+      "details": "Switched away from browser tab or minimized window.",
+      "timestamp": 1791437737440,
+      "isoTime": "2026-10-08T05:35:37.440Z"
+    },
+    {
+      "id": "1791437543100-c4zbcy",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791437543100,
+      "isoTime": "2026-10-08T05:32:23.100Z"
+    },
+    {
+      "id": "1791437529255-099efi",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791437529256,
+      "isoTime": "2026-10-08T05:32:09.256Z"
+    },
+    {
+      "id": "1791437248386-cdx6t3",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791437248386,
+      "isoTime": "2026-10-08T05:27:28.386Z"
+    },
+    {
+      "id": "1791437003292-6j547t",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791437003292,
+      "isoTime": "2026-10-08T05:23:23.292Z"
+    },
+    {
+      "id": "1791436972212-idheaf",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791436972212,
+      "isoTime": "2026-10-08T05:22:52.212Z"
+    },
+    {
+      "id": "1791436764535-aty9bf",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791436764535,
+      "isoTime": "2026-10-08T05:19:24.535Z"
+    },
     {
       "id": "1791433142059-pisman",
       "teamName": "Synora",

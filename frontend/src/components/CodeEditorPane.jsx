@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Send, RotateCcw, Loader2, CheckCircle, AlertTriangle, XCircle, Terminal, Lightbulb, Zap, Snowflake } from 'lucide-react';
+import { Play, Send, RotateCcw, Loader2, CheckCircle, AlertTriangle, XCircle, Terminal, Lightbulb, Zap, Snowflake, Lock, Unlock } from 'lucide-react';
 import { useHintPass } from '../services/api';
+import { UnifiedUnlockModal } from './UnifiedUnlockModal';
 
 const STARTER_TEMPLATES = {
   python: `import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # TODO: parse input, solve, print output\n    print()\n\nif __name__ == "__main__":\n    main()\n`,
@@ -44,10 +45,11 @@ export function CodeEditorPane({
   const [allowPaste, setAllowPaste] = useState(false);
   const [hintLoading, setHintLoading] = useState(false);
   const [hintError, setHintError] = useState('');
+  const [showHintUnlockModal, setShowHintUnlockModal] = useState(false);
 
   const isFrozen = Boolean(team?.frozenUntil && team.frozenUntil > Date.now());
 
-  const handleUnlockHintForProblem = async () => {
+  const handleHintUnlockSuccess = async () => {
     if (!problem?.id || !team?.name) return;
     setHintLoading(true);
     setHintError('');
@@ -60,6 +62,7 @@ export function CodeEditorPane({
       if (onTeamUpdated && res.team) {
         onTeamUpdated(res.team);
       }
+      setShowHintUnlockModal(false);
     } catch (err) {
       setHintError(err.message || 'Failed to unlock hint.');
     } finally {
@@ -292,13 +295,16 @@ export function CodeEditorPane({
 
         {/* 💡 Blue Hint Card / Unlock Hint Button */}
         {team?.revealedHints?.[problem.id] ? (
-          <div style={{
-            background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.8) 100%)',
-            border: '1px solid rgba(56, 139, 253, 0.3)',
-            borderRadius: '10px',
-            padding: '14px 16px',
-            marginBottom: '18px'
-          }}>
+          <div
+            className="card-unlocked-reveal"
+            style={{
+              background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.8) 100%)',
+              border: '1px solid rgba(56, 139, 253, 0.3)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              marginBottom: '18px'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#58a6ff', fontWeight: 700, fontSize: '12px' }}>
                 <Lightbulb size={15} /> Algorithmic Hint
@@ -324,24 +330,24 @@ export function CodeEditorPane({
           }}>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 600, color: '#58a6ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Lightbulb size={14} /> Need algorithmic guidance?
+                <Lock size={14} /> Locked Algorithmic Hint
               </div>
               <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '2px' }}>
-                {team?.hintPassesCount > 0 ? `${team.hintPassesCount} Hint Pass available` : '40 ByteCoins from shared budget'}
+                Password verification required to reveal official algorithmic strategy
               </div>
             </div>
             <button
               type="button"
               className="btn-blue"
-              onClick={handleUnlockHintForProblem}
-              disabled={hintLoading || ((team?.balance ?? 1000) < 40 && (team?.hintPassesCount || 0) === 0)}
+              onClick={() => setShowHintUnlockModal(true)}
               style={{
                 fontSize: '11px',
-                padding: '6px 12px',
-                borderRadius: '6px'
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontWeight: 600
               }}
             >
-              {hintLoading ? 'Unlocking...' : (team?.hintPassesCount || 0) > 0 ? 'Use Hint Pass' : 'Unlock (40 BC)'}
+              <Lock size={12} /> Enter Password
             </button>
           </div>
         )}
@@ -684,6 +690,24 @@ export function CodeEditorPane({
           )}
         </div>
       </div>
+
+      {/* Unified Password Verification Modal for Problem Hint */}
+      <UnifiedUnlockModal
+        isOpen={showHintUnlockModal}
+        onClose={() => setShowHintUnlockModal(false)}
+        target={{
+          type: 'PROBLEM_HINT',
+          id: problem.id,
+          key: problem.key,
+          problemId: problem.id,
+          title: `Hint: ${problem.title}`,
+          subtitle: `Algorithmic strategy for ${problem.id}`
+        }}
+        team={team}
+        currentMember={currentMember}
+        teamBalance={team?.balance ?? 1000}
+        onUnlockSuccess={handleHintUnlockSuccess}
+      />
     </div>
   );
 }

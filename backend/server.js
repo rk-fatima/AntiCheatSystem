@@ -150,15 +150,15 @@ app.get('/api/problems', (req, res) => {
   });
 });
 
-// Dynamic Problem Purchase (Team-level purchase with winning bid amount deduction)
+// Dynamic Problem Purchase (Team-level purchase with password verification & winning bid deduction)
 app.post('/api/problems/purchase', (req, res) => {
-  const { teamName, memberId, problemId, bidAmount } = req.body;
+  const { teamName, memberId, problemId, bidAmount, password } = req.body;
   if (!teamName || !problemId) {
     return res.status(400).json({ error: 'Team name and problem ID are required.' });
   }
 
   try {
-    const { team, txn, problem } = db.purchaseProblem(teamName, memberId, problemId, bidAmount);
+    const { team, txn, problem } = db.purchaseProblem(teamName, memberId, problemId, bidAmount, password);
 
     // Real-time broadcast to all members of this team
     broadcastToTeam(teamName, {
@@ -363,6 +363,29 @@ app.get('/api/cards/targets', (req, res) => {
   const excludeTeam = req.query.excludeTeam || '';
   const targets = db.getSabotageTargets(excludeTeam);
   res.json({ targets });
+});
+
+// Password-protected Power Card Unlock
+app.post('/api/cards/unlock', (req, res) => {
+  const { teamName, memberId, cardType, password } = req.body;
+  if (!teamName || !cardType || !password) {
+    return res.status(400).json({ error: 'Team name, card type, and password are required.' });
+  }
+
+  try {
+    const result = db.unlockCard(teamName, memberId, cardType, password);
+    broadcastToTeam(teamName, {
+      type: 'TEAM_WORKSPACE_UPDATED',
+      team: result.team
+    });
+    broadcastToProctors({
+      type: 'TEAM_UPDATED',
+      team: result.team
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // --- TEAM REGISTRATION & SESSION MANAGEMENT ---

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Unlock, CheckCircle2, Search, X, Gavel, KeyRound, AlertCircle, Sparkles } from 'lucide-react';
 import { PowerCardsSection } from './PowerCardsSection';
+import { UnifiedUnlockModal } from './UnifiedUnlockModal';
 
 export function ProblemCatalog({
   problems = [],
@@ -17,67 +18,49 @@ export function ProblemCatalog({
   const [searchTerm, setSearchTerm] = useState('');
   const [diffFilter, setDiffFilter] = useState('ALL');
   const [selectedBidProblem, setSelectedBidProblem] = useState(null);
-  const [bidAmountInput, setBidAmountInput] = useState('');
-  const [customProblemId, setCustomProblemId] = useState('');
-  const [isQuickUnlockOpen, setIsQuickUnlockOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
 
   const handleOpenBidModal = (prob) => {
-    setSelectedBidProblem(prob);
-    setBidAmountInput('');
+    const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
+    setSelectedBidProblem({
+      type: 'PROBLEM',
+      id: prob.id,
+      key: prob.key,
+      title: `${prob.id} — ${prob.title}`,
+      subtitle: `${prob.diff} · ${diffPoints} pts`,
+      diff: prob.diff,
+      pts: diffPoints,
+      defaultBid: 0
+    });
     setNotification(null);
   };
 
   const handleOpenQuickUnlockModal = () => {
-    setIsQuickUnlockOpen(true);
-    setCustomProblemId('');
-    setBidAmountInput('');
+    setSelectedBidProblem({
+      type: 'PROBLEM',
+      isQuickUnlock: true,
+      title: 'Problem by ID',
+      subtitle: 'Record winning bid & verify key',
+      defaultBid: 0
+    });
     setNotification(null);
   };
 
-  const handleConfirmBid = async () => {
-    const targetProblem = selectedBidProblem || (customProblemId ? problems.find(p => p.id.toUpperCase() === customProblemId.trim().toUpperCase()) : null);
-    const probId = targetProblem ? targetProblem.id : customProblemId.trim().toUpperCase();
-
-    if (!probId) {
-      setNotification({ success: false, text: 'Please select or enter a valid Problem ID.' });
-      return;
-    }
-
-    const amount = parseInt(bidAmountInput, 10);
-    if (isNaN(amount) || amount < 0) {
-      setNotification({ success: false, text: 'Please enter a valid bid amount (≥ ₹0).' });
-      return;
-    }
-
-    if (amount > (teamBalance ?? 1000)) {
-      setNotification({
-        success: false,
-        text: `Insufficient team budget! Your bid is ₹${amount}, but team only has ₹${teamBalance ?? 1000} remaining.`
-      });
-      return;
-    }
-
-    setLoading(true);
-    setNotification(null);
+  const handleUnlockProblemSuccess = async ({ target, password, bidAmount, customProblemId }) => {
+    const probId = target.isQuickUnlock ? customProblemId : target.id;
+    if (!probId) return;
     try {
-      const res = await onPurchaseProblem(probId, amount);
+      const res = await onPurchaseProblem(probId, bidAmount, password);
       setNotification({
         success: true,
-        text: `Unlocked "${probId}" for ₹${amount}. Remaining Team Balance: ₹${res.team?.balance}.`
+        text: `Unlocked "${probId}" for ₹${bidAmount}. Remaining Team Balance: ₹${res?.team?.balance ?? teamBalance}.`
       });
       setSelectedBidProblem(null);
-      setIsQuickUnlockOpen(false);
-      setBidAmountInput('');
-      setCustomProblemId('');
     } catch (err) {
       setNotification({
         success: false,
-        text: err.message || 'Unlock failed. Please check the problem ID and budget.'
+        text: err.message || 'Unlock failed.'
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -364,127 +347,16 @@ export function ProblemCatalog({
           )}
         </div>
 
-        {/* 4. MODAL: UNLOCK PROBLEM */}
-        {(selectedBidProblem || isQuickUnlockOpen) && (
-          <div className="ov" style={{ zIndex: 1100 }}>
-            <div className="box" style={{ maxWidth: '440px', padding: '24px' }}>
-              {/* Modal Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#ffffff' }}>
-                  Unlock Problem
-                </h3>
-                <button
-                  className="btn-ghost"
-                  onClick={() => { setSelectedBidProblem(null); setIsQuickUnlockOpen(false); }}
-                  style={{ padding: '6px' }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Target Problem Info */}
-              {selectedBidProblem ? (
-                <div style={{
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  marginBottom: '18px'
-                }}>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
-                    {selectedBidProblem.id} — {selectedBidProblem.title}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
-                    {selectedBidProblem.diff} · {selectedBidProblem.diff === 'Hard' ? 400 : (selectedBidProblem.diff === 'Medium' ? 300 : 200)} pts
-                  </div>
-                </div>
-              ) : (
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '6px' }}>
-                    Problem ID
-                  </label>
-                  <input
-                    placeholder="e.g. E3, M1, H2"
-                    value={customProblemId}
-                    onChange={(e) => setCustomProblemId(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', fontSize: '13px' }}
-                  />
-                </div>
-              )}
-
-              {/* Winning Bid Input */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '6px' }}>
-                  Winning Bid (ByteCoins)
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--txt-dim)', fontSize: '14px' }}>
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Enter winning bid amount"
-                    value={bidAmountInput}
-                    onChange={(e) => setBidAmountInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmBid()}
-                    autoFocus
-                    style={{
-                      width: '100%',
-                      paddingLeft: '28px',
-                      paddingRight: '12px',
-                      paddingTop: '9px',
-                      paddingBottom: '9px',
-                      fontSize: '14px',
-                      fontFamily: 'var(--font-mono)'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Budget Impact Preview */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '12px',
-                color: 'var(--txt-muted)',
-                marginBottom: '20px',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                background: 'rgba(255, 255, 255, 0.02)'
-              }}>
-                <span>Remaining after unlock:</span>
-                <span style={{
-                  fontWeight: 600,
-                  fontFamily: 'var(--font-mono)',
-                  color: projectedRemaining < 0 ? '#f85149' : '#ffffff'
-                }}>
-                  ₹{projectedRemaining} ByteCoins
-                </span>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => { setSelectedBidProblem(null); setIsQuickUnlockOpen(false); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={handleConfirmBid}
-                  disabled={loading || (currentBidNum > (teamBalance ?? 1000))}
-                  style={{ padding: '8px 18px', borderRadius: '6px' }}
-                >
-                  {loading ? 'Unlocking...' : 'Unlock Problem'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Unified Password Verification Modal for Problems */}
+        <UnifiedUnlockModal
+          isOpen={Boolean(selectedBidProblem)}
+          onClose={() => setSelectedBidProblem(null)}
+          target={selectedBidProblem}
+          team={team}
+          currentMember={currentMember}
+          teamBalance={teamBalance}
+          onUnlockSuccess={handleUnlockProblemSuccess}
+        />
       </div>
     </div>
   );

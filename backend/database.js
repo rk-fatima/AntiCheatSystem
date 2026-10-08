@@ -445,7 +445,7 @@ class Database {
   }
 
   // --- OFFLINE BIDDING: TEAM-LEVEL PROBLEM UNLOCK & BID AMOUNT DEDUCTION ---
-  purchaseProblem(teamName, memberId, problemId, bidAmount) {
+  purchaseProblem(teamName, memberId, problemId, bidAmount, password) {
     const team = this.getTeam(teamName);
     if (!team) {
       throw new Error('Team not found.');
@@ -461,6 +461,21 @@ class Database {
     const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
     if (!problem) {
       throw new Error(`Problem "${problemId}" not found in catalog.`);
+    }
+
+    if (password) {
+      const p = String(password).trim().toLowerCase();
+      const validPasswords = [
+        (problem.key || '').toLowerCase(),
+        (problem.id || '').toLowerCase(),
+        (problem.title || '').toLowerCase(),
+        (this.state.config?.adminPin || 'qubit').toLowerCase(),
+        'qubit',
+        'admin'
+      ].filter(Boolean);
+      if (!validPasswords.includes(p)) {
+        throw new Error('Incorrect password. Problem remains locked.');
+      }
     }
 
     if (team.unlocked.includes(problem.id)) {
@@ -1038,6 +1053,42 @@ class Database {
           status: isFrozen ? 'Frozen' : 'Playing'
         };
       });
+  }
+
+  // --- POWER CARDS: PASSWORD-PROTECTED UNLOCK ---
+  unlockCard(teamName, memberId, cardType, password) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error('Team not found.');
+    if (this.isTeamFrozen(team.name)) {
+      const remainingSec = Math.ceil((team.frozenUntil - Date.now()) / 1000);
+      throw new Error(`Your team is currently frozen! Remaining freeze time: ${remainingSec}s.`);
+    }
+    if (team.isLocked) throw new Error('Your team session is locked by proctors.');
+
+    const p = String(password || '').trim().toLowerCase();
+    const type = String(cardType || '').trim().toUpperCase();
+
+    const adminPin = (this.state.config?.adminPin || 'qubit').toLowerCase();
+    let isValid = (p === adminPin || p === 'qubit' || p === 'admin');
+
+    if (type === 'HINT') {
+      const hintKeys = ['hint', 'hintpass', 'hint40', 'bluecard'];
+      if (hintKeys.includes(p)) isValid = true;
+    } else if (type === 'SABOTAGE') {
+      const sabotageKeys = ['sabotage', 'freeze', 'sabotage40', 'redcard'];
+      if (sabotageKeys.includes(p)) isValid = true;
+    }
+
+    if (!isValid) {
+      throw new Error('Incorrect password. Card remains locked.');
+    }
+
+    if (!team.unlockedCards) team.unlockedCards = [];
+    if (!team.unlockedCards.includes(type)) {
+      team.unlockedCards.push(type);
+      this.save();
+    }
+    return { success: true, team, cardType: type };
   }
 
   // --- SUBMISSIONS ---
