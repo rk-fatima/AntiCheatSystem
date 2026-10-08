@@ -936,43 +936,85 @@ export function adminLogout() {
   } catch (e) {}
 }
 
-export async function adminUnlockProblem({ teamName, problemId }) {
+export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
   try {
     const res = await fetch(`${API_BASE}/admin/problems/unlock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, problemId })
+      body: JSON.stringify({ teamName, problemId, bidPrice })
     });
-    if (res.ok) return await res.json();
-  } catch (e) {}
+    if (res.ok) {
+      return await res.json();
+    }
+    const errData = await res.json().catch(() => null);
+    if (errData?.error) throw new Error(errData.error);
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
 
   const store = getFallbackStore();
-  const teamsToUpdate = [];
-  if (!teamName || teamName.toUpperCase() === 'ALL') {
-    teamsToUpdate.push(...Object.values(store.teams));
-  } else {
-    const key = (teamName || '').trim().toUpperCase();
-    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key];
+  if (!team) {
+    throw new Error(`Team "${teamName}" not found.`);
   }
 
-  for (const t of teamsToUpdate) {
-    if (!t.unlocked) t.unlocked = [];
-    if (!t.unlocked.includes(problemId)) {
-      t.unlocked.push(problemId);
-    }
-    if (!t.problemStatuses) t.problemStatuses = {};
-    if (!t.problemStatuses[problemId] || t.problemStatuses[problemId].status !== 'SOLVED') {
-      t.problemStatuses[problemId] = {
-        status: 'UNLOCKED',
-        unlockedBy: 'ADMIN',
-        unlockedByName: 'Administrator',
-        unlockedAt: new Date().toISOString()
-      };
-    }
+  const bid = Number(bidPrice);
+  if (isNaN(bid) || bid <= 0) {
+    throw new Error('Bid price must be a valid positive number.');
   }
+
+  const currentBalance = team.balance ?? 1000;
+  if (bid > currentBalance) {
+    throw new Error('Insufficient ByteCoins');
+  }
+
+  const previousBalance = currentBalance;
+  team.balance = currentBalance - bid;
+  const remainingBalance = team.balance;
+
+  if (!team.unlocked) team.unlocked = [];
+  if (!team.unlocked.includes(problemId)) {
+    team.unlocked.push(problemId);
+  }
+  if (!team.problemStatuses) team.problemStatuses = {};
+  if (!team.problemStatuses[problemId] || team.problemStatuses[problemId].status !== 'SOLVED') {
+    team.problemStatuses[problemId] = {
+      status: 'UNLOCKED',
+      unlockedBy: 'ADMIN',
+      unlockedByName: 'Administrator',
+      unlockedAt: new Date().toISOString(),
+      bidPrice: bid
+    };
+  }
+
+  const prob = (fallbackProblemsData.problems || []).find(p => p.id === problemId);
+  const problemTitle = prob ? prob.title : problemId;
+  const now = new Date();
+
+  const record = {
+    id: `TXN-ADM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    type: 'ADMIN_UNLOCK',
+    teamName: team.name,
+    problemId: problemId,
+    problemTitle: problemTitle,
+    bidPrice: bid,
+    bidAmount: bid,
+    price: bid,
+    previousBalance: previousBalance,
+    remainingBalance: remainingBalance,
+    status: 'UNLOCKED',
+    timestamp: now.toISOString(),
+    displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+  };
+
+  if (!team.transactions) team.transactions = [];
+  team.transactions.unshift(record);
+  if (!store.unlockHistory) store.unlockHistory = [];
+  store.unlockHistory.unshift(record);
 
   saveFallbackStore(store);
-  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+  return { success: true, team, teams: [team], txn: record, unlockRecord: record };
 }
 
 export async function adminLockProblem({ teamName, problemId }) {
@@ -1161,7 +1203,8 @@ export async function fetchAdminOverview() {
   return {
     teams: Object.values(store.teams),
     problems: fallbackProblemsData.problems || [],
-    transactions: [],
+    transactions: store.transactions || [],
+    unlockHistory: store.unlockHistory || [],
     submissions: []
   };
 }

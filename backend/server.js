@@ -717,9 +717,9 @@ app.post('/api/admin/login', (req, res) => {
 
 // Admin Problem Unlock
 app.post('/api/admin/problems/unlock', (req, res) => {
-  const { teamName, problemId } = req.body;
+  const { teamName, problemId, bidPrice } = req.body;
   try {
-    const result = db.adminUnlockProblem(teamName, problemId);
+    const result = db.adminUnlockProblem(teamName, problemId, bidPrice);
     if (result.teams) {
       result.teams.forEach(t => {
         broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
@@ -827,6 +827,7 @@ app.get('/api/admin/overview', (req, res) => {
     teams,
     problems,
     transactions: db.getAllTransactions(),
+    unlockHistory: db.getUnlockHistory(),
     submissions: db.getAllSubmissions().slice(0, 100)
   });
 });

@@ -1424,11 +1424,12 @@
           "college": ""
         }
       ],
-      "balance": 390,
+      "balance": 290,
       "unlocked": [
         "E1",
         "E2",
-        "E4"
+        "E4",
+        "E3"
       ],
       "solved": [
         "E1",
@@ -1471,12 +1472,34 @@
           "unlockedByName": "Sreethan",
           "bidAmount": 100,
           "unlockedAt": "2026-10-08T07:20:13.854Z"
+        },
+        "E3": {
+          "status": "UNLOCKED",
+          "unlockedBy": "ADMIN",
+          "unlockedByName": "Administrator",
+          "unlockedAt": "2026-10-08T10:09:42.963Z",
+          "bidPrice": 100
         }
       },
       "revealedHints": {},
       "hintPassesCount": 6,
       "sabotageCardsCount": 1,
       "transactions": [
+        {
+          "id": "TXN-ADM-1791454182963-weuw",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "Synora",
+          "problemId": "E3",
+          "problemTitle": "Valid Parentheses",
+          "bidPrice": 100,
+          "bidAmount": 100,
+          "price": 100,
+          "previousBalance": 390,
+          "remainingBalance": 290,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-08T10:09:42.963Z",
+          "displayTime": "03:39 PM"
+        },
         {
           "id": "TXN-1791444013854-5HMD7",
           "teamId": "Synora",
@@ -2363,6 +2386,21 @@
   },
   "transactions": [
     {
+      "id": "TXN-ADM-1791454182963-weuw",
+      "type": "ADMIN_UNLOCK",
+      "teamName": "Synora",
+      "problemId": "E3",
+      "problemTitle": "Valid Parentheses",
+      "bidPrice": 100,
+      "bidAmount": 100,
+      "price": 100,
+      "previousBalance": 390,
+      "remainingBalance": 290,
+      "status": "UNLOCKED",
+      "timestamp": "2026-10-08T10:09:42.963Z",
+      "displayTime": "03:39 PM"
+    },
+    {
       "id": "TXN-1791444013854-5HMD7",
       "teamId": "Synora",
       "teamName": "Synora",
@@ -2565,6 +2603,23 @@
       "remainingBalance": 960,
       "timestamp": 1791401710499,
       "isoTime": "2026-10-07T19:35:10.499Z"
+    }
+  ],
+  "unlockHistory": [
+    {
+      "id": "TXN-ADM-1791454182963-weuw",
+      "type": "ADMIN_UNLOCK",
+      "teamName": "Synora",
+      "problemId": "E3",
+      "problemTitle": "Valid Parentheses",
+      "bidPrice": 100,
+      "bidAmount": 100,
+      "price": 100,
+      "previousBalance": 390,
+      "remainingBalance": 290,
+      "status": "UNLOCKED",
+      "timestamp": "2026-10-08T10:09:42.963Z",
+      "displayTime": "03:39 PM"
     }
   ],
   "submissions": [

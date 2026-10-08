@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Shield,
   Trophy,
   Lock,
   Unlock,
@@ -10,17 +9,15 @@ import {
   RefreshCw,
   Search,
   CheckCircle2,
-  AlertTriangle,
   Coins,
   Users,
-  Eye,
   Check,
   X,
   ExternalLink,
-  ChevronDown,
-  Sparkles,
+  Eye,
   Snowflake,
-  ShieldAlert
+  AlertTriangle,
+  History
 } from 'lucide-react';
 import {
   fetchAdminOverview,
@@ -33,19 +30,17 @@ import {
   adminClearFreeze,
   adminLogout
 } from '../services/api';
-import { ProctorDashboard } from './ProctorDashboard';
 
 export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
-  const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage'
+  const [activeTab, setActiveTab] = useState('problems'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage'
   const [teams, setTeams] = useState([]);
   const [problems, setProblems] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [unlockHistory, setUnlockHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedTeamName, setSelectedTeamName] = useState('ALL');
+  const [selectedTeamName, setSelectedTeamName] = useState('');
   const [notification, setNotification] = useState(null);
-  const [showProctorStation, setShowProctorStation] = useState(false);
 
-  // Leaderboard filters & sorting
+  // Leaderboard filters
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
   const [leaderboardSort, setLeaderboardSort] = useState('score'); // 'score' | 'solved' | 'balance' | 'name'
 
@@ -53,13 +48,25 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [problemSearch, setProblemSearch] = useState('');
   const [problemDiffFilter, setProblemDiffFilter] = useState('ALL');
 
+  // Bid Price Unlock Modal
+  // unlockModal: { problem, team, bidPrice }
+  const [unlockModal, setUnlockModal] = useState(null);
+  const [unlockSubmitting, setUnlockSubmitting] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAdminOverview();
-      setTeams(data.teams || []);
+      const loadedTeams = data.teams || [];
+      setTeams(loadedTeams);
       setProblems(data.problems || []);
-      setTransactions(data.transactions || []);
+      setUnlockHistory(data.unlockHistory || []);
+
+      // If no team is selected yet, default to the first team
+      setSelectedTeamName(prev => {
+        if (prev && loadedTeams.some(t => t.name === prev)) return prev;
+        return loadedTeams[0]?.name || 'Synora';
+      });
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -77,59 +84,90 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     setNotification({ text: message, success: isSuccess });
     setTimeout(() => {
       setNotification(prev => (prev?.text === message ? null : prev));
-    }, 4000);
+    }, 4500);
   };
 
-  // Selected Team Object (if specific team selected)
-  const currentTeam = selectedTeamName !== 'ALL'
-    ? teams.find(t => (t.name || '').toUpperCase() === selectedTeamName.toUpperCase()) || null
-    : null;
+  // Target team object
+  const targetTeam = teams.find(
+    t => (t.name || '').toUpperCase() === (selectedTeamName || '').toUpperCase()
+  ) || teams[0] || null;
 
-  // --- ACTIONS: PROBLEM UNLOCK MANAGEMENT ---
-  const handleToggleProblemUnlock = async (problemId, currentlyUnlocked) => {
-    try {
-      if (currentlyUnlocked) {
-        await adminLockProblem({ teamName: selectedTeamName, problemId });
-        showToast(`🔒 Problem ${problemId} locked for ${selectedTeamName === 'ALL' ? 'all teams' : selectedTeamName}.`);
-      } else {
-        await adminUnlockProblem({ teamName: selectedTeamName, problemId });
-        showToast(`🔓 Problem ${problemId} unlocked for ${selectedTeamName === 'ALL' ? 'all teams' : selectedTeamName}!`);
-      }
-      loadData();
-    } catch (err) {
-      showToast(err.message || 'Action failed', false);
-    }
-  };
+  // --- STATS COMPUTATION FOR TOP 4 COMPACT CARDS ---
+  const totalTeamsCount = teams.length;
+  const activeTeamsCount = teams.filter(t => !t.isLocked).length;
+  const totalByteCoins = teams.reduce((acc, t) => acc + (t.balance ?? 1000), 0);
 
-  const handleBulkProblemAction = async (shouldUnlock) => {
-    const actionWord = shouldUnlock ? 'unlock' : 'lock';
-    if (!window.confirm(`Are you sure you want to ${actionWord} ALL problems for ${selectedTeamName === 'ALL' ? 'ALL teams' : selectedTeamName}?`)) {
+  // Problems unlocked for current selected team
+  const targetTeamUnlockedCount = (targetTeam?.unlocked || []).length;
+
+  // --- PROBLEM UNLOCK (BID MODAL TRIGGER) ---
+  const handleOpenUnlockModal = (problem) => {
+    if (!targetTeam) {
+      showToast('Please select a target team first.', false);
       return;
     }
+    setUnlockModal({
+      problem,
+      team: targetTeam,
+      bidPrice: '100' // Suggested default
+    });
+  };
+
+  const handleConfirmUnlock = async () => {
+    if (!unlockModal) return;
+    const { problem, team, bidPrice } = unlockModal;
+
+    const bidNum = Number(bidPrice);
+    if (!bidPrice || isNaN(bidNum) || bidNum <= 0) {
+      showToast('Please enter a valid positive bid price.', false);
+      return;
+    }
+
+    const currentBalance = team.balance ?? 1000;
+    if (bidNum > currentBalance) {
+      showToast('Insufficient ByteCoins: Bid exceeds team balance.', false);
+      return;
+    }
+
+    setUnlockSubmitting(true);
     try {
-      for (const prob of problems) {
-        if (shouldUnlock) {
-          await adminUnlockProblem({ teamName: selectedTeamName, problemId: prob.id });
-        } else {
-          await adminLockProblem({ teamName: selectedTeamName, problemId: prob.id });
-        }
-      }
-      showToast(`Successfully ${shouldUnlock ? 'unlocked' : 'locked'} all problems for ${selectedTeamName}!`);
-      loadData();
+      const res = await adminUnlockProblem({
+        teamName: team.name,
+        problemId: problem.id,
+        bidPrice: bidNum
+      });
+
+      showToast(`🔓 Unlocked ${problem.id} for ${team.name}! Deducted ${bidNum} ByteCoins.`);
+      setUnlockModal(null);
+      await loadData();
     } catch (err) {
-      showToast(err.message || 'Bulk update failed', false);
+      showToast(err.message || 'Failed to unlock problem', false);
+    } finally {
+      setUnlockSubmitting(false);
     }
   };
 
-  // --- ACTIONS: HINT CARD MANAGEMENT ---
+  const handleLockProblem = async (problemId) => {
+    if (!targetTeam) return;
+    try {
+      await adminLockProblem({ teamName: targetTeam.name, problemId });
+      showToast(`🔒 Problem ${problemId} locked for ${targetTeam.name}.`);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to lock problem', false);
+    }
+  };
+
+  // --- CARD UNLOCK/LOCK ACTIONS ---
   const handleToggleHintCard = async (shouldUnlock) => {
+    if (!targetTeam) return;
     try {
       if (shouldUnlock) {
-        await adminUnlockCard({ teamName: selectedTeamName, cardType: 'HINT' });
-        showToast(`💡 Hint Pass Card unlocked for ${selectedTeamName === 'ALL' ? 'all teams' : selectedTeamName}!`);
+        await adminUnlockCard({ teamName: targetTeam.name, cardType: 'HINT' });
+        showToast(`💡 Hint Pass unlocked for ${targetTeam.name}!`);
       } else {
-        await adminLockCard({ teamName: selectedTeamName, cardType: 'HINT' });
-        showToast(`🔒 Hint Pass Card locked for ${selectedTeamName === 'ALL' ? 'all teams' : selectedTeamName}.`);
+        await adminLockCard({ teamName: targetTeam.name, cardType: 'HINT' });
+        showToast(`🔒 Hint Pass locked for ${targetTeam.name}.`);
       }
       loadData();
     } catch (err) {
@@ -138,10 +176,10 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   const handleGrantHintPass = async (amount = 1) => {
+    if (!targetTeam) return;
     try {
-      const targetTeam = selectedTeamName === 'ALL' ? (teams[0]?.name || 'Synora') : selectedTeamName;
-      await adminGrantCardPass({ teamName: targetTeam, cardType: 'HINT', amount });
-      showToast(`💡 Granted +${amount} Hint Pass(es) to team ${targetTeam}!`);
+      await adminGrantCardPass({ teamName: targetTeam.name, cardType: 'HINT', amount });
+      showToast(`💡 Granted +${amount} Hint Pass to ${targetTeam.name}!`);
       loadData();
     } catch (err) {
       showToast(err.message || 'Failed to grant pass', false);
@@ -149,25 +187,25 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   const handleRevealProblemHint = async (problemId) => {
+    if (!targetTeam) return;
     try {
-      const targetTeam = selectedTeamName === 'ALL' ? (teams[0]?.name || 'Synora') : selectedTeamName;
-      await adminRevealProblemHint({ teamName: targetTeam, problemId });
-      showToast(`💡 Revealed hint for problem ${problemId} to team ${targetTeam}!`);
+      await adminRevealProblemHint({ teamName: targetTeam.name, problemId });
+      showToast(`💡 Revealed hint for ${problemId} to ${targetTeam.name}!`);
       loadData();
     } catch (err) {
       showToast(err.message || 'Failed to reveal hint', false);
     }
   };
 
-  // --- ACTIONS: SABOTAGE CARD MANAGEMENT ---
   const handleToggleSabotageCard = async (shouldUnlock) => {
+    if (!targetTeam) return;
     try {
       if (shouldUnlock) {
-        await adminUnlockCard({ teamName: selectedTeamName, cardType: 'SABOTAGE' });
-        showToast(`⚡ Sabotage Card unlocked for ${selectedTeamName === 'ALL' ? 'all teams' : selectedTeamName}!`);
+        await adminUnlockCard({ teamName: targetTeam.name, cardType: 'SABOTAGE' });
+        showToast(`⚡ Sabotage Card unlocked for ${targetTeam.name}!`);
       } else {
-        await adminLockCard({ teamName: selectedTeamName, cardType: 'SABOTAGE' });
-        showToast(`🔒 Sabotage Card locked for ${selectedTeamName === 'ALL' ? 'all teams' : selectedTeamName}.`);
+        await adminLockCard({ teamName: targetTeam.name, cardType: 'SABOTAGE' });
+        showToast(`🔒 Sabotage Card locked for ${targetTeam.name}.`);
       }
       loadData();
     } catch (err) {
@@ -176,10 +214,10 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   const handleGrantSabotageCard = async (amount = 1) => {
+    if (!targetTeam) return;
     try {
-      const targetTeam = selectedTeamName === 'ALL' ? (teams[0]?.name || 'Synora') : selectedTeamName;
-      await adminGrantCardPass({ teamName: targetTeam, cardType: 'SABOTAGE', amount });
-      showToast(`⚡ Granted +${amount} Sabotage Card(s) to team ${targetTeam}!`);
+      await adminGrantCardPass({ teamName: targetTeam.name, cardType: 'SABOTAGE', amount });
+      showToast(`⚡ Granted +${amount} Sabotage Card to ${targetTeam.name}!`);
       loadData();
     } catch (err) {
       showToast(err.message || 'Failed to grant sabotage card', false);
@@ -189,47 +227,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const handleClearTeamFreeze = async (teamName) => {
     try {
       await adminClearFreeze({ teamName });
-      showToast(`❄️ Sabotage freeze cleared for team ${teamName}!`);
+      showToast(`❄️ Sabotage freeze cleared for ${teamName}!`);
       loadData();
     } catch (err) {
       showToast(err.message || 'Failed to clear freeze', false);
     }
   };
 
-  // --- STATS COMPUTATION FOR TOP METRICS ---
-  const totalTeamsCount = teams.length;
-  const activeTeamsCount = teams.filter(t => !t.isLocked).length;
-
-  // Problems unlocked count (across all teams or for selected team)
-  let problemsUnlockedCount = 0;
-  if (selectedTeamName === 'ALL') {
-    const allUnlockedSet = new Set();
-    teams.forEach(t => (t.unlocked || []).forEach(id => allUnlockedSet.add(id)));
-    problemsUnlockedCount = allUnlockedSet.size;
-  } else {
-    problemsUnlockedCount = (currentTeam?.unlocked || []).length;
-  }
-
-  // Hints unlocked count
-  const hintsUnlockedCount = teams.filter(
-    t => (t.unlockedCards || []).includes('HINT') || t.hintUnlocked || (t.hintPassesCount || 0) > 0
-  ).length;
-
-  // Sabotages unlocked count
-  const sabotagesUnlockedCount = teams.filter(
-    t => (t.unlockedCards || []).includes('SABOTAGE') || t.sabotageUnlocked || (t.sabotageCardsCount || 0) > 0
-  ).length;
-
-  // Check if current target has hint/sabotage unlocked
-  const isHintCardUnlockedForTarget = selectedTeamName === 'ALL'
-    ? teams.length > 0 && teams.every(t => (t.unlockedCards || []).includes('HINT') || t.hintUnlocked)
-    : Boolean((currentTeam?.unlockedCards || []).includes('HINT') || currentTeam?.hintUnlocked);
-
-  const isSabotageCardUnlockedForTarget = selectedTeamName === 'ALL'
-    ? teams.length > 0 && teams.every(t => (t.unlockedCards || []).includes('SABOTAGE') || t.sabotageUnlocked)
-    : Boolean((currentTeam?.unlockedCards || []).includes('SABOTAGE') || currentTeam?.sabotageUnlocked);
-
-  // Leaderboard sorting & filtering
+  // Filter & sort leaderboard
   const filteredLeaderboard = [...teams]
     .filter(t => (t.name || '').toLowerCase().includes(leaderboardSearch.toLowerCase()))
     .sort((a, b) => {
@@ -240,19 +245,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       return 0;
     });
 
-  // Problems tab filtering
+  // Filter problems for Problems tab
   const filteredProblems = problems.filter(prob => {
     const matchesSearch =
       prob.id.toLowerCase().includes(problemSearch.toLowerCase()) ||
       prob.title.toLowerCase().includes(problemSearch.toLowerCase()) ||
       (prob.cat || '').toLowerCase().includes(problemSearch.toLowerCase());
 
-    let isUnlocked = false;
-    if (selectedTeamName === 'ALL') {
-      isUnlocked = teams.some(t => (t.unlocked || []).includes(prob.id));
-    } else {
-      isUnlocked = (currentTeam?.unlocked || []).includes(prob.id);
-    }
+    const isUnlocked = Boolean(targetTeam?.unlocked && targetTeam.unlocked.includes(prob.id));
 
     const matchesDiff =
       problemDiffFilter === 'ALL' ||
@@ -262,6 +262,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
     return matchesSearch && matchesDiff;
   });
+
+  const isHintCardUnlocked = Boolean(
+    (targetTeam?.unlockedCards || []).includes('HINT') || targetTeam?.hintUnlocked
+  );
+
+  const isSabotageCardUnlocked = Boolean(
+    (targetTeam?.unlockedCards || []).includes('SABOTAGE') || targetTeam?.sabotageUnlocked
+  );
 
   return (
     <div style={{
@@ -278,15 +286,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '14px 28px',
-        background: 'rgba(9, 13, 24, 0.9)',
+        background: 'rgba(9, 13, 24, 0.92)',
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         zIndex: 50,
         flexWrap: 'wrap',
         gap: '16px'
       }}>
-        {/* Brand & Admin Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.6px', color: '#ffffff' }}>
               QUBIT
@@ -310,10 +318,10 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             fontWeight: 700,
             padding: '2px 8px',
             borderRadius: '12px',
-            background: 'rgba(88, 166, 255, 0.15)',
-            border: '1px solid rgba(88, 166, 255, 0.35)',
+            background: 'rgba(88, 166, 255, 0.12)',
+            border: '1px solid rgba(88, 166, 255, 0.3)',
             color: '#58a6ff',
-            letterSpacing: '0.5px'
+            letterSpacing: '0.4px'
           }}>
             EXCLUSIVE UNLOCK AUTHORITY
           </span>
@@ -321,17 +329,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
         {/* Global Controls & Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Organiser & Proctor Control Station (Pricing, Team Monitor, Audit Logs) */}
-          <button
-            className="btn-primary"
-            onClick={() => setShowProctorStation(true)}
-            title="Open Organiser & Proctor Control Station (Dynamic Pricing, Live Monitor & Audit Logs)"
-            style={{ fontSize: '12px', padding: '6px 14px', gap: '6px', boxShadow: '0 2px 10px rgba(88, 166, 255, 0.2)' }}
-          >
-            <Shield size={13} />
-            <span>Pricing & Proctor Station</span>
-          </button>
-
           {/* Refresh Button */}
           <button
             className="btn-ghost"
@@ -343,7 +340,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             <span>Sync</span>
           </button>
 
-          {/* Switch to Team Workspace (if needed to preview) */}
+          {/* Switch to Team Workspace */}
           {onSwitchToWorkspace && (
             <button
               className="btn-ghost"
@@ -378,7 +375,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       </header>
 
       {/* 2. MAIN CONTAINER */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', maxWidth: '1280px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '24px 28px',
+        maxWidth: '1240px',
+        margin: '0 auto',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
         {/* Toast Alert */}
         {notification && (
           <div style={{
@@ -405,67 +410,59 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           </div>
         )}
 
-        {/* 3. TOP SUMMARY CARDS (5 Cards per specification) */}
+        {/* 3. TOP SUMMARY CARDS (Compact 4 Cards) */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
           gap: '14px',
-          marginBottom: '24px'
+          marginBottom: '22px'
         }}>
-          {/* 1. Total Teams */}
-          <div style={summaryCardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={summaryLabelStyle}>Total Teams</span>
-              <Users size={16} color="var(--txt-dim)" />
+          {/* 1. Teams */}
+          <div style={compactCardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={compactLabelStyle}>TEAMS</span>
+              <Users size={15} color="var(--txt-dim)" />
             </div>
-            <div style={summaryValueStyle}>{totalTeamsCount}</div>
-            <div style={summarySubtextStyle}>Registered contest participants</div>
+            <div style={compactValueStyle}>{totalTeamsCount}</div>
+            <div style={compactSubtextStyle}>Registered contest teams</div>
           </div>
 
           {/* 2. Active Teams */}
-          <div style={summaryCardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={summaryLabelStyle}>Active Teams</span>
-              <CheckCircle2 size={16} color="#3fb950" />
+          <div style={compactCardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={compactLabelStyle}>ACTIVE TEAMS</span>
+              <CheckCircle2 size={15} color="#3fb950" />
             </div>
-            <div style={{ ...summaryValueStyle, color: '#3fb950' }}>{activeTeamsCount}</div>
-            <div style={summarySubtextStyle}>Currently participating without lockout</div>
+            <div style={{ ...compactValueStyle, color: '#3fb950' }}>{activeTeamsCount}</div>
+            <div style={compactSubtextStyle}>Competing without lockout</div>
           </div>
 
-          {/* 3. Problems Unlocked */}
-          <div style={summaryCardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={summaryLabelStyle}>Problems Unlocked</span>
-              <Unlock size={16} color="#58a6ff" />
+          {/* 3. ByteCoins in Circulation */}
+          <div style={compactCardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={compactLabelStyle}>BYTECOINS IN CIRCULATION</span>
+              <Coins size={15} color="#58a6ff" />
             </div>
-            <div style={{ ...summaryValueStyle, color: '#58a6ff' }}>{problemsUnlockedCount}</div>
-            <div style={summarySubtextStyle}>
-              {selectedTeamName === 'ALL' ? 'Unique problems open across teams' : `Unlocked for ${selectedTeamName}`}
-            </div>
+            <div style={{ ...compactValueStyle, color: '#58a6ff' }}>{totalByteCoins} BC</div>
+            <div style={compactSubtextStyle}>Total liquidity held by teams</div>
           </div>
 
-          {/* 4. Hints Unlocked */}
-          <div style={summaryCardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={summaryLabelStyle}>Hints Unlocked</span>
-              <Lightbulb size={16} color="#d29922" />
+          {/* 4. Problems Unlocked */}
+          <div style={compactCardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={compactLabelStyle}>PROBLEMS UNLOCKED</span>
+              <Unlock size={15} color="#bc8cff" />
             </div>
-            <div style={{ ...summaryValueStyle, color: '#d29922' }}>{hintsUnlockedCount}</div>
-            <div style={summarySubtextStyle}>Teams granted Hint Pass access</div>
-          </div>
-
-          {/* 5. Sabotages Unlocked */}
-          <div style={summaryCardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={summaryLabelStyle}>Sabotages Unlocked</span>
-              <Zap size={16} color="#ff7b72" />
+            <div style={{ ...compactValueStyle, color: '#bc8cff' }}>
+              {targetTeam ? `${targetTeamUnlockedCount} / ${problems.length}` : '—'}
             </div>
-            <div style={{ ...summaryValueStyle, color: '#ff7b72' }}>{sabotagesUnlockedCount}</div>
-            <div style={summarySubtextStyle}>Teams granted Sabotage weapons</div>
+            <div style={compactSubtextStyle}>
+              {targetTeam ? `Unlocked for ${targetTeam.name}` : 'Select a team'}
+            </div>
           </div>
         </div>
 
-        {/* 4. NAVIGATION TABS + TEAM SCOPE SELECTOR */}
+        {/* 4. NAVIGATION TABS */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -475,12 +472,11 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           flexWrap: 'wrap',
           gap: '14px'
         }}>
-          {/* Main Navigation Tabs */}
+          {/* Main 4 Tabs */}
           <div style={{ display: 'flex', gap: '4px' }}>
             {[
               { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
               { id: 'problems', label: 'Problems', icon: Lock },
-              { id: 'pricing', label: 'Dynamic Pricing & Proctor', icon: Shield },
               { id: 'hints', label: 'Hints', icon: Lightbulb },
               { id: 'sabotage', label: 'Sabotage', icon: Zap }
             ].map(tab => {
@@ -512,29 +508,28 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             })}
           </div>
 
-          {/* Team Scope Selector (Applies to Problems, Hints, Sabotage) */}
+          {/* Quick Target Team Selector (for Problems, Hints, Sabotage) */}
           {activeTab !== 'leaderboard' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', color: 'var(--txt-muted)', fontWeight: 600 }}>
-                Target Scope:
+                Target Team:
               </span>
               <select
                 value={selectedTeamName}
                 onChange={(e) => setSelectedTeamName(e.target.value)}
                 style={{
                   fontSize: '13px',
-                  padding: '6px 12px',
+                  padding: '6px 14px',
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '6px',
                   color: '#ffffff',
                   fontWeight: 600
                 }}
               >
-                <option value="ALL">🌐 All Teams (Global Contest)</option>
                 {teams.map(t => (
                   <option key={t.name} value={t.name}>
-                    👥 {t.name} (Score: {t.score || 0}, Solved: {(t.solved || []).length})
+                    👥 {t.name} ({t.balance ?? 1000} BC · {t.score || 0} pts)
                   </option>
                 ))}
               </select>
@@ -542,9 +537,11 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           )}
         </div>
 
-        {/* 5. TAB CONTENT PANELS */}
+        {/* 5. TAB PANELS */}
 
-        {/* TAB 1: LEADERBOARD MONITORING */}
+        {/* ============================================================ */}
+        {/* TAB 1: LEADERBOARD MONITORING                                */}
+        {/* ============================================================ */}
         {activeTab === 'leaderboard' && (
           <div>
             {/* Filter & Search Bar */}
@@ -616,9 +613,9 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     letterSpacing: '0.6px'
                   }}>
                     <th style={{ padding: '12px 16px', width: '60px' }}>Rank</th>
-                    <th style={{ padding: '12px 16px' }}>Team Name / ID</th>
+                    <th style={{ padding: '12px 16px' }}>Team Name</th>
                     <th style={{ padding: '12px 16px' }}>Score</th>
-                    <th style={{ padding: '12px 16px' }}>Solved</th>
+                    <th style={{ padding: '12px 16px' }}>Problems Solved</th>
                     <th style={{ padding: '12px 16px' }}>ByteCoins</th>
                     <th style={{ padding: '12px 16px' }}>Hints Used</th>
                     <th style={{ padding: '12px 16px' }}>Sabotages</th>
@@ -630,7 +627,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     const rank = idx + 1;
                     const solvedCount = (team.solved || []).length;
                     const hintsRevealedCount = Object.keys(team.revealedHints || {}).length;
-                    const violationsCount = (team.violations || []).length;
                     const isFrozen = Boolean(team.frozenUntil && team.frozenUntil > Date.now());
 
                     return (
@@ -690,7 +686,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         </td>
 
                         {/* ByteCoins */}
-                        <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', color: '#58a6ff', fontWeight: 600 }}>
+                        <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', color: '#58a6ff', fontWeight: 700, fontSize: '13px' }}>
                           {team.balance ?? 1000} BC
                         </td>
 
@@ -708,7 +704,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         <td style={{ padding: '12px 16px' }}>
                           {team.isLocked ? (
                             <span style={{ color: '#ff7b72', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
-                              <Lock size={12} /> Proctor Locked
+                              <Lock size={12} /> Locked
                             </span>
                           ) : isFrozen ? (
                             <span style={{ color: '#58a6ff', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
@@ -717,11 +713,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                           ) : (
                             <span style={{ color: '#3fb950', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
                               <CheckCircle2 size={12} /> Active
-                            </span>
-                          )}
-                          {violationsCount > 0 && (
-                            <span style={{ marginLeft: '6px', fontSize: '11px', color: '#ff7b72' }}>
-                              ({violationsCount} flags)
                             </span>
                           )}
                         </td>
@@ -742,48 +733,58 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           </div>
         )}
 
-        {/* TAB 2: PROBLEM UNLOCK MANAGEMENT */}
+        {/* ============================================================ */}
+        {/* TAB 2: PROBLEM UNLOCK MANAGEMENT                             */}
+        {/* ============================================================ */}
         {activeTab === 'problems' && (
           <div>
-            {/* Context Notice */}
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              background: 'rgba(88, 166, 255, 0.08)',
-              border: '1px solid rgba(88, 166, 255, 0.2)',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '10px'
-            }}>
-              <div>
-                <b style={{ color: '#58a6ff' }}>Admin Problem Unlock Control:</b>{' '}
-                <span style={{ color: '#c9d1d9' }}>
-                  Targeting <b>{selectedTeamName === 'ALL' ? 'ALL TEAMS' : selectedTeamName}</b>. Teams cannot unlock problems on their own. Only you decide when each problem is unlocked.
-                </span>
-              </div>
+            {/* Target Team Banner */}
+            {targetTeam && (
+              <div style={{
+                background: 'rgba(88, 166, 255, 0.07)',
+                border: '1px solid rgba(88, 166, 255, 0.22)',
+                borderRadius: '10px',
+                padding: '16px 20px',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '14px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#58a6ff', fontWeight: 700 }}>
+                    Selected Target Team
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', marginTop: '2px' }}>
+                    {targetTeam.name}
+                  </div>
+                </div>
 
-              {/* Bulk Actions */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  className="btn-primary"
-                  onClick={() => handleBulkProblemAction(true)}
-                  style={{ fontSize: '12px', padding: '6px 12px' }}
-                >
-                  <Unlock size={13} /> Unlock All
-                </button>
-                <button
-                  className="btn-ghost"
-                  onClick={() => handleBulkProblemAction(false)}
-                  style={{ fontSize: '12px', padding: '6px 12px', color: '#ff7b72', borderColor: 'rgba(248, 81, 73, 0.3)' }}
-                >
-                  <Lock size={13} /> Lock All
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>Available Balance</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#58a6ff', fontFamily: 'var(--font-mono)' }}>
+                      {targetTeam.balance ?? 1000} ByteCoins
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>Score</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#bc8cff', fontFamily: 'var(--font-mono)' }}>
+                      {targetTeam.score || 0} pts
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>Unlocked</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#3fb950', fontFamily: 'var(--font-mono)' }}>
+                      {targetTeamUnlockedCount} / {problems.length}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Filter controls */}
             <div style={{
@@ -797,7 +798,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
                 <Search size={14} color="var(--txt-dim)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
-                  placeholder="Filter problems by ID, title, topic..."
+                  placeholder="Filter problems by ID, title..."
                   value={problemSearch}
                   onChange={(e) => setProblemSearch(e.target.value)}
                   style={{
@@ -825,9 +826,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               }}>
                 {[
                   { id: 'ALL', label: 'All' },
-                  { id: 'EASY', label: 'Easy' },
-                  { id: 'MEDIUM', label: 'Medium' },
-                  { id: 'HARD', label: 'Hard' },
                   { id: 'UNLOCKED', label: 'Unlocked' },
                   { id: 'LOCKED', label: 'Locked' }
                 ].map(tab => {
@@ -841,7 +839,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         color: isActive ? '#ffffff' : 'var(--txt-muted)',
                         border: 'none',
                         borderRadius: '6px',
-                        padding: '4px 10px',
+                        padding: '4px 12px',
                         fontSize: '12px',
                         fontWeight: isActive ? 600 : 500,
                         cursor: 'pointer'
@@ -854,26 +852,18 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               </div>
             </div>
 
-            {/* Problem List with 1-Click Unlock / Lock Controls */}
+            {/* Problem List (Cleaner Problem List) */}
             <div style={{
               background: 'rgba(13, 17, 28, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '10px',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              marginBottom: '32px'
             }}>
               {filteredProblems.map((prob) => {
-                let isUnlocked = false;
-                let unlockedTeamsCount = 0;
-
-                if (selectedTeamName === 'ALL') {
-                  const uTeams = teams.filter(t => (t.unlocked || []).includes(prob.id));
-                  unlockedTeamsCount = uTeams.length;
-                  isUnlocked = unlockedTeamsCount > 0;
-                } else {
-                  isUnlocked = (currentTeam?.unlocked || []).includes(prob.id);
-                }
-
+                const isUnlocked = Boolean(targetTeam?.unlocked && targetTeam.unlocked.includes(prob.id));
                 const diffColor = prob.diff === 'Hard' ? '#ff7b72' : prob.diff === 'Medium' ? '#d29922' : '#3fb950';
+                const pts = prob.diff === 'Hard' ? 400 : prob.diff === 'Medium' ? 300 : 200;
 
                 return (
                   <div
@@ -882,7 +872,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '14px 18px',
+                      padding: '14px 20px',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
                       gap: '16px',
                       transition: 'background 0.15s ease'
@@ -906,48 +896,36 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       </div>
 
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
-                            {prob.id} &nbsp;{prob.title}
-                          </span>
+                        <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                          {prob.id} &nbsp;{prob.title}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
                           <span style={{ color: diffColor, fontWeight: 600 }}>{prob.diff}</span>
                           <span>•</span>
-                          <span>{prob.diff === 'Hard' ? 400 : prob.diff === 'Medium' ? 300 : 200} pts</span>
-                          {selectedTeamName === 'ALL' && (
-                            <>
-                              <span>•</span>
-                              <span style={{ color: isUnlocked ? '#58a6ff' : 'var(--txt-dim)' }}>
-                                {unlockedTeamsCount} of {teams.length} teams unlocked
-                              </span>
-                            </>
-                          )}
+                          <span>{pts} pts</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Right: Explicit Unlock / Lock Control */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {/* Right: Status Tag + Clean Action */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <span style={{
-                        fontSize: '12px',
-                        fontWeight: 600,
+                        fontSize: '11px',
+                        fontWeight: 700,
                         padding: '4px 10px',
                         borderRadius: '6px',
                         background: isUnlocked ? 'rgba(63, 185, 80, 0.12)' : 'rgba(255, 255, 255, 0.04)',
                         border: `1px solid ${isUnlocked ? 'rgba(63, 185, 80, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
                         color: isUnlocked ? '#3fb950' : 'var(--txt-dim)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
+                        letterSpacing: '0.4px'
                       }}>
-                        {isUnlocked ? <><Unlock size={12} /> UNLOCKED</> : <><Lock size={12} /> LOCKED</>}
+                        {isUnlocked ? 'UNLOCKED' : 'LOCKED'}
                       </span>
 
                       {isUnlocked ? (
                         <button
                           className="btn-ghost"
-                          onClick={() => handleToggleProblemUnlock(prob.id, true)}
+                          onClick={() => handleLockProblem(prob.id)}
                           style={{
                             fontSize: '12px',
                             padding: '6px 14px',
@@ -961,7 +939,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       ) : (
                         <button
                           className="btn-primary"
-                          onClick={() => handleToggleProblemUnlock(prob.id, false)}
+                          onClick={() => handleOpenUnlockModal(prob)}
                           style={{
                             fontSize: '12px',
                             padding: '6px 14px',
@@ -982,16 +960,104 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </div>
               )}
             </div>
+
+            {/* UNLOCK HISTORY SECTION */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <History size={16} color="#58a6ff" />
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+                  Unlock Transaction History
+                </h3>
+              </div>
+
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '10px',
+                overflow: 'hidden'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      color: 'var(--txt-muted)',
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      <th style={{ padding: '10px 14px' }}>Time</th>
+                      <th style={{ padding: '10px 14px' }}>Team</th>
+                      <th style={{ padding: '10px 14px' }}>Problem</th>
+                      <th style={{ padding: '10px 14px' }}>Bid Price</th>
+                      <th style={{ padding: '10px 14px' }}>Prev Balance</th>
+                      <th style={{ padding: '10px 14px' }}>New Balance</th>
+                      <th style={{ padding: '10px 14px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unlockHistory.map((rec) => (
+                      <tr
+                        key={rec.id}
+                        style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.03)' }}
+                      >
+                        <td style={{ padding: '10px 14px', color: 'var(--txt-dim)' }}>
+                          {rec.displayTime || new Date(rec.timestamp).toLocaleTimeString()}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontWeight: 600, color: '#ffffff' }}>
+                          {rec.teamName}
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ color: '#58a6ff', fontWeight: 600 }}>{rec.problemId}</span>
+                          {rec.problemTitle ? ` · ${rec.problemTitle}` : ''}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', color: '#ff7b72', fontWeight: 700 }}>
+                          -{rec.bidPrice || rec.bidAmount || rec.price} BC
+                        </td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', color: 'var(--txt-muted)' }}>
+                          {rec.previousBalance ?? '—'} BC
+                        </td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', color: '#3fb950', fontWeight: 700 }}>
+                          {rec.remainingBalance} BC
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            color: '#3fb950',
+                            background: 'rgba(63, 185, 80, 0.1)',
+                            border: '1px solid rgba(63, 185, 80, 0.25)',
+                            padding: '2px 8px',
+                            borderRadius: '10px'
+                          }}>
+                            {rec.status || 'UNLOCKED'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {unlockHistory.length === 0 && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--txt-dim)' }}>
+                          No unlock transactions recorded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* TAB 3: HINT CARD MANAGEMENT */}
+        {/* ============================================================ */}
+        {/* TAB 3: HINT CARD MANAGEMENT                                  */}
+        {/* ============================================================ */}
         {activeTab === 'hints' && (
           <div>
-            {/* Card Status Hero Banner */}
+            {/* Hint Hero Banner */}
             <div style={{
               background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.85) 100%)',
-              border: `1px solid ${isHintCardUnlockedForTarget ? 'rgba(56, 139, 253, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
+              border: `1px solid ${isHintCardUnlocked ? 'rgba(56, 139, 253, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
               borderRadius: '12px',
               padding: '22px 24px',
               marginBottom: '24px',
@@ -1006,12 +1072,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   width: '46px',
                   height: '46px',
                   borderRadius: '10px',
-                  background: isHintCardUnlockedForTarget ? 'rgba(56, 139, 253, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isHintCardUnlockedForTarget ? 'rgba(56, 139, 253, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                  background: isHintCardUnlocked ? 'rgba(56, 139, 253, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${isHintCardUnlocked ? 'rgba(56, 139, 253, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isHintCardUnlockedForTarget ? '#58a6ff' : 'var(--txt-dim)'
+                  color: isHintCardUnlocked ? '#58a6ff' : 'var(--txt-dim)'
                 }}>
                   <Lightbulb size={24} />
                 </div>
@@ -1020,11 +1086,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     Hint Pass Card Authority
                   </h3>
                   <div style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>
-                    Current State for <b>{selectedTeamName === 'ALL' ? 'All Teams' : selectedTeamName}</b>:{' '}
-                    <span style={{ color: isHintCardUnlockedForTarget ? '#3fb950' : '#ff7b72', fontWeight: 700 }}>
-                      {isHintCardUnlockedForTarget ? '🔓 UNLOCKED' : '🔒 LOCKED'}
+                    Current State for <b>{targetTeam?.name || 'Selected Team'}</b>:{' '}
+                    <span style={{ color: isHintCardUnlocked ? '#3fb950' : '#ff7b72', fontWeight: 700 }}>
+                      {isHintCardUnlocked ? '🔓 UNLOCKED' : '🔒 LOCKED'}
                     </span>
-                    {' · Teams have no password unlock workaround.'}
+                    {' · Inventory: '}
+                    <b style={{ color: '#ffffff' }}>{targetTeam?.hintPassesCount || 0} Available</b>
                   </div>
                 </div>
               </div>
@@ -1040,7 +1107,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   + Grant 1 Hint Pass
                 </button>
 
-                {isHintCardUnlockedForTarget ? (
+                {isHintCardUnlocked ? (
                   <button
                     className="btn-ghost"
                     onClick={() => handleToggleHintCard(false)}
@@ -1065,9 +1132,9 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               </div>
             </div>
 
-            {/* Problem-Specific Hint Revealing Section */}
-            <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Problem Algorithmic Hints Dispatch
+            {/* Problem Hints Dispatch */}
+            <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Problem Hints Dispatch for {targetTeam?.name}
             </h4>
 
             <div style={{
@@ -1077,7 +1144,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               overflow: 'hidden'
             }}>
               {problems.map((prob) => {
-                const targetTeam = selectedTeamName === 'ALL' ? teams[0] : currentTeam;
                 const isRevealed = Boolean(targetTeam?.revealedHints?.[prob.id]);
 
                 return (
@@ -1099,7 +1165,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
                         {isRevealed ? (
                           <span style={{ color: '#3fb950', fontWeight: 500 }}>
-                            ✓ Hint revealed to {targetTeam?.name || 'team'}
+                            ✓ Hint revealed to {targetTeam?.name}
                           </span>
                         ) : (
                           <span style={{ color: 'var(--txt-dim)' }}>Hint concealed from team</span>
@@ -1128,7 +1194,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                           onClick={() => handleRevealProblemHint(prob.id)}
                           style={{ fontSize: '12px', padding: '5px 12px', color: '#58a6ff' }}
                         >
-                          <Eye size={13} /> Reveal Hint to Team
+                          <Eye size={13} /> Reveal Hint
                         </button>
                       )}
                     </div>
@@ -1139,13 +1205,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           </div>
         )}
 
-        {/* TAB 4: SABOTAGE CARD MANAGEMENT */}
+        {/* ============================================================ */}
+        {/* TAB 4: SABOTAGE CARD MANAGEMENT                              */}
+        {/* ============================================================ */}
         {activeTab === 'sabotage' && (
           <div>
-            {/* Sabotage Card Status Hero Banner */}
+            {/* Sabotage Hero Banner */}
             <div style={{
               background: 'linear-gradient(180deg, rgba(180, 25, 60, 0.12) 0%, rgba(20, 10, 16, 0.85) 100%)',
-              border: `1px solid ${isSabotageCardUnlockedForTarget ? 'rgba(248, 81, 73, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
+              border: `1px solid ${isSabotageCardUnlocked ? 'rgba(248, 81, 73, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
               borderRadius: '12px',
               padding: '22px 24px',
               marginBottom: '24px',
@@ -1160,12 +1228,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   width: '46px',
                   height: '46px',
                   borderRadius: '10px',
-                  background: isSabotageCardUnlockedForTarget ? 'rgba(248, 81, 73, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isSabotageCardUnlockedForTarget ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                  background: isSabotageCardUnlocked ? 'rgba(248, 81, 73, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${isSabotageCardUnlocked ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isSabotageCardUnlockedForTarget ? '#ff7b72' : 'var(--txt-dim)'
+                  color: isSabotageCardUnlocked ? '#ff7b72' : 'var(--txt-dim)'
                 }}>
                   <Zap size={24} />
                 </div>
@@ -1174,11 +1242,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     Sabotage Card Authority
                   </h3>
                   <div style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>
-                    Current State for <b>{selectedTeamName === 'ALL' ? 'All Teams' : selectedTeamName}</b>:{' '}
-                    <span style={{ color: isSabotageCardUnlockedForTarget ? '#3fb950' : '#ff7b72', fontWeight: 700 }}>
-                      {isSabotageCardUnlockedForTarget ? '🔓 UNLOCKED' : '🔒 LOCKED'}
+                    Current State for <b>{targetTeam?.name || 'Selected Team'}</b>:{' '}
+                    <span style={{ color: isSabotageCardUnlocked ? '#3fb950' : '#ff7b72', fontWeight: 700 }}>
+                      {isSabotageCardUnlocked ? '🔓 UNLOCKED' : '🔒 LOCKED'}
                     </span>
-                    {' · Teams cannot unlock without admin permission.'}
+                    {' · Inventory: '}
+                    <b style={{ color: '#ffffff' }}>{targetTeam?.sabotageCardsCount || 0} Available</b>
                   </div>
                 </div>
               </div>
@@ -1188,13 +1257,13 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 <button
                   className="btn-ghost"
                   onClick={() => handleGrantSabotageCard(1)}
-                  title="Award 1 free sabotage weapon to team inventory"
+                  title="Award 1 free sabotage card to team inventory"
                   style={{ fontSize: '12px', padding: '8px 14px' }}
                 >
                   + Grant 1 Sabotage Card
                 </button>
 
-                {isSabotageCardUnlockedForTarget ? (
+                {isSabotageCardUnlocked ? (
                   <button
                     className="btn-ghost"
                     onClick={() => handleToggleSabotageCard(false)}
@@ -1220,8 +1289,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             </div>
 
             {/* Active Freeze Monitoring & Admin Override */}
-            <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-              Active Sabotage Freezes & Emergency Unfreeze
+            <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Active Sabotage Freezes
             </h4>
 
             <div style={{
@@ -1267,7 +1336,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                           {t.name}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
-                          Inventory: {t.sabotageCardsCount || 0} sabotage cards · {isFrozen ? (
+                          {isFrozen ? (
                             <span style={{ color: '#58a6ff', fontWeight: 600 }}>
                               ❄️ Frozen by {t.frozenBy || 'Rival Team'} ({remainingMins}m / {remainingSecs}s remaining)
                             </span>
@@ -1292,7 +1361,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                             fontWeight: 700
                           }}
                         >
-                          <Snowflake size={13} /> Clear Freeze Now
+                          <Snowflake size={13} /> Clear Freeze
                         </button>
                       ) : (
                         <span style={{ fontSize: '12px', color: 'var(--txt-dim)' }}>
@@ -1306,47 +1375,274 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             </div>
           </div>
         )}
-
-        {/* TAB 5: DYNAMIC PRICING & ORGANISER PROCTOR STATION */}
-        {activeTab === 'pricing' && (
-          <ProctorDashboard onClose={() => setActiveTab('leaderboard')} />
-        )}
-
-        {/* Modal display when opened via top Pricing & Proctor Station button */}
-        {showProctorStation && activeTab !== 'pricing' && (
-          <ProctorDashboard onClose={() => setShowProctorStation(false)} />
-        )}
       </div>
+
+      {/* ============================================================ */}
+      {/* BID PRICE UNLOCK MODAL                                       */}
+      {/* ============================================================ */}
+      {unlockModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !unlockSubmitting) {
+              setUnlockModal(null);
+            }
+          }}
+        >
+          <div
+            className="box"
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              background: '#0d111c',
+              border: '1px solid rgba(88, 166, 255, 0.3)',
+              borderRadius: '14px',
+              padding: '26px 28px',
+              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.6)'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'rgba(88, 166, 255, 0.15)',
+                  border: '1px solid rgba(88, 166, 255, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#58a6ff'
+                }}>
+                  <Unlock size={18} />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                  Unlock Problem
+                </h3>
+              </div>
+              <button
+                onClick={() => !unlockSubmitting && setUnlockModal(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--txt-dim)',
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Context Info */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              fontSize: '13px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--txt-muted)' }}>Problem:</span>
+                <span style={{ fontWeight: 700, color: '#ffffff' }}>
+                  {unlockModal.problem.id} {unlockModal.problem.title}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--txt-muted)' }}>Team:</span>
+                <span style={{ fontWeight: 700, color: '#58a6ff' }}>
+                  {unlockModal.team.name}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--txt-muted)' }}>Team ByteCoins:</span>
+                <span style={{ fontWeight: 800, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
+                  {unlockModal.team.balance ?? 1000} ByteCoins
+                </span>
+              </div>
+            </div>
+
+            {/* Bid Input */}
+            {(() => {
+              const currentBalance = unlockModal.team.balance ?? 1000;
+              const rawBid = unlockModal.bidPrice;
+              const bidNum = Number(rawBid);
+              const isNumeric = rawBid !== '' && !isNaN(bidNum);
+              const isPositive = isNumeric && bidNum > 0;
+              const isOverBalance = isNumeric && bidNum > currentBalance;
+              const remainingBalance = isNumeric ? currentBalance - bidNum : currentBalance;
+              const isValid = isPositive && !isOverBalance;
+
+              return (
+                <div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--txt-muted)', marginBottom: '8px' }}>
+                      Enter Bid Price
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        min="1"
+                        max={currentBalance}
+                        placeholder="e.g. 100"
+                        value={unlockModal.bidPrice}
+                        onChange={(e) => setUnlockModal({ ...unlockModal, bidPrice: e.target.value })}
+                        autoFocus
+                        style={{
+                          width: '100%',
+                          padding: '10px 90px 10px 14px',
+                          fontSize: '15px',
+                          fontWeight: 700,
+                          fontFamily: 'var(--font-mono)',
+                          borderRadius: '8px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: `1px solid ${isOverBalance ? '#ff7b72' : 'rgba(88, 166, 255, 0.4)'}`,
+                          color: '#ffffff',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        right: '14px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: '#58a6ff'
+                      }}>
+                        ByteCoins
+                      </span>
+                    </div>
+
+                    {/* Validation Alerts */}
+                    {isOverBalance && (
+                      <div style={{
+                        marginTop: '8px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#ff7b72',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <AlertTriangle size={14} />
+                        <span>Insufficient ByteCoins</span>
+                      </div>
+                    )}
+
+                    {rawBid !== '' && !isPositive && (
+                      <div style={{
+                        marginTop: '8px',
+                        fontSize: '12px',
+                        color: '#ff7b72'
+                      }}>
+                        Bid price must be greater than 0.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Remaining Balance Display */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    marginBottom: '22px',
+                    fontSize: '13px'
+                  }}>
+                    <span style={{ color: 'var(--txt-muted)' }}>Remaining Balance:</span>
+                    <span style={{
+                      fontWeight: 800,
+                      fontFamily: 'var(--font-mono)',
+                      color: isOverBalance ? '#ff7b72' : '#3fb950',
+                      fontSize: '14px'
+                    }}>
+                      {isOverBalance ? '0' : remainingBalance} ByteCoins
+                    </span>
+                  </div>
+
+                  {/* Modal Action Buttons */}
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => setUnlockModal(null)}
+                      disabled={unlockSubmitting}
+                      style={{ padding: '9px 18px', fontSize: '13px', borderRadius: '8px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={handleConfirmUnlock}
+                      disabled={!isValid || unlockSubmitting}
+                      style={{
+                        padding: '9px 20px',
+                        fontSize: '13px',
+                        borderRadius: '8px',
+                        opacity: isValid && !unlockSubmitting ? 1 : 0.45,
+                        cursor: isValid && !unlockSubmitting ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      {unlockSubmitting ? 'Unlocking...' : 'Unlock Problem'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Styling helpers
-const summaryCardStyle = {
+// Compact card styling
+const compactCardStyle = {
   background: 'rgba(13, 17, 28, 0.75)',
   border: '1px solid rgba(255, 255, 255, 0.08)',
-  borderRadius: '12px',
-  padding: '16px 18px',
+  borderRadius: '10px',
+  padding: '14px 16px',
   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)'
 };
 
-const summaryLabelStyle = {
-  fontSize: '12px',
+const compactLabelStyle = {
+  fontSize: '11px',
   color: 'var(--txt-muted)',
-  fontWeight: 600,
-  letterSpacing: '0.2px'
+  fontWeight: 700,
+  letterSpacing: '0.5px'
 };
 
-const summaryValueStyle = {
-  fontSize: '24px',
+const compactValueStyle = {
+  fontSize: '20px',
   fontWeight: 800,
   fontFamily: 'var(--font-mono)',
   color: '#ffffff',
   lineHeight: 1.2,
-  marginBottom: '4px'
+  marginBottom: '3px'
 };
 
-const summarySubtextStyle = {
+const compactSubtextStyle = {
   fontSize: '11px',
   color: 'var(--txt-dim)',
   lineHeight: 1.3

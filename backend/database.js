@@ -19,6 +19,7 @@ class Database {
       problemPrices: {}, // problemId -> number (dynamically set by organizer)
       teams: {},         // Clean start: populated ONLY via actual registration
       transactions: [],  // Immutable audit log of problem purchases
+      unlockHistory: [], // Admin unlock transactions audit log
       submissions: [],
       telemetry: [],
       config: {
@@ -44,6 +45,7 @@ class Database {
           ...parsed,
           problemPrices: parsed.problemPrices || {},
           transactions: parsed.transactions || [],
+          unlockHistory: parsed.unlockHistory || [],
           teams: parsed.teams || {},
           submissions: parsed.submissions || [],
           telemetry: parsed.telemetry || []
@@ -213,6 +215,10 @@ class Database {
       prob.pts = this.getProblemDifficultyPoints(prob);
     }
     return prob;
+  }
+
+  getProblem(id) {
+    return this.getFullProblem(id);
   }
 
   findProblemByKey(key) {
@@ -1124,38 +1130,90 @@ class Database {
     return this.state.transactions || [];
   }
 
+  getUnlockHistory() {
+    return this.state.unlockHistory || [];
+  }
+
   // --- DEDICATED ADMIN MANAGEMENT METHODS ---
-  adminUnlockProblem(teamName, problemId) {
-    const teamsToUpdate = [];
+  adminUnlockProblem(teamName, problemId, bidPrice) {
     if (!teamName || teamName.toUpperCase() === 'ALL') {
-      teamsToUpdate.push(...Object.values(this.state.teams));
-    } else {
-      const team = this.getTeam(teamName);
-      if (team) teamsToUpdate.push(team);
+      throw new Error('Please select a specific target team to unlock a problem.');
     }
 
-    if (teamsToUpdate.length === 0) {
+    const team = this.getTeam(teamName);
+    if (!team) {
       throw new Error(`Team "${teamName}" not found.`);
     }
 
-    for (const team of teamsToUpdate) {
-      if (!team.unlocked) team.unlocked = [];
-      if (!team.unlocked.includes(problemId)) {
-        team.unlocked.push(problemId);
-      }
-      if (!team.problemStatuses) team.problemStatuses = {};
-      if (!team.problemStatuses[problemId] || team.problemStatuses[problemId].status !== 'SOLVED') {
-        team.problemStatuses[problemId] = {
-          status: 'UNLOCKED',
-          unlockedBy: 'ADMIN',
-          unlockedByName: 'Administrator',
-          unlockedAt: new Date().toISOString()
-        };
-      }
+    if (bidPrice === undefined || bidPrice === null || String(bidPrice).trim() === '') {
+      throw new Error('Bid price is required.');
     }
 
+    const bid = Number(bidPrice);
+    if (isNaN(bid) || bid <= 0) {
+      throw new Error('Bid price must be a valid positive number greater than 0.');
+    }
+
+    const currentBalance = team.balance ?? 1000;
+    if (bid > currentBalance) {
+      throw new Error('Insufficient ByteCoins');
+    }
+
+    const problem = this.getProblem(problemId);
+    const problemTitle = problem ? problem.title : problemId;
+
+    const previousBalance = currentBalance;
+    team.balance = currentBalance - bid;
+    const remainingBalance = team.balance;
+
+    if (!team.unlocked) team.unlocked = [];
+    if (!team.unlocked.includes(problemId)) {
+      team.unlocked.push(problemId);
+    }
+    if (!team.problemStatuses) team.problemStatuses = {};
+    if (!team.problemStatuses[problemId] || team.problemStatuses[problemId].status !== 'SOLVED') {
+      team.problemStatuses[problemId] = {
+        status: 'UNLOCKED',
+        unlockedBy: 'ADMIN',
+        unlockedByName: 'Administrator',
+        unlockedAt: new Date().toISOString(),
+        bidPrice: bid
+      };
+    }
+
+    const now = new Date();
+    const txn = {
+      id: `TXN-ADM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      type: 'ADMIN_UNLOCK',
+      teamName: team.name,
+      problemId: problemId,
+      problemTitle: problemTitle,
+      bidPrice: bid,
+      bidAmount: bid,
+      price: bid,
+      previousBalance: previousBalance,
+      remainingBalance: remainingBalance,
+      status: 'UNLOCKED',
+      timestamp: now.toISOString(),
+      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    if (!this.state.transactions) this.state.transactions = [];
+    this.state.transactions.unshift(txn);
+    if (!this.state.unlockHistory) this.state.unlockHistory = [];
+    this.state.unlockHistory.unshift(txn);
+
+    this.updateTeam(team);
     this.save();
-    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+    return {
+      success: true,
+      team,
+      teams: [team],
+      txn,
+      unlockRecord: txn
+    };
   }
 
   adminLockProblem(teamName, problemId) {
@@ -1178,6 +1236,7 @@ class Database {
       if (team.problemStatuses && team.problemStatuses[problemId] && team.problemStatuses[problemId].status !== 'SOLVED') {
         delete team.problemStatuses[problemId];
       }
+      this.updateTeam(team);
     }
 
     this.save();
