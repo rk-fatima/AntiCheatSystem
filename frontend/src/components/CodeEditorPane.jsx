@@ -205,12 +205,38 @@ export function CodeEditorPane({
     setIsRunning(true);
     setOutputResult({ status: 'QUEUED', message: 'Job enqueued on runner worker pool...' });
     try {
-      const res = await onRunCode({ lang, code, stdin, memberId: currentMember?.memberId });
+      const res = await onRunCode({ lang, code, stdin, memberId: currentMember?.memberId, problemId: problem?.id });
+      const resultData = res?.result || res?.data || {};
+
+      const stdout = resultData.stdout !== undefined ? resultData.stdout : (resultData.output || '');
+      const stderr = resultData.stderr || '';
+
+      const norm = (s) => (s || '').trim().replace(/\r\n/g, '\n');
+      const normStdin = norm(stdin);
+      const normSampleIn = norm(problem?.si);
+      const expectedOut = norm(problem?.eo || problem?.so);
+
+      let isCorrect = null;
+      let expected = null;
+
+      // If stdin matches problem sample input or is blank, compare against sample expected output
+      if (normStdin === normSampleIn || !normStdin) {
+        expected = expectedOut;
+        const normActual = norm(stdout);
+        isCorrect = Boolean(expected && normActual === expected && normActual.length > 0);
+      }
+
       setOutputResult({
-        status: res.status,
+        status: res?.status || 'COMPLETED',
         type: 'run',
-        data: res.result,
-        error: res.error
+        data: {
+          ...resultData,
+          stdout,
+          stderr,
+          expected,
+          isCorrect
+        },
+        error: res?.error
       });
     } catch (err) {
       setOutputResult({
@@ -227,11 +253,23 @@ export function CodeEditorPane({
     setOutputResult({ status: 'QUEUED', message: 'Submission queued for server-side evaluation...' });
     try {
       const res = await onSubmitCode({ problemId: problem.id, lang, code, memberId: currentMember?.memberId });
+      const resultData = res?.result || res?.data || {};
+
+      const norm = (s) => (s || '').trim().replace(/\r\n/g, '\n');
+      const stdout = resultData.stdout !== undefined ? resultData.stdout : (resultData.output || '');
+      const expected = norm(problem?.eo || problem?.so);
+      const passed = Boolean(resultData.passed);
+
       setOutputResult({
-        status: res.status,
+        status: res?.status || 'COMPLETED',
         type: 'submit',
-        data: res.result,
-        error: res.error
+        data: {
+          ...resultData,
+          stdout,
+          expected,
+          isCorrect: passed
+        },
+        error: res?.error
       });
     } catch (err) {
       setOutputResult({
@@ -596,23 +634,48 @@ export function CodeEditorPane({
           background: '#070a12',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px',
-          padding: '12px 16px',
-          minHeight: '120px',
-          maxHeight: '180px',
+          padding: '14px 18px',
+          minHeight: '130px',
+          maxHeight: '260px',
           overflowY: 'auto'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            marginBottom: '8px',
+            justifyContent: 'space-between',
+            marginBottom: '10px',
             color: 'var(--txt-muted)',
             fontSize: '11px',
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: '0.8px'
           }}>
-            <Terminal size={13} /> Execution Output
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Terminal size={13} /> Execution Output
+            </div>
+            {outputResult && outputResult.status === 'COMPLETED' && outputResult.data && (
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'none',
+                letterSpacing: 'normal',
+                color: outputResult.data.compileError
+                  ? '#ff7b72'
+                  : outputResult.data.isCorrect === true
+                  ? '#3fb950'
+                  : outputResult.data.isCorrect === false
+                  ? '#ff7b72'
+                  : '#58a6ff'
+              }}>
+                {outputResult.data.compileError
+                  ? 'Compilation Failed'
+                  : outputResult.data.isCorrect === true
+                  ? 'Status: Correct'
+                  : outputResult.data.isCorrect === false
+                  ? 'Status: Wrong Answer'
+                  : 'Status: Completed'}
+              </span>
+            )}
           </div>
 
           {!outputResult && (
@@ -622,69 +685,176 @@ export function CodeEditorPane({
           )}
 
           {outputResult && outputResult.status === 'QUEUED' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#d29922', fontSize: '13px' }}>
-              <Loader2 size={15} className="spin" />
-              <span>{outputResult.message}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#d29922', fontSize: '13px', padding: '12px 0' }}>
+              <Loader2 size={16} className="spin" />
+              <span>{outputResult.message || 'Executing code on runner pool...'}</span>
             </div>
           )}
 
-          {outputResult && outputResult.type === 'run' && outputResult.data && (
+          {outputResult && outputResult.data && outputResult.status !== 'QUEUED' && (
             <div>
-              {outputResult.data.compileError && (
-                <div style={{ color: '#ff7b72', fontWeight: 600, marginBottom: '6px' }}>
-                  ❌ Compilation Error
-                </div>
-              )}
-              {outputResult.data.stderr && (
-                <pre style={{ color: '#ff7b72', margin: '4px 0', fontSize: '12px' }}>
-                  {outputResult.data.stderr}
-                </pre>
-              )}
-              <pre style={{ margin: 0, fontSize: '13px', color: '#f0f6fc', fontFamily: 'var(--font-mono)' }}>
-                {outputResult.data.stdout || '(Program exited with no output)'}
-              </pre>
-            </div>
-          )}
-
-          {outputResult && outputResult.type === 'submit' && outputResult.data && (
-            <div>
+              {/* Status Verdict Strip */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 12px',
+                padding: '7px 12px',
                 borderRadius: '6px',
-                marginBottom: '8px',
+                marginBottom: '12px',
+                fontSize: '13px',
                 fontWeight: 600,
-                background: outputResult.data.passed ? 'rgba(63, 185, 80, 0.12)' : 'rgba(248, 81, 73, 0.12)',
-                color: outputResult.data.passed ? '#3fb950' : '#ff7b72',
-                border: `1px solid ${outputResult.data.passed ? 'rgba(63, 185, 80, 0.3)' : 'rgba(248, 81, 73, 0.3)'}`
+                background: outputResult.data.compileError
+                  ? 'rgba(248, 81, 73, 0.12)'
+                  : outputResult.data.isCorrect === true
+                  ? 'rgba(63, 185, 80, 0.12)'
+                  : outputResult.data.isCorrect === false
+                  ? 'rgba(248, 81, 73, 0.12)'
+                  : 'rgba(56, 139, 253, 0.12)',
+                color: outputResult.data.compileError
+                  ? '#ff7b72'
+                  : outputResult.data.isCorrect === true
+                  ? '#3fb950'
+                  : outputResult.data.isCorrect === false
+                  ? '#ff7b72'
+                  : '#58a6ff',
+                border: `1px solid ${
+                  outputResult.data.compileError
+                    ? 'rgba(248, 81, 73, 0.3)'
+                    : outputResult.data.isCorrect === true
+                    ? 'rgba(63, 185, 80, 0.3)'
+                    : outputResult.data.isCorrect === false
+                    ? 'rgba(248, 81, 73, 0.3)'
+                    : 'rgba(56, 139, 253, 0.3)'
+                }`
               }}>
-                {outputResult.data.passed ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                <span>Verdict: {outputResult.data.verdict}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '12px' }}>
-                  {outputResult.data.passed
-                    ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} Difficulty Points Awarded`
-                    : `−10 WA Penalty (Passed ${outputResult.data.hiddenPassed} / ${outputResult.data.totalHidden})`}
-                </span>
+                {outputResult.data.compileError ? (
+                  <>
+                    <XCircle size={16} />
+                    <span>Compilation Error</span>
+                  </>
+                ) : outputResult.data.isCorrect === true ? (
+                  <>
+                    <CheckCircle size={16} />
+                    <span>Correct {outputResult.type === 'submit' ? '— ACCEPTED' : '(Matches Expected Output)'}</span>
+                  </>
+                ) : outputResult.data.isCorrect === false ? (
+                  <>
+                    <XCircle size={16} />
+                    <span>Wrong {outputResult.type === 'submit' ? 'Answer' : '(Output Mismatch)'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Terminal size={16} />
+                    <span>Program Executed Successfully</span>
+                  </>
+                )}
+
+                {outputResult.type === 'submit' && (
+                  <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 500 }}>
+                    {outputResult.data.passed
+                      ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} Difficulty Points Awarded`
+                      : `−10 WA Penalty (Passed ${outputResult.data.hiddenPassed || 0} / ${outputResult.data.totalHidden || 3})`}
+                  </span>
+                )}
               </div>
 
+              {/* Output Comparison Grid: Your Output (Always Shown) vs Expected Output */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: outputResult.data.expected ? '1fr 1fr' : '1fr',
+                gap: '12px',
+                marginBottom: '8px'
+              }}>
+                {/* Box A: YOUR OUTPUT */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: `1px solid ${outputResult.data.isCorrect === false ? 'rgba(248, 81, 73, 0.28)' : 'rgba(255, 255, 255, 0.08)'}`,
+                  borderRadius: '6px',
+                  padding: '10px 12px'
+                }}>
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: 'var(--txt-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    marginBottom: '6px'
+                  }}>
+                    Your Output
+                  </div>
+                  <pre style={{
+                    margin: 0,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '13px',
+                    color: outputResult.data.isCorrect === false ? '#ff7b72' : '#f0f6fc',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all'
+                  }}>
+                    {outputResult.data.stdout || outputResult.data.output || '(Program exited with no standard output)'}
+                  </pre>
+                </div>
+
+                {/* Box B: EXPECTED OUTPUT */}
+                {outputResult.data.expected && (
+                  <div style={{
+                    background: 'rgba(63, 185, 80, 0.04)',
+                    border: '1px solid rgba(63, 185, 80, 0.25)',
+                    borderRadius: '6px',
+                    padding: '10px 12px'
+                  }}>
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#3fb950',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.6px',
+                      marginBottom: '6px'
+                    }}>
+                      Expected Output
+                    </div>
+                    <pre style={{
+                      margin: 0,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '13px',
+                      color: '#a6e3a1',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all'
+                    }}>
+                      {outputResult.data.expected}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Details explanation if submit failure or diff info */}
               {outputResult.data.details && (
-                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginBottom: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '6px' }}>
                   {outputResult.data.details}
                 </div>
               )}
 
-              {outputResult.data.output && (
-                <pre style={{ margin: 0, fontSize: '12px', color: 'var(--txt-dim)', fontFamily: 'var(--font-mono)' }}>
-                  Output: {outputResult.data.output}
-                </pre>
+              {/* Stderr Diagnostics */}
+              {outputResult.data.stderr && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'rgba(248, 81, 73, 0.08)',
+                  border: '1px solid rgba(248, 81, 73, 0.25)'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#ff7b72', marginBottom: '4px' }}>
+                    STDERR / COMPILER DIAGNOSTICS:
+                  </div>
+                  <pre style={{ margin: 0, fontSize: '12px', color: '#ff7b72', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' }}>
+                    {outputResult.data.stderr}
+                  </pre>
+                </div>
               )}
             </div>
           )}
 
           {outputResult && outputResult.error && (
-            <div style={{ color: '#ff7b72', fontSize: '13px' }}>
+            <div style={{ color: '#ff7b72', fontSize: '13px', marginTop: '6px' }}>
               ⚠ {outputResult.error}
             </div>
           )}

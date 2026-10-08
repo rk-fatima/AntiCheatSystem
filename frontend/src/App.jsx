@@ -208,13 +208,14 @@ export function App() {
     setCodeMap(prev => ({ ...prev, [currentKey]: newCode }));
   };
 
-  const handleRunCode = async ({ lang, code, stdin, memberId }) => {
+  const handleRunCode = async ({ lang, code, stdin, memberId, problemId }) => {
     return await runCodeAsync({
-      teamName: team.name,
+      teamName: team?.name,
       memberId: memberId || currentMember?.memberId,
       lang,
       code,
-      stdin
+      stdin,
+      problemId: problemId || currentProblemId
     });
   };
 

@@ -1424,10 +1424,11 @@
           "college": ""
         }
       ],
-      "balance": 490,
+      "balance": 390,
       "unlocked": [
         "E1",
-        "E2"
+        "E2",
+        "E4"
       ],
       "solved": [
         "E1",
@@ -1463,12 +1464,33 @@
           "solvedByName": "Salman",
           "solvedAt": "2026-10-07T19:51:59.773Z",
           "finalProblemScore": 190
+        },
+        "E4": {
+          "status": "UNLOCKED",
+          "unlockedBy": "SYNORA-001-M02",
+          "unlockedByName": "Sreethan",
+          "bidAmount": 100,
+          "unlockedAt": "2026-10-08T07:20:13.854Z"
         }
       },
       "revealedHints": {},
       "hintPassesCount": 6,
       "sabotageCardsCount": 1,
       "transactions": [
+        {
+          "id": "TXN-1791444013854-5HMD7",
+          "teamId": "Synora",
+          "teamName": "Synora",
+          "problemId": "E4",
+          "problemTitle": "Merge Two Sorted Lists",
+          "bidAmount": 100,
+          "price": 100,
+          "purchasedBy": "SYNORA-001-M02",
+          "purchasedByName": "Sreethan",
+          "remainingBalance": 390,
+          "purchaseTime": "2026-10-08T07:20:13.854Z",
+          "displayTime": "12:50 PM"
+        },
         {
           "id": "TXN-SABOTAGE-1791438437401-C3KH",
           "teamId": "Synora",
@@ -2040,10 +2062,127 @@
           "details": "Window lost focus (switched to external application).",
           "timestamp": 1791438441955,
           "isoTime": "2026-10-08T05:47:21.955Z"
+        },
+        {
+          "id": "1791443471614-oom558",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443471614,
+          "isoTime": "2026-10-08T07:11:11.614Z"
+        },
+        {
+          "id": "1791443628151-opgcpd",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443628151,
+          "isoTime": "2026-10-08T07:13:48.151Z"
+        },
+        {
+          "id": "1791443648168-s0lq25",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443648168,
+          "isoTime": "2026-10-08T07:14:08.168Z"
+        },
+        {
+          "id": "1791443653418-pf08v3",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443653418,
+          "isoTime": "2026-10-08T07:14:13.418Z"
+        },
+        {
+          "id": "1791443691084-sjomxu",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443691084,
+          "isoTime": "2026-10-08T07:14:51.084Z"
+        },
+        {
+          "id": "1791443703251-egl0dc",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443703251,
+          "isoTime": "2026-10-08T07:15:03.251Z"
+        },
+        {
+          "id": "1791443784239-g0c6tn",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "BULK_TEXT_INSERTION",
+          "details": "Blocked abnormal bulk text insertion of 412 characters.",
+          "timestamp": 1791443784239,
+          "isoTime": "2026-10-08T07:16:24.239Z"
+        },
+        {
+          "id": "1791443790451-77qub0",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "BULK_TEXT_INSERTION",
+          "details": "Blocked abnormal bulk text insertion of 413 characters.",
+          "timestamp": 1791443790451,
+          "isoTime": "2026-10-08T07:16:30.451Z"
+        },
+        {
+          "id": "1791443797298-fy4e1u",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "BULK_TEXT_INSERTION",
+          "details": "Blocked abnormal bulk text insertion of 413 characters.",
+          "timestamp": 1791443797298,
+          "isoTime": "2026-10-08T07:16:37.298Z"
+        },
+        {
+          "id": "1791443825998-uk0hfx",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443825998,
+          "isoTime": "2026-10-08T07:17:05.998Z"
+        },
+        {
+          "id": "1791443852062-hshn6u",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791443852062,
+          "isoTime": "2026-10-08T07:17:32.062Z"
+        },
+        {
+          "id": "1791443961021-zyt1xa",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M02",
+          "event": "TAB_SWITCH",
+          "details": "Switched away from browser tab or minimized window.",
+          "timestamp": 1791443961021,
+          "isoTime": "2026-10-08T07:19:21.021Z"
+        },
+        {
+          "id": "1791444137450-630zjr",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M02",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791444137450,
+          "isoTime": "2026-10-08T07:22:17.450Z"
         }
       ],
-      "isLocked": false,
-      "lockReason": "",
+      "isLocked": true,
+      "lockReason": "Flag threshold exceeded (55 violations detected; latest by SYNORA-001-M02). Organiser review required.",
       "attempts": [
         {
           "id": "SUB-1791432775616-APGP",
@@ -2223,6 +2362,20 @@
     }
   },
   "transactions": [
+    {
+      "id": "TXN-1791444013854-5HMD7",
+      "teamId": "Synora",
+      "teamName": "Synora",
+      "problemId": "E4",
+      "problemTitle": "Merge Two Sorted Lists",
+      "bidAmount": 100,
+      "price": 100,
+      "purchasedBy": "SYNORA-001-M02",
+      "purchasedByName": "Sreethan",
+      "remainingBalance": 390,
+      "purchaseTime": "2026-10-08T07:20:13.854Z",
+      "displayTime": "12:50 PM"
+    },
     {
       "id": "TXN-SABOTAGE-1791438437401-C3KH",
       "teamId": "Synora",
@@ -2549,6 +2702,123 @@
     }
   ],
   "telemetry": [
+    {
+      "id": "1791444137450-630zjr",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M02",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791444137450,
+      "isoTime": "2026-10-08T07:22:17.450Z"
+    },
+    {
+      "id": "1791443961021-zyt1xa",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M02",
+      "event": "TAB_SWITCH",
+      "details": "Switched away from browser tab or minimized window.",
+      "timestamp": 1791443961021,
+      "isoTime": "2026-10-08T07:19:21.021Z"
+    },
+    {
+      "id": "1791443852062-hshn6u",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443852062,
+      "isoTime": "2026-10-08T07:17:32.062Z"
+    },
+    {
+      "id": "1791443825998-uk0hfx",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443825998,
+      "isoTime": "2026-10-08T07:17:05.998Z"
+    },
+    {
+      "id": "1791443797298-fy4e1u",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "BULK_TEXT_INSERTION",
+      "details": "Blocked abnormal bulk text insertion of 413 characters.",
+      "timestamp": 1791443797298,
+      "isoTime": "2026-10-08T07:16:37.298Z"
+    },
+    {
+      "id": "1791443790451-77qub0",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "BULK_TEXT_INSERTION",
+      "details": "Blocked abnormal bulk text insertion of 413 characters.",
+      "timestamp": 1791443790451,
+      "isoTime": "2026-10-08T07:16:30.451Z"
+    },
+    {
+      "id": "1791443784239-g0c6tn",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "BULK_TEXT_INSERTION",
+      "details": "Blocked abnormal bulk text insertion of 412 characters.",
+      "timestamp": 1791443784239,
+      "isoTime": "2026-10-08T07:16:24.239Z"
+    },
+    {
+      "id": "1791443703251-egl0dc",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443703251,
+      "isoTime": "2026-10-08T07:15:03.251Z"
+    },
+    {
+      "id": "1791443691084-sjomxu",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443691084,
+      "isoTime": "2026-10-08T07:14:51.084Z"
+    },
+    {
+      "id": "1791443653418-pf08v3",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443653418,
+      "isoTime": "2026-10-08T07:14:13.418Z"
+    },
+    {
+      "id": "1791443648168-s0lq25",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443648168,
+      "isoTime": "2026-10-08T07:14:08.168Z"
+    },
+    {
+      "id": "1791443628151-opgcpd",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443628151,
+      "isoTime": "2026-10-08T07:13:48.151Z"
+    },
+    {
+      "id": "1791443471614-oom558",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791443471614,
+      "isoTime": "2026-10-08T07:11:11.614Z"
+    },
     {
       "id": "1791438441955-vvqst3",
       "teamName": "Synora",
