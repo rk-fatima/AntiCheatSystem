@@ -1217,92 +1217,103 @@ class Database {
   }
 
   adminLockProblem(teamName, problemId) {
-    const teamsToUpdate = [];
-    if (!teamName || teamName.toUpperCase() === 'ALL') {
-      teamsToUpdate.push(...Object.values(this.state.teams));
-    } else {
-      const team = this.getTeam(teamName);
-      if (team) teamsToUpdate.push(team);
-    }
-
-    if (teamsToUpdate.length === 0) {
-      throw new Error(`Team "${teamName}" not found.`);
-    }
-
-    for (const team of teamsToUpdate) {
-      if (team.unlocked) {
-        team.unlocked = team.unlocked.filter(id => id !== problemId);
-      }
-      if (team.problemStatuses && team.problemStatuses[problemId] && team.problemStatuses[problemId].status !== 'SOLVED') {
-        delete team.problemStatuses[problemId];
-      }
-      this.updateTeam(team);
-    }
-
-    this.save();
-    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+    throw new Error('Once unlocked, problem statements cannot be locked.');
   }
 
-  adminUnlockCard(teamName, cardType) {
+  adminUnlockCard(teamName, cardType, bidPrice) {
     const type = String(cardType || '').trim().toUpperCase();
-    const teamsToUpdate = [];
     if (!teamName || teamName.toUpperCase() === 'ALL') {
-      teamsToUpdate.push(...Object.values(this.state.teams));
-    } else {
-      const team = this.getTeam(teamName);
-      if (team) teamsToUpdate.push(team);
+      throw new Error('Please select a specific target team to unlock a card.');
     }
 
-    if (teamsToUpdate.length === 0) {
+    const team = this.getTeam(teamName);
+    if (!team) {
       throw new Error(`Team "${teamName}" not found.`);
     }
 
-    for (const team of teamsToUpdate) {
-      if (!team.unlockedCards) team.unlockedCards = [];
-      if (!team.unlockedCards.includes(type)) {
-        team.unlockedCards.push(type);
+    const cardTitle = type === 'HINT' ? 'Hint Pass' : 'Sabotage Card';
+
+    if (
+      (team.unlockedCards && team.unlockedCards.includes(type)) ||
+      (type === 'HINT' && team.hintUnlocked) ||
+      (type === 'SABOTAGE' && team.sabotageUnlocked)
+    ) {
+      throw new Error(`${cardTitle} is already unlocked for team "${team.name}". Once unlocked, it cannot be locked.`);
+    }
+
+    if (bidPrice === undefined || bidPrice === null || String(bidPrice).trim() === '') {
+      throw new Error('Bid price is required.');
+    }
+
+    const bid = Number(bidPrice);
+    if (isNaN(bid) || bid <= 0) {
+      throw new Error('Bid price must be a valid positive number greater than 0.');
+    }
+
+    const currentBalance = team.balance ?? 1000;
+    if (bid > currentBalance) {
+      throw new Error('Insufficient ByteCoins');
+    }
+
+    const previousBalance = currentBalance;
+    team.balance = currentBalance - bid;
+    const remainingBalance = team.balance;
+
+    if (!team.unlockedCards) team.unlockedCards = [];
+    if (!team.unlockedCards.includes(type)) {
+      team.unlockedCards.push(type);
+    }
+    if (type === 'HINT') {
+      team.hintUnlocked = true;
+      if (!team.hintPassesCount || team.hintPassesCount < 1) {
+        team.hintPassesCount = 1;
       }
-      if (type === 'HINT') {
-        team.hintUnlocked = true;
-        if (!team.hintPassesCount || team.hintPassesCount < 1) {
-          team.hintPassesCount = 1;
-        }
-      } else if (type === 'SABOTAGE') {
-        team.sabotageUnlocked = true;
-        if (!team.sabotageCardsCount || team.sabotageCardsCount < 1) {
-          team.sabotageCardsCount = 1;
-        }
+    } else if (type === 'SABOTAGE') {
+      team.sabotageUnlocked = true;
+      if (!team.sabotageCardsCount || team.sabotageCardsCount < 1) {
+        team.sabotageCardsCount = 1;
       }
     }
 
+    const now = new Date();
+    const txn = {
+      id: `TXN-ADM-CARD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      type: 'ADMIN_UNLOCK',
+      teamName: team.name,
+      problemId: type,
+      problemTitle: cardTitle,
+      cardType: type,
+      bidPrice: bid,
+      bidAmount: bid,
+      price: bid,
+      previousBalance: previousBalance,
+      remainingBalance: remainingBalance,
+      status: 'UNLOCKED',
+      timestamp: now.toISOString(),
+      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    if (!this.state.transactions) this.state.transactions = [];
+    this.state.transactions.unshift(txn);
+    if (!this.state.unlockHistory) this.state.unlockHistory = [];
+    this.state.unlockHistory.unshift(txn);
+
+    this.updateTeam(team);
     this.save();
-    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+    return {
+      success: true,
+      team,
+      teams: [team],
+      cardType: type,
+      txn,
+      unlockRecord: txn
+    };
   }
 
   adminLockCard(teamName, cardType) {
-    const type = String(cardType || '').trim().toUpperCase();
-    const teamsToUpdate = [];
-    if (!teamName || teamName.toUpperCase() === 'ALL') {
-      teamsToUpdate.push(...Object.values(this.state.teams));
-    } else {
-      const team = this.getTeam(teamName);
-      if (team) teamsToUpdate.push(team);
-    }
-
-    if (teamsToUpdate.length === 0) {
-      throw new Error(`Team "${teamName}" not found.`);
-    }
-
-    for (const team of teamsToUpdate) {
-      if (team.unlockedCards) {
-        team.unlockedCards = team.unlockedCards.filter(c => c !== type);
-      }
-      if (type === 'HINT') team.hintUnlocked = false;
-      if (type === 'SABOTAGE') team.sabotageUnlocked = false;
-    }
-
-    this.save();
-    return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+    throw new Error('Once unlocked, cards cannot be locked.');
   }
 
   adminGrantCardPass(teamName, cardType, amount = 1) {

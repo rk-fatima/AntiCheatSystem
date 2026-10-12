@@ -1424,9 +1424,8 @@
           "college": ""
         }
       ],
-      "balance": 290,
+      "balance": 265,
       "unlocked": [
-        "E1",
         "E2",
         "E4",
         "E3"
@@ -1485,6 +1484,22 @@
       "hintPassesCount": 6,
       "sabotageCardsCount": 1,
       "transactions": [
+        {
+          "id": "TXN-ADM-CARD-1791792287879-17ll",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "Synora",
+          "problemId": "HINT",
+          "problemTitle": "Hint Pass",
+          "cardType": "HINT",
+          "bidPrice": 25,
+          "bidAmount": 25,
+          "price": 25,
+          "previousBalance": 290,
+          "remainingBalance": 265,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T08:04:47.879Z",
+          "displayTime": "01:34 PM"
+        },
         {
           "id": "TXN-ADM-1791454182963-weuw",
           "type": "ADMIN_UNLOCK",
@@ -2202,10 +2217,37 @@
           "details": "Window lost focus (switched to external application).",
           "timestamp": 1791444137450,
           "isoTime": "2026-10-08T07:22:17.450Z"
+        },
+        {
+          "id": "1791791011595-ny8yyx",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791791011595,
+          "isoTime": "2026-10-12T07:43:31.595Z"
+        },
+        {
+          "id": "1791791065318-yuk3hr",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791791065318,
+          "isoTime": "2026-10-12T07:44:25.318Z"
+        },
+        {
+          "id": "1791791131056-2zakw3",
+          "teamName": "Synora",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791791131056,
+          "isoTime": "2026-10-12T07:45:31.056Z"
         }
       ],
       "isLocked": true,
-      "lockReason": "Flag threshold exceeded (55 violations detected; latest by SYNORA-001-M02). Organiser review required.",
+      "lockReason": "Flag threshold exceeded (58 violations detected; latest by SYNORA-001-M01). Organiser review required.",
       "attempts": [
         {
           "id": "SUB-1791432775616-APGP",
@@ -2345,7 +2387,10 @@
         "E1": 2,
         "E2": 1
       },
-      "unlockedCards": []
+      "unlockedCards": [
+        "HINT"
+      ],
+      "hintUnlocked": true
     },
     "VisionX": {
       "id": "VisionX",
@@ -2385,6 +2430,22 @@
     }
   },
   "transactions": [
+    {
+      "id": "TXN-ADM-CARD-1791792287879-17ll",
+      "type": "ADMIN_UNLOCK",
+      "teamName": "Synora",
+      "problemId": "HINT",
+      "problemTitle": "Hint Pass",
+      "cardType": "HINT",
+      "bidPrice": 25,
+      "bidAmount": 25,
+      "price": 25,
+      "previousBalance": 290,
+      "remainingBalance": 265,
+      "status": "UNLOCKED",
+      "timestamp": "2026-10-12T08:04:47.879Z",
+      "displayTime": "01:34 PM"
+    },
     {
       "id": "TXN-ADM-1791454182963-weuw",
       "type": "ADMIN_UNLOCK",
@@ -2607,6 +2668,22 @@
   ],
   "unlockHistory": [
     {
+      "id": "TXN-ADM-CARD-1791792287879-17ll",
+      "type": "ADMIN_UNLOCK",
+      "teamName": "Synora",
+      "problemId": "HINT",
+      "problemTitle": "Hint Pass",
+      "cardType": "HINT",
+      "bidPrice": 25,
+      "bidAmount": 25,
+      "price": 25,
+      "previousBalance": 290,
+      "remainingBalance": 265,
+      "status": "UNLOCKED",
+      "timestamp": "2026-10-12T08:04:47.879Z",
+      "displayTime": "01:34 PM"
+    },
+    {
       "id": "TXN-ADM-1791454182963-weuw",
       "type": "ADMIN_UNLOCK",
       "teamName": "Synora",
@@ -2757,6 +2834,33 @@
     }
   ],
   "telemetry": [
+    {
+      "id": "1791791131056-2zakw3",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791791131056,
+      "isoTime": "2026-10-12T07:45:31.056Z"
+    },
+    {
+      "id": "1791791065318-yuk3hr",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791791065318,
+      "isoTime": "2026-10-12T07:44:25.318Z"
+    },
+    {
+      "id": "1791791011595-ny8yyx",
+      "teamName": "Synora",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791791011595,
+      "isoTime": "2026-10-12T07:43:31.595Z"
+    },
     {
       "id": "1791444137450-630zjr",
       "teamName": "Synora",

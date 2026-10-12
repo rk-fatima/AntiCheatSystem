@@ -751,9 +751,9 @@ app.post('/api/admin/problems/lock', (req, res) => {
 
 // Admin Card Unlock (Hint or Sabotage)
 app.post('/api/admin/cards/unlock', (req, res) => {
-  const { teamName, cardType } = req.body;
+  const { teamName, cardType, bidPrice } = req.body;
   try {
-    const result = db.adminUnlockCard(teamName, cardType);
+    const result = db.adminUnlockCard(teamName, cardType, bidPrice);
     if (result.teams) {
       result.teams.forEach(t => {
         broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });

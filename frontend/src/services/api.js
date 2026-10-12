@@ -1018,103 +1018,93 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
 }
 
 export async function adminLockProblem({ teamName, problemId }) {
-  try {
-    const res = await fetch(`${API_BASE}/admin/problems/lock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, problemId })
-    });
-    if (res.ok) return await res.json();
-  } catch (e) {}
-
-  const store = getFallbackStore();
-  const teamsToUpdate = [];
-  if (!teamName || teamName.toUpperCase() === 'ALL') {
-    teamsToUpdate.push(...Object.values(store.teams));
-  } else {
-    const key = (teamName || '').trim().toUpperCase();
-    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
-  }
-
-  for (const t of teamsToUpdate) {
-    if (t.unlocked) {
-      t.unlocked = t.unlocked.filter(id => id !== problemId);
-    }
-    if (t.problemStatuses && t.problemStatuses[problemId] && t.problemStatuses[problemId].status !== 'SOLVED') {
-      delete t.problemStatuses[problemId];
-    }
-  }
-
-  saveFallbackStore(store);
-  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate };
+  throw new Error('Once unlocked, problem statements cannot be locked.');
 }
 
-export async function adminUnlockCard({ teamName, cardType }) {
+export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
   try {
     const res = await fetch(`${API_BASE}/admin/cards/unlock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, cardType })
+      body: JSON.stringify({ teamName, cardType, bidPrice })
     });
     if (res.ok) return await res.json();
-  } catch (e) {}
+    const errData = await res.json().catch(() => null);
+    if (errData?.error) throw new Error(errData.error);
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
 
   const type = String(cardType || '').trim().toUpperCase();
   const store = getFallbackStore();
-  const teamsToUpdate = [];
-  if (!teamName || teamName.toUpperCase() === 'ALL') {
-    teamsToUpdate.push(...Object.values(store.teams));
-  } else {
-    const key = (teamName || '').trim().toUpperCase();
-    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key];
+  if (!team) {
+    throw new Error(`Team "${teamName}" not found.`);
   }
 
-  for (const t of teamsToUpdate) {
-    if (!t.unlockedCards) t.unlockedCards = [];
-    if (!t.unlockedCards.includes(type)) t.unlockedCards.push(type);
-    if (type === 'HINT') {
-      t.hintUnlocked = true;
-      if (!t.hintPassesCount || t.hintPassesCount < 1) t.hintPassesCount = 1;
-    } else if (type === 'SABOTAGE') {
-      t.sabotageUnlocked = true;
-      if (!t.sabotageCardsCount || t.sabotageCardsCount < 1) t.sabotageCardsCount = 1;
-    }
+  const cardTitle = type === 'HINT' ? 'Hint Pass' : 'Sabotage Card';
+  if (
+    (team.unlockedCards && team.unlockedCards.includes(type)) ||
+    (type === 'HINT' && team.hintUnlocked) ||
+    (type === 'SABOTAGE' && team.sabotageUnlocked)
+  ) {
+    throw new Error(`${cardTitle} is already unlocked for team "${team.name}". Once unlocked, it cannot be locked.`);
   }
+
+  const bid = Number(bidPrice);
+  if (isNaN(bid) || bid <= 0) {
+    throw new Error('Bid price must be a valid positive number.');
+  }
+
+  const currentBalance = team.balance ?? 1000;
+  if (bid > currentBalance) {
+    throw new Error('Insufficient ByteCoins');
+  }
+
+  const previousBalance = currentBalance;
+  team.balance = currentBalance - bid;
+  const remainingBalance = team.balance;
+
+  if (!team.unlockedCards) team.unlockedCards = [];
+  if (!team.unlockedCards.includes(type)) team.unlockedCards.push(type);
+  if (type === 'HINT') {
+    team.hintUnlocked = true;
+    if (!team.hintPassesCount || team.hintPassesCount < 1) team.hintPassesCount = 1;
+  } else if (type === 'SABOTAGE') {
+    team.sabotageUnlocked = true;
+    if (!team.sabotageCardsCount || team.sabotageCardsCount < 1) team.sabotageCardsCount = 1;
+  }
+
+  const now = new Date();
+  const record = {
+    id: `TXN-ADM-CARD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    type: 'ADMIN_UNLOCK',
+    teamName: team.name,
+    problemId: type,
+    problemTitle: cardTitle,
+    cardType: type,
+    bidPrice: bid,
+    bidAmount: bid,
+    price: bid,
+    previousBalance: previousBalance,
+    remainingBalance: remainingBalance,
+    status: 'UNLOCKED',
+    timestamp: now.toISOString(),
+    displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+  };
+
+  if (!team.transactions) team.transactions = [];
+  team.transactions.unshift(record);
+  if (!store.unlockHistory) store.unlockHistory = [];
+  store.unlockHistory.unshift(record);
 
   saveFallbackStore(store);
-  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+  return { success: true, team, teams: [team], cardType: type, txn: record, unlockRecord: record };
 }
 
 export async function adminLockCard({ teamName, cardType }) {
-  try {
-    const res = await fetch(`${API_BASE}/admin/cards/lock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, cardType })
-    });
-    if (res.ok) return await res.json();
-  } catch (e) {}
-
-  const type = String(cardType || '').trim().toUpperCase();
-  const store = getFallbackStore();
-  const teamsToUpdate = [];
-  if (!teamName || teamName.toUpperCase() === 'ALL') {
-    teamsToUpdate.push(...Object.values(store.teams));
-  } else {
-    const key = (teamName || '').trim().toUpperCase();
-    if (store.teams[key]) teamsToUpdate.push(store.teams[key]);
-  }
-
-  for (const t of teamsToUpdate) {
-    if (t.unlockedCards) {
-      t.unlockedCards = t.unlockedCards.filter(c => c !== type);
-    }
-    if (type === 'HINT') t.hintUnlocked = false;
-    if (type === 'SABOTAGE') t.sabotageUnlocked = false;
-  }
-
-  saveFallbackStore(store);
-  return { success: true, updatedCount: teamsToUpdate.length, teams: teamsToUpdate, cardType: type };
+  throw new Error('Once unlocked, cards cannot be locked.');
 }
 
 export async function adminGrantCardPass({ teamName, cardType, amount = 1 }) {

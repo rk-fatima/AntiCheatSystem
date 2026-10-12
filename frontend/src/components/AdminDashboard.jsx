@@ -22,9 +22,7 @@ import {
 import {
   fetchAdminOverview,
   adminUnlockProblem,
-  adminLockProblem,
   adminUnlockCard,
-  adminLockCard,
   adminGrantCardPass,
   adminRevealProblemHint,
   adminClearFreeze,
@@ -48,8 +46,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [problemSearch, setProblemSearch] = useState('');
   const [problemDiffFilter, setProblemDiffFilter] = useState('ALL');
 
-  // Bid Price Unlock Modal
-  // unlockModal: { problem, team, bidPrice }
+  // Unified Bid Price Unlock Modal
+  // unlockModal: { type: 'PROBLEM' | 'HINT' | 'SABOTAGE', id, title, team, bidPrice }
   const [unlockModal, setUnlockModal] = useState(null);
   const [unlockSubmitting, setUnlockSubmitting] = useState(false);
 
@@ -100,22 +98,40 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   // Problems unlocked for current selected team
   const targetTeamUnlockedCount = (targetTeam?.unlocked || []).length;
 
-  // --- PROBLEM UNLOCK (BID MODAL TRIGGER) ---
-  const handleOpenUnlockModal = (problem) => {
+  // --- MODAL TRIGGERS ---
+  const handleOpenProblemUnlockModal = (problem) => {
     if (!targetTeam) {
       showToast('Please select a target team first.', false);
       return;
     }
     setUnlockModal({
-      problem,
+      type: 'PROBLEM',
+      id: problem.id,
+      title: `${problem.id} ${problem.title}`,
       team: targetTeam,
-      bidPrice: '100' // Suggested default
+      bidPrice: '100'
     });
   };
 
+  const handleOpenCardUnlockModal = (cardType) => {
+    if (!targetTeam) {
+      showToast('Please select a target team first.', false);
+      return;
+    }
+    const isHint = cardType === 'HINT';
+    setUnlockModal({
+      type: isHint ? 'HINT' : 'SABOTAGE',
+      id: cardType,
+      title: isHint ? 'Hint Pass' : 'Sabotage Card',
+      team: targetTeam,
+      bidPrice: '40'
+    });
+  };
+
+  // --- CONFIRM UNLOCK (DEDUCTION & AUDIT LOG) ---
   const handleConfirmUnlock = async () => {
     if (!unlockModal) return;
-    const { problem, team, bidPrice } = unlockModal;
+    const { type, id, title, team, bidPrice } = unlockModal;
 
     const bidNum = Number(bidPrice);
     if (!bidPrice || isNaN(bidNum) || bidNum <= 0) {
@@ -131,50 +147,39 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
     setUnlockSubmitting(true);
     try {
-      const res = await adminUnlockProblem({
-        teamName: team.name,
-        problemId: problem.id,
-        bidPrice: bidNum
-      });
+      if (type === 'PROBLEM') {
+        await adminUnlockProblem({
+          teamName: team.name,
+          problemId: id,
+          bidPrice: bidNum
+        });
+        showToast(`🔓 Unlocked problem ${id} for ${team.name}! Deducted ${bidNum} ByteCoins.`);
+      } else if (type === 'HINT') {
+        await adminUnlockCard({
+          teamName: team.name,
+          cardType: 'HINT',
+          bidPrice: bidNum
+        });
+        showToast(`💡 Hint Pass unlocked for ${team.name}! Deducted ${bidNum} ByteCoins.`);
+      } else if (type === 'SABOTAGE') {
+        await adminUnlockCard({
+          teamName: team.name,
+          cardType: 'SABOTAGE',
+          bidPrice: bidNum
+        });
+        showToast(`⚡ Sabotage Card unlocked for ${team.name}! Deducted ${bidNum} ByteCoins.`);
+      }
 
-      showToast(`🔓 Unlocked ${problem.id} for ${team.name}! Deducted ${bidNum} ByteCoins.`);
       setUnlockModal(null);
       await loadData();
     } catch (err) {
-      showToast(err.message || 'Failed to unlock problem', false);
+      showToast(err.message || 'Failed to unlock', false);
     } finally {
       setUnlockSubmitting(false);
     }
   };
 
-  const handleLockProblem = async (problemId) => {
-    if (!targetTeam) return;
-    try {
-      await adminLockProblem({ teamName: targetTeam.name, problemId });
-      showToast(`🔒 Problem ${problemId} locked for ${targetTeam.name}.`);
-      await loadData();
-    } catch (err) {
-      showToast(err.message || 'Failed to lock problem', false);
-    }
-  };
-
-  // --- CARD UNLOCK/LOCK ACTIONS ---
-  const handleToggleHintCard = async (shouldUnlock) => {
-    if (!targetTeam) return;
-    try {
-      if (shouldUnlock) {
-        await adminUnlockCard({ teamName: targetTeam.name, cardType: 'HINT' });
-        showToast(`💡 Hint Pass unlocked for ${targetTeam.name}!`);
-      } else {
-        await adminLockCard({ teamName: targetTeam.name, cardType: 'HINT' });
-        showToast(`🔒 Hint Pass locked for ${targetTeam.name}.`);
-      }
-      loadData();
-    } catch (err) {
-      showToast(err.message || 'Card update failed', false);
-    }
-  };
-
+  // --- PASS / CARD INVENTORY ACTIONS ---
   const handleGrantHintPass = async (amount = 1) => {
     if (!targetTeam) return;
     try {
@@ -194,22 +199,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       loadData();
     } catch (err) {
       showToast(err.message || 'Failed to reveal hint', false);
-    }
-  };
-
-  const handleToggleSabotageCard = async (shouldUnlock) => {
-    if (!targetTeam) return;
-    try {
-      if (shouldUnlock) {
-        await adminUnlockCard({ teamName: targetTeam.name, cardType: 'SABOTAGE' });
-        showToast(`⚡ Sabotage Card unlocked for ${targetTeam.name}!`);
-      } else {
-        await adminLockCard({ teamName: targetTeam.name, cardType: 'SABOTAGE' });
-        showToast(`🔒 Sabotage Card locked for ${targetTeam.name}.`);
-      }
-      loadData();
-    } catch (err) {
-      showToast(err.message || 'Card update failed', false);
     }
   };
 
@@ -852,7 +841,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               </div>
             </div>
 
-            {/* Problem List (Cleaner Problem List) */}
+            {/* Problem List (Permanent Unlocks, No Re-locking) */}
             <div style={{
               background: 'rgba(13, 17, 28, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -884,15 +873,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         width: '32px',
                         height: '32px',
                         borderRadius: '6px',
-                        background: isUnlocked ? 'rgba(88, 166, 255, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                        border: `1px solid ${isUnlocked ? 'rgba(88, 166, 255, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
+                        background: isUnlocked ? 'rgba(63, 185, 80, 0.14)' : 'rgba(255, 255, 255, 0.04)',
+                        border: `1px solid ${isUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: isUnlocked ? '#58a6ff' : 'var(--txt-dim)',
+                        color: isUnlocked ? '#3fb950' : 'var(--txt-dim)',
                         flexShrink: 0
                       }}>
-                        {isUnlocked ? <Unlock size={16} /> : <Lock size={15} />}
+                        {isUnlocked ? <Check size={16} /> : <Lock size={15} />}
                       </div>
 
                       <div style={{ minWidth: 0 }}>
@@ -907,47 +896,49 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       </div>
                     </div>
 
-                    {/* Right: Status Tag + Clean Action */}
+                    {/* Right: Permanent Unlocks (Once Unlocked, Cannot Be Locked) */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        background: isUnlocked ? 'rgba(63, 185, 80, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-                        border: `1px solid ${isUnlocked ? 'rgba(63, 185, 80, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
-                        color: isUnlocked ? '#3fb950' : 'var(--txt-dim)',
-                        letterSpacing: '0.4px'
-                      }}>
-                        {isUnlocked ? 'UNLOCKED' : 'LOCKED'}
-                      </span>
-
                       {isUnlocked ? (
-                        <button
-                          className="btn-ghost"
-                          onClick={() => handleLockProblem(prob.id)}
-                          style={{
-                            fontSize: '12px',
-                            padding: '6px 14px',
-                            borderRadius: '6px',
-                            color: '#ff7b72',
-                            borderColor: 'rgba(248, 81, 73, 0.3)'
-                          }}
-                        >
-                          <Lock size={13} /> Lock Problem
-                        </button>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          background: 'rgba(63, 185, 80, 0.14)',
+                          border: '1px solid rgba(63, 185, 80, 0.35)',
+                          color: '#3fb950',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}>
+                          <Check size={13} /> Unlocked
+                        </span>
                       ) : (
-                        <button
-                          className="btn-primary"
-                          onClick={() => handleOpenUnlockModal(prob)}
-                          style={{
-                            fontSize: '12px',
-                            padding: '6px 14px',
-                            borderRadius: '6px'
-                          }}
-                        >
-                          <Unlock size={13} /> Unlock Problem
-                        </button>
+                        <>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            color: 'var(--txt-dim)',
+                            letterSpacing: '0.4px'
+                          }}>
+                            LOCKED
+                          </span>
+                          <button
+                            className="btn-primary"
+                            onClick={() => handleOpenProblemUnlockModal(prob)}
+                            style={{
+                              fontSize: '12px',
+                              padding: '6px 16px',
+                              borderRadius: '6px'
+                            }}
+                          >
+                            <Unlock size={13} /> Unlock Problem
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -988,7 +979,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     }}>
                       <th style={{ padding: '10px 14px' }}>Time</th>
                       <th style={{ padding: '10px 14px' }}>Team</th>
-                      <th style={{ padding: '10px 14px' }}>Problem</th>
+                      <th style={{ padding: '10px 14px' }}>Item / Problem</th>
                       <th style={{ padding: '10px 14px' }}>Bid Price</th>
                       <th style={{ padding: '10px 14px' }}>Prev Balance</th>
                       <th style={{ padding: '10px 14px' }}>New Balance</th>
@@ -999,7 +990,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     {unlockHistory.map((rec) => (
                       <tr
                         key={rec.id}
-                        style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.03)' }}
+                        style={{ borderBottom: '1px solid rgba(255, 255, 0, 0.03)' }}
                       >
                         <td style={{ padding: '10px 14px', color: 'var(--txt-dim)' }}>
                           {rec.displayTime || new Date(rec.timestamp).toLocaleTimeString()}
@@ -1055,31 +1046,38 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
         {activeTab === 'hints' && (
           <div>
             {/* Hint Hero Banner */}
-            <div style={{
-              background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.85) 100%)',
-              border: `1px solid ${isHintCardUnlocked ? 'rgba(56, 139, 253, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
-              borderRadius: '12px',
-              padding: '22px 24px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '16px'
-            }}>
+            <div
+              onClick={() => {
+                if (!isHintCardUnlocked) handleOpenCardUnlockModal('HINT');
+              }}
+              style={{
+                background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.85) 100%)',
+                border: `1px solid ${isHintCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(56, 139, 253, 0.3)'}`,
+                borderRadius: '12px',
+                padding: '22px 24px',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px',
+                cursor: !isHintCardUnlocked ? 'pointer' : 'default',
+                transition: 'border-color 0.2s ease, transform 0.2s ease'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
                   width: '46px',
                   height: '46px',
                   borderRadius: '10px',
-                  background: isHintCardUnlocked ? 'rgba(56, 139, 253, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isHintCardUnlocked ? 'rgba(56, 139, 253, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                  background: isHintCardUnlocked ? 'rgba(63, 185, 80, 0.16)' : 'rgba(56, 139, 253, 0.15)',
+                  border: `1px solid ${isHintCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(56, 139, 253, 0.35)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isHintCardUnlocked ? '#58a6ff' : 'var(--txt-dim)'
+                  color: isHintCardUnlocked ? '#3fb950' : '#58a6ff'
                 }}>
-                  <Lightbulb size={24} />
+                  {isHintCardUnlocked ? <Check size={24} /> : <Lightbulb size={24} />}
                 </div>
                 <div>
                   <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
@@ -1096,11 +1094,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </div>
               </div>
 
-              {/* Master Actions */}
+              {/* Master Actions (Once Unlocked, Cannot Be Locked) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
                   className="btn-ghost"
-                  onClick={() => handleGrantHintPass(1)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGrantHintPass(1);
+                  }}
                   title="Award 1 free hint pass to team inventory"
                   style={{ fontSize: '12px', padding: '8px 14px' }}
                 >
@@ -1108,22 +1109,27 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </button>
 
                 {isHintCardUnlocked ? (
-                  <button
-                    className="btn-ghost"
-                    onClick={() => handleToggleHintCard(false)}
-                    style={{
-                      fontSize: '13px',
-                      padding: '8px 16px',
-                      color: '#ff7b72',
-                      borderColor: 'rgba(248, 81, 73, 0.3)'
-                    }}
-                  >
-                    <Lock size={14} /> Lock Hint Card
-                  </button>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(63, 185, 80, 0.14)',
+                    border: '1px solid rgba(63, 185, 80, 0.35)',
+                    color: '#3fb950',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Check size={14} /> Unlocked
+                  </span>
                 ) : (
                   <button
                     className="btn-blue"
-                    onClick={() => handleToggleHintCard(true)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenCardUnlockModal('HINT');
+                    }}
                     style={{ fontSize: '13px', padding: '8px 18px', fontWeight: 600 }}
                   >
                     <Unlock size={14} /> Unlock Hint Card
@@ -1211,31 +1217,38 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
         {activeTab === 'sabotage' && (
           <div>
             {/* Sabotage Hero Banner */}
-            <div style={{
-              background: 'linear-gradient(180deg, rgba(180, 25, 60, 0.12) 0%, rgba(20, 10, 16, 0.85) 100%)',
-              border: `1px solid ${isSabotageCardUnlocked ? 'rgba(248, 81, 73, 0.35)' : 'rgba(255, 255, 255, 0.1)'}`,
-              borderRadius: '12px',
-              padding: '22px 24px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '16px'
-            }}>
+            <div
+              onClick={() => {
+                if (!isSabotageCardUnlocked) handleOpenCardUnlockModal('SABOTAGE');
+              }}
+              style={{
+                background: 'linear-gradient(180deg, rgba(180, 25, 60, 0.12) 0%, rgba(20, 10, 16, 0.85) 100%)',
+                border: `1px solid ${isSabotageCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(248, 81, 73, 0.3)'}`,
+                borderRadius: '12px',
+                padding: '22px 24px',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px',
+                cursor: !isSabotageCardUnlocked ? 'pointer' : 'default',
+                transition: 'border-color 0.2s ease, transform 0.2s ease'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
                   width: '46px',
                   height: '46px',
                   borderRadius: '10px',
-                  background: isSabotageCardUnlocked ? 'rgba(248, 81, 73, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isSabotageCardUnlocked ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                  background: isSabotageCardUnlocked ? 'rgba(63, 185, 80, 0.16)' : 'rgba(248, 81, 73, 0.15)',
+                  border: `1px solid ${isSabotageCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(248, 81, 73, 0.35)'}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isSabotageCardUnlocked ? '#ff7b72' : 'var(--txt-dim)'
+                  color: isSabotageCardUnlocked ? '#3fb950' : '#ff7b72'
                 }}>
-                  <Zap size={24} />
+                  {isSabotageCardUnlocked ? <Check size={24} /> : <Zap size={24} />}
                 </div>
                 <div>
                   <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
@@ -1252,11 +1265,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </div>
               </div>
 
-              {/* Master Actions */}
+              {/* Master Actions (Once Unlocked, Cannot Be Locked) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
                   className="btn-ghost"
-                  onClick={() => handleGrantSabotageCard(1)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGrantSabotageCard(1);
+                  }}
                   title="Award 1 free sabotage card to team inventory"
                   style={{ fontSize: '12px', padding: '8px 14px' }}
                 >
@@ -1264,22 +1280,27 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </button>
 
                 {isSabotageCardUnlocked ? (
-                  <button
-                    className="btn-ghost"
-                    onClick={() => handleToggleSabotageCard(false)}
-                    style={{
-                      fontSize: '13px',
-                      padding: '8px 16px',
-                      color: '#ff7b72',
-                      borderColor: 'rgba(248, 81, 73, 0.3)'
-                    }}
-                  >
-                    <Lock size={14} /> Lock Sabotage Card
-                  </button>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(63, 185, 80, 0.14)',
+                    border: '1px solid rgba(63, 185, 80, 0.35)',
+                    color: '#3fb950',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Check size={14} /> Unlocked
+                  </span>
                 ) : (
                   <button
                     className="btn-danger"
-                    onClick={() => handleToggleSabotageCard(true)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenCardUnlockModal('SABOTAGE');
+                    }}
                     style={{ fontSize: '13px', padding: '8px 18px', fontWeight: 600 }}
                   >
                     <Unlock size={14} /> Unlock Sabotage Card
@@ -1378,7 +1399,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       </div>
 
       {/* ============================================================ */}
-      {/* BID PRICE UNLOCK MODAL                                       */}
+      {/* BID PRICE UNLOCK MODAL (FOR PROBLEMS, HINT & SABOTAGE CARDS) */}
       {/* ============================================================ */}
       {unlockModal && (
         <div
@@ -1429,7 +1450,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   <Unlock size={18} />
                 </div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
-                  Unlock Problem
+                  {unlockModal.type === 'PROBLEM' ? 'Unlock Problem' : `Unlock ${unlockModal.title}`}
                 </h3>
               </div>
               <button
@@ -1459,9 +1480,11 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               fontSize: '13px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--txt-muted)' }}>Problem:</span>
+                <span style={{ color: 'var(--txt-muted)' }}>
+                  {unlockModal.type === 'PROBLEM' ? 'Problem:' : 'Card:'}
+                </span>
                 <span style={{ fontWeight: 700, color: '#ffffff' }}>
-                  {unlockModal.problem.id} {unlockModal.problem.title}
+                  {unlockModal.title}
                 </span>
               </div>
 
@@ -1502,7 +1525,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         type="number"
                         min="1"
                         max={currentBalance}
-                        placeholder="e.g. 100"
+                        placeholder="e.g. 50"
                         value={unlockModal.bidPrice}
                         onChange={(e) => setUnlockModal({ ...unlockModal, bidPrice: e.target.value })}
                         autoFocus
@@ -1604,7 +1627,9 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         cursor: isValid && !unlockSubmitting ? 'pointer' : 'not-allowed'
                       }}
                     >
-                      {unlockSubmitting ? 'Unlocking...' : 'Unlock Problem'}
+                      {unlockSubmitting
+                        ? 'Unlocking...'
+                        : (unlockModal.type === 'PROBLEM' ? 'Unlock Problem' : `Unlock ${unlockModal.title}`)}
                     </button>
                   </div>
                 </div>
