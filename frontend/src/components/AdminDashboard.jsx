@@ -275,7 +275,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     setEventConfirmModal({
       targetStatus: 'REGISTRATION_CLOSED',
       title: 'Close Public Registration?',
-      description: 'Public self-registration via QR code and URL will be closed. New teams cannot register, but you can review and approve existing pending teams before starting the competition.',
+      description: 'Stop accepting new public registrations. Existing registrations and pending approvals will be preserved for review.',
       confirmText: 'Close Registration',
       confirmColor: '#d29922'
     });
@@ -284,9 +284,9 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const promptStartEvent = () => {
     setEventConfirmModal({
       targetStatus: 'EVENT_LIVE',
-      title: 'Start Competition (Go Live)?',
-      description: 'This will officially launch the Code Auctioneer event! Problem catalog access, auction purchases, and live coding submissions will be activated for all approved teams.',
-      confirmText: 'Start Event Now',
+      title: 'Start Event?',
+      description: 'Confirm with the admin: activate the competition and enable auction bidding and live coding submissions for all approved teams.',
+      confirmText: 'Start Event',
       confirmColor: '#2ea043'
     });
   };
@@ -294,19 +294,19 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const promptEndEvent = () => {
     setEventConfirmModal({
       targetStatus: 'EVENT_ENDED',
-      title: 'End Competition?',
-      description: 'Are you sure you want to officially END the competition? This will conclude all bidding, card purchases, and code submissions. Final scores, team balances, and leaderboard standings will remain permanently preserved.',
+      title: 'End Event?',
+      description: 'Are you sure you want to end the competition? This will disable further bidding and code submissions. Results and the leaderboard will remain permanently available.',
       confirmText: 'End Event',
-      confirmColor: '#f85149'
+      confirmColor: '#da3633'
     });
   };
 
   const promptReopenRegistration = () => {
     setEventConfirmModal({
       targetStatus: 'REGISTRATION_OPEN',
-      title: 'Re-open Public Registration?',
-      description: 'This will allow new teams to access the registration page and submit registrations via QR code or portal link.',
-      confirmText: 'Re-open Registration',
+      title: 'Reopen Registration?',
+      description: 'Allow new teams to submit registrations again before the event starts.',
+      confirmText: 'Reopen Registration',
       confirmColor: '#38bdf8'
     });
   };
@@ -651,126 +651,126 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   }`
                 }}>
                   {eventState.status === 'EVENT_ENDED'
-                    ? '■ EVENT ENDED'
+                    ? 'EVENT ENDED'
                     : eventState.status === 'EVENT_LIVE'
-                    ? '● EVENT LIVE'
+                    ? 'EVENT LIVE'
                     : eventState.status === 'REGISTRATION_CLOSED'
-                    ? '■ REGISTRATION CLOSED'
-                    : '● REGISTRATION OPEN'}
+                    ? 'REGISTRATION CLOSED'
+                    : 'REGISTRATION OPEN'}
                 </span>
               </div>
               <div style={{ fontSize: '13px', color: '#c9d1d9' }}>
                 {eventState.status === 'EVENT_ENDED'
-                  ? 'Competition concluded. Final leaderboard standings, balances, and records are preserved.'
+                  ? 'The competition has ended. Results and leaderboard are available.'
                   : eventState.status === 'EVENT_LIVE'
-                  ? 'Competition is LIVE! Problem catalog bidding and live coding are active.'
+                  ? 'The competition is live. Teams can participate in the auction.'
                   : eventState.status === 'REGISTRATION_CLOSED'
-                  ? 'Public registration closed. Review and approve pending teams before starting the event.'
-                  : 'Public registration is open. Teams can self-register via QR code or registration link.'}
+                  ? 'Public registration is closed. Review and approve pending teams before starting the event.'
+                  : 'Public registration is open. Teams can register.'}
               </div>
             </div>
           </div>
 
-          {/* Action buttons */}
+          {/* Action buttons (Only relevant actions for current state, QR button removed) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Show QR code button (only when relevant before event goes live) */}
-            {(eventState.status === 'REGISTRATION_OPEN' || eventState.status === 'REGISTRATION_CLOSED') && (
-              <button
-                className="btn-ghost"
-                onClick={() => setShowQrModal(true)}
-                style={{
-                  fontSize: '12px',
-                  padding: '7px 14px',
-                  color: '#58a6ff',
-                  borderColor: 'rgba(88, 166, 255, 0.3)',
-                  background: 'rgba(88, 166, 255, 0.08)'
-                }}
-              >
-                <QrCode size={14} />
-                <span>Registration QR</span>
-              </button>
-            )}
-
-            {/* Streamlined State Machine Actions */}
             {eventState.status === 'REGISTRATION_OPEN' ? (
               /* Registration Open -> Primary Action: Close Registration */
               <button
+                type="button"
                 onClick={promptCloseRegistration}
+                disabled={eventActionLoading}
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '7px 16px',
+                  padding: '8px 16px',
                   fontSize: '12px',
                   fontWeight: 700,
-                  background: 'linear-gradient(135deg, #d29922 0%, #b08800 100%)',
-                  border: 'none',
+                  background: 'rgba(210, 153, 34, 0.16)',
+                  border: '1px solid rgba(210, 153, 34, 0.45)',
                   borderRadius: '6px',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(210, 153, 34, 0.35)'
+                  color: '#d29922',
+                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
                 }}
               >
                 <Pause size={13} />
                 <span>Close Registration</span>
               </button>
             ) : eventState.status === 'REGISTRATION_CLOSED' ? (
-              /* Registration Closed -> Primary Action: Start Event */
+              /* Registration Closed -> Primary Action: Start Event | Secondary: Reopen Registration */
               <>
                 <button
+                  type="button"
                   className="btn-ghost"
                   onClick={promptReopenRegistration}
-                  style={{ fontSize: '12px', padding: '7px 14px', color: '#38bdf8' }}
+                  disabled={eventActionLoading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    padding: '8px 14px',
+                    color: '#38bdf8',
+                    borderColor: 'rgba(56, 189, 248, 0.3)',
+                    background: 'rgba(56, 189, 248, 0.08)',
+                    borderRadius: '6px',
+                    cursor: eventActionLoading ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <RefreshCw size={13} />
                   <span>Reopen Registration</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={promptStartEvent}
+                  disabled={eventActionLoading}
                   style={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '7px 16px',
+                    padding: '8px 18px',
                     fontSize: '12px',
                     fontWeight: 700,
                     background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
-                    border: 'none',
+                    border: '1px solid rgba(46, 160, 67, 0.4)',
                     borderRadius: '6px',
                     color: '#ffffff',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(46, 160, 67, 0.35)'
+                    cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(46, 160, 67, 0.35)'
                   }}
                 >
-                  <Play size={13} />
+                  <Play size={13} fill="#ffffff" />
                   <span>Start Event</span>
                 </button>
               </>
             ) : eventState.status === 'EVENT_LIVE' ? (
               /* Event Live -> Primary Action: End Event */
               <button
+                type="button"
                 onClick={promptEndEvent}
+                disabled={eventActionLoading}
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '7px 16px',
+                  padding: '8px 18px',
                   fontSize: '12px',
                   fontWeight: 700,
                   background: 'linear-gradient(135deg, #cf222e 0%, #da3633 100%)',
-                  border: 'none',
+                  border: '1px solid rgba(218, 54, 51, 0.4)',
                   borderRadius: '6px',
                   color: '#ffffff',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(207, 34, 46, 0.35)'
+                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(207, 34, 46, 0.35)'
                 }}
               >
                 <Square size={12} fill="#ffffff" />
                 <span>End Event</span>
               </button>
             ) : (
-              /* EVENT_ENDED */
+              /* Event Ended -> Actions removed */
               <div style={{
                 fontSize: '12px',
                 fontWeight: 600,

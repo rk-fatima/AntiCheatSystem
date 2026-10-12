@@ -960,6 +960,14 @@ class Database {
 
   // --- POWER CARDS: 💡 HINT PASS (40 ByteCoins) ---
   purchaseHintPass(teamName, memberId, problemId = null) {
+    const eventState = this.getEventState();
+    if (eventState.status !== 'EVENT_LIVE') {
+      if (eventState.status === 'EVENT_ENDED') {
+        throw new Error('The competition has concluded. Hint Pass purchase is no longer active.');
+      }
+      throw new Error('The event is not live. Hint Pass purchase will activate once the competition starts.');
+    }
+
     const team = this.getTeam(teamName);
     if (!team) throw new Error('Team not found.');
     if (this.isTeamFrozen(team.name)) {
@@ -1098,6 +1106,14 @@ class Database {
 
   // --- POWER CARDS: ⚡ SABOTAGE CARD (40 ByteCoins) ---
   purchaseSabotageCard(teamName, memberId) {
+    const eventState = this.getEventState();
+    if (eventState.status !== 'EVENT_LIVE') {
+      if (eventState.status === 'EVENT_ENDED') {
+        throw new Error('The competition has concluded. Sabotage Card purchase is no longer active.');
+      }
+      throw new Error('The event is not live. Sabotage Card purchase will activate once the competition starts.');
+    }
+
     const team = this.getTeam(teamName);
     if (!team) throw new Error('Team not found.');
     if (this.isTeamFrozen(team.name)) {
