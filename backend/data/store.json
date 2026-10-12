@@ -1463,7 +1463,7 @@
       "attempts": [],
       "createdAt": "2026-10-12T16:05:31.969Z",
       "frozenUntil": 0,
-      "currentEventId": null
+      "currentEventId": "EVT-MV5L3EKA"
     },
     "CyberKnights": {
       "id": "CyberKnights",
@@ -1526,6 +1526,92 @@
       "createdAt": "2026-10-12T17:43:58.790Z",
       "currentEventId": null,
       "frozenUntil": 0
+    },
+    "AlphaTeam": {
+      "id": "AlphaTeam",
+      "name": "AlphaTeam",
+      "size": 1,
+      "captainId": "ALPHATEA-001-M01",
+      "captainName": "Alpha Leader",
+      "members": [
+        {
+          "memberId": "ALPHATEA-001-M01",
+          "name": "Alpha Leader",
+          "isCaptain": true,
+          "rollNo": "",
+          "phone": "+91 9876543210",
+          "email": "alpha@test.com",
+          "college": ""
+        }
+      ],
+      "passwordHash": "dc2f489c78f82f1091cb8d0fc274f305:08683ae5465f7b70fcabc74930852c5c7272597541f01495b3dd5aea76f1106e799366c858e75a7e746c2e8a305718b7a8bc79a4238f772641f36890614b794c",
+      "balance": 1000,
+      "unlocked": [],
+      "unlockedCards": [],
+      "solved": [],
+      "problemStatuses": {},
+      "revealedHints": {},
+      "hintPassesCount": 0,
+      "sabotageCardsCount": 0,
+      "transactions": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-12T18:22:04.583Z",
+      "currentEventId": null,
+      "frozenUntil": 0,
+      "problemWrong": {
+        "E1": 6
+      },
+      "lastScoreTime": 1791829590508,
+      "rawScore": 590,
+      "totalProblemScores": 600,
+      "totalWrongPenalty": 10
+    },
+    "BetaTeam": {
+      "id": "BetaTeam",
+      "name": "BetaTeam",
+      "size": 1,
+      "captainId": "BETATEAM-001-M01",
+      "captainName": "Beta Leader",
+      "members": [
+        {
+          "memberId": "BETATEAM-001-M01",
+          "name": "Beta Leader",
+          "isCaptain": true,
+          "rollNo": "",
+          "phone": "+91 9876543211",
+          "email": "beta@test.com",
+          "college": ""
+        }
+      ],
+      "passwordHash": "370be319e691acb3aec74b7e7ebbca02:8a8b66fa4018b0f0d974de795b6769c12544f81227f660dad68ac87c4983476063f62fa85236ee321618662b8d5664c62b2769be4e9a59740ee85f0a956c8578",
+      "balance": 1000,
+      "unlocked": [],
+      "unlockedCards": [],
+      "solved": [],
+      "problemStatuses": {},
+      "revealedHints": {},
+      "hintPassesCount": 0,
+      "sabotageCardsCount": 0,
+      "transactions": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-12T18:22:04.606Z",
+      "currentEventId": null,
+      "frozenUntil": 0,
+      "problemWrong": {},
+      "lastScoreTime": 1791829590507,
+      "rawScore": 200,
+      "totalProblemScores": 200,
+      "totalWrongPenalty": 0
     }
   },
   "registrations": {
@@ -1610,15 +1696,83 @@
           "college": ""
         }
       ]
+    },
+    "REG-MV5KWZD8-QUKE": {
+      "id": "REG-MV5KWZD8-QUKE",
+      "teamName": "AlphaTeam",
+      "leaderName": "Alpha Leader",
+      "leaderContact": "+91 9876543210",
+      "leaderEmail": "alpha@test.com",
+      "passwordHash": "dc2f489c78f82f1091cb8d0fc274f305:08683ae5465f7b70fcabc74930852c5c7272597541f01495b3dd5aea76f1106e799366c858e75a7e746c2e8a305718b7a8bc79a4238f772641f36890614b794c",
+      "memberCount": 1,
+      "members": [
+        {
+          "name": "Alpha Leader",
+          "rollNo": "",
+          "email": "alpha@test.com",
+          "phone": "+91 9876543210",
+          "college": ""
+        }
+      ],
+      "status": "APPROVED",
+      "rejectionReason": "",
+      "createdAt": "2026-10-12T18:22:04.582Z",
+      "approvedAt": "2026-10-12T18:22:04.583Z",
+      "assignedMembers": [
+        {
+          "memberId": "ALPHATEA-001-M01",
+          "name": "Alpha Leader",
+          "isCaptain": true,
+          "rollNo": "",
+          "phone": "+91 9876543210",
+          "email": "alpha@test.com",
+          "college": ""
+        }
+      ]
+    },
+    "REG-MV5KWZDZ-4B83": {
+      "id": "REG-MV5KWZDZ-4B83",
+      "teamName": "BetaTeam",
+      "leaderName": "Beta Leader",
+      "leaderContact": "+91 9876543211",
+      "leaderEmail": "beta@test.com",
+      "passwordHash": "370be319e691acb3aec74b7e7ebbca02:8a8b66fa4018b0f0d974de795b6769c12544f81227f660dad68ac87c4983476063f62fa85236ee321618662b8d5664c62b2769be4e9a59740ee85f0a956c8578",
+      "memberCount": 1,
+      "members": [
+        {
+          "name": "Beta Leader",
+          "rollNo": "",
+          "email": "beta@test.com",
+          "phone": "+91 9876543211",
+          "college": ""
+        }
+      ],
+      "status": "APPROVED",
+      "rejectionReason": "",
+      "createdAt": "2026-10-12T18:22:04.605Z",
+      "approvedAt": "2026-10-12T18:22:04.606Z",
+      "assignedMembers": [
+        {
+          "memberId": "BETATEAM-001-M01",
+          "name": "Beta Leader",
+          "isCaptain": true,
+          "rollNo": "",
+          "phone": "+91 9876543211",
+          "email": "beta@test.com",
+          "college": ""
+        }
+      ]
     }
   },
   "eventState": {
-    "status": "EVENT_ENDED",
-    "startedAt": "2026-10-12T17:44:31.203Z",
-    "endedAt": "2026-10-12T17:45:16.425Z",
-    "currentEventId": null,
-    "currentEventName": null,
-    "participatingTeams": []
+    "status": "EVENT_LIVE",
+    "startedAt": "2026-10-12T18:27:04.188Z",
+    "endedAt": null,
+    "currentEventId": "EVT-MV5L3EKA",
+    "currentEventName": "QUBIT Code Auctioneer",
+    "participatingTeams": [
+      "SYNORA"
+    ]
   },
   "archivedEvents": [
     {
@@ -1995,15 +2149,312 @@
       },
       "transactions": [],
       "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5JN3EV",
+      "name": "QUBIT Code Auctioneer",
+      "startedAt": "2026-10-12T17:46:23.625Z",
+      "endedAt": "2026-10-12T17:46:31.574Z",
+      "participatingTeams": [
+        "SYNORA"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5KYVGK",
+      "name": "Test Scoring Championship",
+      "startedAt": "2026-10-12T18:23:32.804Z",
+      "endedAt": "2026-10-12T18:25:09.315Z",
+      "participatingTeams": [
+        "AlphaTeam",
+        "BetaTeam"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "AlphaTeam",
+          "captainName": "Alpha Leader",
+          "size": 1,
+          "score": 590,
+          "solvedCount": 2,
+          "solved": [
+            "E1",
+            "H1"
+          ],
+          "balance": 1000,
+          "wrongAttempts": 2,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        },
+        {
+          "name": "BetaTeam",
+          "captainName": "Beta Leader",
+          "size": 1,
+          "score": 200,
+          "solvedCount": 1,
+          "solved": [
+            "E1"
+          ],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 2
+        }
+      ],
+      "teamSnapshots": {
+        "AlphaTeam": {
+          "score": 590,
+          "balance": 1000,
+          "solved": [
+            "E1",
+            "H1"
+          ],
+          "unlocked": [],
+          "wrong": 2,
+          "problemStatuses": {
+            "E1": {
+              "status": "SOLVED",
+              "workingBy": "AlphaTeam-01",
+              "workingByName": "Team Member",
+              "updatedAt": "2026-10-12T18:23:32.806Z",
+              "baseScore": 200,
+              "difficulty": "Easy",
+              "wrongSubmissions": 2,
+              "wrongPenalty": 10,
+              "solvedBy": "AlphaTeam-01",
+              "solvedByName": "Team Member",
+              "solvedAt": "2026-10-12T18:23:32.809Z",
+              "timeComplexity": "O(1)",
+              "spaceComplexity": "O(1)",
+              "timeDeduction": 0,
+              "spaceDeduction": 0,
+              "complexityAdjustedScore": 200,
+              "reviewStatus": "ADMIN_VERIFIED",
+              "reason": "Admin reviewed: Time O(1), Space O(1)",
+              "finalProblemScore": 200
+            },
+            "H1": {
+              "status": "SOLVED",
+              "solvedBy": "AlphaTeam-01",
+              "solvedByName": "Team Member",
+              "solvedAt": "2026-10-12T18:23:32.814Z",
+              "baseScore": 400,
+              "difficulty": "Hard",
+              "timeComplexity": "O(1)",
+              "spaceComplexity": "O(1)",
+              "timeDeduction": 0,
+              "spaceDeduction": 0,
+              "complexityAdjustedScore": 400,
+              "wrongSubmissions": 0,
+              "wrongPenalty": 0,
+              "reviewStatus": "AUTOMATED",
+              "reason": "Constant time O(1): no loops or recursive calls detected; direct calculation or lookup. | Auxiliary Space: Constant O(1) auxiliary space: only scalar variables and pointers allocated in memory.",
+              "finalProblemScore": 400
+            }
+          }
+        },
+        "BetaTeam": {
+          "score": 200,
+          "balance": 1000,
+          "solved": [
+            "E1"
+          ],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {
+            "E1": {
+              "status": "SOLVED",
+              "solvedBy": "BetaTeam-01",
+              "solvedByName": "Team Member",
+              "solvedAt": "2026-10-12T18:23:32.813Z",
+              "baseScore": 200,
+              "difficulty": "Easy",
+              "timeComplexity": "O(1)",
+              "spaceComplexity": "O(1)",
+              "timeDeduction": 0,
+              "spaceDeduction": 0,
+              "complexityAdjustedScore": 200,
+              "wrongSubmissions": 0,
+              "wrongPenalty": 0,
+              "reviewStatus": "AUTOMATED",
+              "reason": "Constant time O(1): no loops or recursive calls detected; direct calculation or lookup. | Auxiliary Space: Constant O(1) auxiliary space: only scalar variables and pointers allocated in memory.",
+              "finalProblemScore": 200
+            }
+          }
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5L2OKJ",
+      "name": "Test Scoring Championship",
+      "startedAt": "2026-10-12T18:26:30.500Z",
+      "endedAt": "2026-10-12T18:26:54.587Z",
+      "participatingTeams": [
+        "AlphaTeam",
+        "BetaTeam"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "AlphaTeam",
+          "captainName": "Alpha Leader",
+          "size": 1,
+          "score": 590,
+          "solvedCount": 2,
+          "solved": [
+            "E1",
+            "H1"
+          ],
+          "balance": 1000,
+          "wrongAttempts": 2,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        },
+        {
+          "name": "BetaTeam",
+          "captainName": "Beta Leader",
+          "size": 1,
+          "score": 200,
+          "solvedCount": 1,
+          "solved": [
+            "E1"
+          ],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 2
+        }
+      ],
+      "teamSnapshots": {
+        "AlphaTeam": {
+          "score": 590,
+          "balance": 1000,
+          "solved": [
+            "E1",
+            "H1"
+          ],
+          "unlocked": [],
+          "wrong": 2,
+          "problemStatuses": {
+            "E1": {
+              "status": "SOLVED",
+              "workingBy": "AlphaTeam-01",
+              "workingByName": "Team Member",
+              "updatedAt": "2026-10-12T18:26:30.501Z",
+              "baseScore": 200,
+              "difficulty": "Easy",
+              "wrongSubmissions": 6,
+              "wrongPenalty": 30,
+              "solvedBy": "AlphaTeam-01",
+              "solvedByName": "Team Member",
+              "solvedAt": "2026-10-12T18:26:30.502Z",
+              "timeComplexity": "O(1)",
+              "spaceComplexity": "O(1)",
+              "timeDeduction": 0,
+              "spaceDeduction": 0,
+              "complexityAdjustedScore": 200,
+              "reviewStatus": "ADMIN_VERIFIED",
+              "reason": "Admin reviewed: Time O(1), Space O(1)",
+              "finalProblemScore": 200
+            },
+            "H1": {
+              "status": "SOLVED",
+              "solvedBy": "AlphaTeam-01",
+              "solvedByName": "Team Member",
+              "solvedAt": "2026-10-12T18:26:30.508Z",
+              "baseScore": 400,
+              "difficulty": "Hard",
+              "timeComplexity": "O(1)",
+              "spaceComplexity": "O(1)",
+              "timeDeduction": 0,
+              "spaceDeduction": 0,
+              "complexityAdjustedScore": 400,
+              "wrongSubmissions": 0,
+              "wrongPenalty": 0,
+              "reviewStatus": "AUTOMATED",
+              "reason": "Constant time O(1): no loops or recursive calls detected; direct calculation or lookup. | Auxiliary Space: Constant O(1) auxiliary space: only scalar variables and pointers allocated in memory.",
+              "finalProblemScore": 400
+            }
+          }
+        },
+        "BetaTeam": {
+          "score": 200,
+          "balance": 1000,
+          "solved": [
+            "E1"
+          ],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {
+            "E1": {
+              "status": "SOLVED",
+              "solvedBy": "BetaTeam-01",
+              "solvedByName": "Team Member",
+              "solvedAt": "2026-10-12T18:26:30.507Z",
+              "baseScore": 200,
+              "difficulty": "Easy",
+              "timeComplexity": "O(1)",
+              "spaceComplexity": "O(1)",
+              "timeDeduction": 0,
+              "spaceDeduction": 0,
+              "complexityAdjustedScore": 200,
+              "wrongSubmissions": 0,
+              "wrongPenalty": 0,
+              "reviewStatus": "AUTOMATED",
+              "reason": "Constant time O(1): no loops or recursive calls detected; direct calculation or lookup. | Auxiliary Space: Constant O(1) auxiliary space: only scalar variables and pointers allocated in memory.",
+              "finalProblemScore": 200
+            }
+          }
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
     }
   ],
   "currentEvent": {
-    "id": null,
-    "name": null,
-    "status": "EVENT_ENDED",
-    "startedAt": null,
-    "endedAt": "2026-10-12T17:45:16.425Z",
-    "participatingTeams": []
+    "id": "EVT-MV5L3EKA",
+    "name": "QUBIT Code Auctioneer",
+    "status": "EVENT_LIVE",
+    "startedAt": "2026-10-12T18:27:04.188Z",
+    "endedAt": null,
+    "participatingTeams": [
+      "SYNORA"
+    ]
   },
   "transactions": [],
   "unlockHistory": [],
@@ -2042,5 +2493,39 @@
     "maxFlags": 3,
     "executionTimeoutMs": 3000,
     "initialTeamBalance": 1000
+  },
+  "scoringConfig": {
+    "baseScores": {
+      "Easy": 200,
+      "Medium": 300,
+      "Hard": 400
+    },
+    "problemBaseScores": {
+      "P1": 200
+    },
+    "problemDifficulties": {},
+    "timeComplexityDeductions": {
+      "O(1)": 0,
+      "O(log n)": 5,
+      "O(n)": 10,
+      "O(n log n)": 15,
+      "O(n^2)": 25,
+      "O(n²)": 25,
+      "O(n^3)": 40,
+      "O(n³)": 40,
+      "O(2^n)": 60,
+      "O(2ⁿ)": 60,
+      "O(n!)": 80
+    },
+    "spaceComplexityDeductions": {
+      "O(1)": 0,
+      "O(log n)": 5,
+      "O(n)": 10,
+      "O(n^2)": 20,
+      "O(n²)": 20,
+      "O(n^3+)": 30,
+      "O(n³+)": 30
+    },
+    "wrongSubmissionPenalty": 5
   }
 }

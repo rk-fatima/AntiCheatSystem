@@ -210,13 +210,14 @@ export function ProblemCatalog({
                       marginTop: '2px',
                       flexWrap: 'wrap'
                     }}>
-                      <span>{prob.diff} · {diffPoints} pts</span>
+                      <span>{prob.diff} · Base {diffPoints} pts</span>
 
                       {isSolved && (
                         <>
                           <span>•</span>
-                          <span style={{ color: '#3fb950', fontWeight: 500 }}>
-                            Solved {statusInfo?.solvedByName || statusInfo?.solvedBy ? `by ${statusInfo.solvedByName || statusInfo.solvedBy}` : ''}
+                          <span style={{ color: '#3fb950', fontWeight: 600 }}>
+                            Solved (+{statusInfo?.complexityAdjustedScore ?? diffPoints} pts)
+                            {statusInfo?.timeComplexity && ` · ${statusInfo.timeComplexity}`}
                           </span>
                         </>
                       )}
@@ -234,7 +235,7 @@ export function ProblemCatalog({
                         <>
                           <span>•</span>
                           <span style={{ color: '#ff7b72' }}>
-                            {wrongCount} WA (-{wrongCount * 10} pts)
+                            {wrongCount} wrong (−{wrongCount * 5} pts)
                           </span>
                         </>
                       )}

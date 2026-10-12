@@ -360,10 +360,34 @@ export function CodeEditorPane({
               {problem.cat || 'Algorithms'}
             </span>
             <span className={`badge ${problem.diff}`}>
-              {problem.diff} · {problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts
+              {problem.diff} · Base {problem.pts || (problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200))} pts
             </span>
 
-            {/* Wrong submissions counter & penalty */}
+            {/* Solved Status & Complexity breakdown badge */}
+            {(problemStatus?.status === 'SOLVED' || (team?.solved || []).includes(problem.id)) && (
+              <span style={{
+                background: 'rgba(63, 185, 80, 0.12)',
+                border: '1px solid rgba(63, 185, 80, 0.35)',
+                color: '#3fb950',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <CheckCircle2 size={12} />
+                <span>Solved: +{problemStatus?.complexityAdjustedScore ?? problem.pts ?? 200} pts</span>
+                {problemStatus?.timeComplexity && (
+                  <span style={{ color: 'var(--txt-muted)', fontWeight: 500, fontSize: '10px' }}>
+                    ({problemStatus.timeComplexity} · {problemStatus.spaceComplexity || 'O(1)'})
+                  </span>
+                )}
+              </span>
+            )}
+
+            {/* Wrong submissions counter & 5-point penalty */}
             {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions || 0) > 0 && (
               <span style={{
                 background: 'rgba(248, 81, 73, 0.1)',
@@ -374,7 +398,7 @@ export function CodeEditorPane({
                 fontSize: '11px',
                 fontWeight: 600
               }}>
-                {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions)} WA (−{(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions) * 10} pts)
+                {(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions)} Wrong (−{(team?.problemWrong?.[problem.id] || problemStatus?.wrongSubmissions) * 5} pts)
               </span>
             )}
           </div>
@@ -912,13 +936,101 @@ export function CodeEditorPane({
                     )}
 
                     {outputResult.type === 'submit' && (
-                      <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 600 }}>
+                      <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 700 }}>
                         {outputResult.data.passed
-                          ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts awarded`
-                          : `−10 WA Penalty (Passed ${outputResult.data.hiddenPassed || 0} / ${outputResult.data.totalHidden || 3})`}
+                          ? `+${outputResult.data?.scoring?.complexityAdjustedScore ?? problem.pts ?? 200} pts awarded`
+                          : `−5 Penalty (${outputResult.data.compileError ? 'Compilation Error' : 'Unsuccessful Attempt'})`}
                       </span>
                     )}
                   </div>
+
+                  {/* Complexity-Aware Score Breakdown Card (for Submissions) */}
+                  {outputResult.type === 'submit' && (
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      padding: '12px 16px',
+                      marginBottom: '14px',
+                      fontSize: '12px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Sparkles size={14} color="#58a6ff" />
+                          <span>Evaluation & Complexity Score Breakdown</span>
+                        </span>
+                        {outputResult.data?.scoring?.reviewStatus && (
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: outputResult.data.scoring.reviewStatus === 'PENDING_REVIEW' ? 'rgba(210, 153, 34, 0.15)' : 'rgba(56, 139, 253, 0.15)',
+                            color: outputResult.data.scoring.reviewStatus === 'PENDING_REVIEW' ? '#d29922' : '#58a6ff',
+                            border: `1px solid ${outputResult.data.scoring.reviewStatus === 'PENDING_REVIEW' ? 'rgba(210, 153, 34, 0.3)' : 'rgba(56, 139, 253, 0.3)'}`
+                          }}>
+                            {outputResult.data.scoring.reviewStatus === 'PENDING_REVIEW' ? 'Pending Review' : 'Verified by Static Analysis'}
+                          </span>
+                        )}
+                      </div>
+
+                      {outputResult.data.passed ? (
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--txt-muted)' }}>Difficulty / Base</div>
+                              <div style={{ fontWeight: 700, color: '#ffffff', marginTop: '2px' }}>
+                                {problem.diff} ({outputResult.data?.scoring?.baseScore ?? problem.pts ?? 200} pts)
+                              </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--txt-muted)' }}>Time Complexity</div>
+                              <div style={{ fontWeight: 700, color: '#58a6ff', marginTop: '2px' }}>
+                                {outputResult.data?.scoring?.timeComplexity || 'O(n)'} (−{outputResult.data?.scoring?.timeDeduction ?? 10} pts)
+                              </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--txt-muted)' }}>Space (Auxiliary)</div>
+                              <div style={{ fontWeight: 700, color: '#bc8cff', marginTop: '2px' }}>
+                                {outputResult.data?.scoring?.spaceComplexity || 'O(1)'} (−{outputResult.data?.scoring?.spaceDeduction ?? 0} pts)
+                              </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(46, 160, 67, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(46, 160, 67, 0.25)' }}>
+                              <div style={{ fontSize: '10px', color: '#3fb950', fontWeight: 600 }}>Adjusted Score</div>
+                              <div style={{ fontWeight: 800, color: '#3fb950', marginTop: '2px' }}>
+                                {outputResult.data?.scoring?.complexityAdjustedScore ?? problem.pts ?? 200} pts
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: '11px', color: 'var(--txt-muted)', lineHeight: '1.5' }}>
+                            <span style={{ color: 'var(--txt-dim)' }}>Formula: </span>
+                            <code>max(0, {outputResult.data?.scoring?.baseScore ?? 200} Base − {outputResult.data?.scoring?.timeDeduction ?? 0} Time − {outputResult.data?.scoring?.spaceDeduction ?? 0} Space) = <strong style={{ color: '#3fb950' }}>{outputResult.data?.scoring?.complexityAdjustedScore ?? 200} pts</strong></code>.
+                            {(outputResult.data?.scoring?.totalTeamWrong || team?.wrong || 0) > 0 && (
+                              <span style={{ marginLeft: '6px', color: '#ff7b72' }}>
+                                (Team has {outputResult.data?.scoring?.totalTeamWrong || team?.wrong} total wrong submission(s) across event: −{(outputResult.data?.scoring?.totalTeamWrong || team?.wrong) * 5} pts penalty).
+                              </span>
+                            )}
+                          </div>
+                          {outputResult.data?.scoring?.reason && (
+                            <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '4px', fontStyle: 'italic' }}>
+                              Analysis note: {outputResult.data.scoring.reason}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '11px', color: '#ff7b72', lineHeight: '1.5' }}>
+                          <div>⚠️ Unsuccessful submission attempt. Deduction: <strong>−5 points penalty</strong> applied to team total score.</div>
+                          <div style={{ color: 'var(--txt-dim)', marginTop: '4px' }}>
+                            Solution must pass all required testcases to earn complexity-adjusted base score.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* LeetCode Result Output vs Expected */}
                   <div style={{

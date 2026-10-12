@@ -3,6 +3,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { getPredefinedHint } from './hints.js';
+import {
+  analyzeComplexity,
+  normalizeTimeComplexityKey,
+  normalizeSpaceComplexityKey,
+  DEFAULT_TIME_COMPLEXITY_DEDUCTIONS,
+  DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS,
+  SUPPORTED_TIME_COMPLEXITIES,
+  SUPPORTED_SPACE_COMPLEXITIES
+} from './complexityAnalyzer.js';
 
 export function hashPassword(password) {
   if (!password || typeof password !== 'string') {
@@ -58,6 +67,18 @@ class Database {
         maxFlags: 3,
         executionTimeoutMs: 3000,
         initialTeamBalance: 1000
+      },
+      scoringConfig: {
+        baseScores: {
+          Easy: 200,
+          Medium: 300,
+          Hard: 400
+        },
+        problemBaseScores: {},
+        problemDifficulties: {},
+        timeComplexityDeductions: { ...DEFAULT_TIME_COMPLEXITY_DEDUCTIONS },
+        spaceComplexityDeductions: { ...DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS },
+        wrongSubmissionPenalty: 5
       }
     };
     this.load();
@@ -86,7 +107,15 @@ class Database {
           archivedEvents: parsed.archivedEvents || [],
           currentEvent: parsed.currentEvent || null,
           submissions: parsed.submissions || [],
-          telemetry: parsed.telemetry || []
+          telemetry: parsed.telemetry || [],
+          scoringConfig: {
+            baseScores: { Easy: 200, Medium: 300, Hard: 400, ...(parsed.scoringConfig?.baseScores || {}) },
+            problemBaseScores: { ...(parsed.scoringConfig?.problemBaseScores || {}) },
+            problemDifficulties: { ...(parsed.scoringConfig?.problemDifficulties || {}) },
+            timeComplexityDeductions: { ...DEFAULT_TIME_COMPLEXITY_DEDUCTIONS, ...(parsed.scoringConfig?.timeComplexityDeductions || {}) },
+            spaceComplexityDeductions: { ...DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS, ...(parsed.scoringConfig?.spaceComplexityDeductions || {}) },
+            wrongSubmissionPenalty: parsed.scoringConfig?.wrongSubmissionPenalty ?? 5
+          }
         };
       }
     } catch (err) {
@@ -125,17 +154,254 @@ class Database {
     this.save();
   }
 
-  // --- PROBLEM DIFFICULTY POINTS CONFIGURATION ---
-  // Easy problem → 200 points
-  // Medium problem → 300 points
-  // Hard problem → 400 points
+  // --- PROBLEM DIFFICULTY & SCORING CONFIGURATION ---
+  // Easy problem → default 200 points
+  // Medium problem → default 300 points
+  // Hard problem → default 400 points
   getProblemDifficultyPoints(prob) {
     if (!prob) return 200;
-    const diff = typeof prob === 'string' ? prob : (prob.diff || 'Easy');
+    const probId = typeof prob === 'string' ? prob : prob.id;
+
+    // 1. Explicit admin problem base score override
+    if (this.state.scoringConfig?.problemBaseScores?.[probId] !== undefined) {
+      return Number(this.state.scoringConfig.problemBaseScores[probId]);
+    }
+
+    // 2. Problem difficulty override or original
+    const customDiff = this.state.scoringConfig?.problemDifficulties?.[probId];
+    const diff = customDiff || (typeof prob === 'object' ? prob.diff : 'Easy') || 'Easy';
     const d = String(diff).trim().toLowerCase();
-    if (d === 'hard') return 400;
-    if (d === 'medium') return 300;
-    return 200; // Easy is default: 200
+    const baseScores = this.state.scoringConfig?.baseScores || { Easy: 200, Medium: 300, Hard: 400 };
+
+    if (d === 'hard') return baseScores.Hard ?? 400;
+    if (d === 'medium') return baseScores.Medium ?? 300;
+    return baseScores.Easy ?? 200;
+  }
+
+  getScoringConfig() {
+    return this.state.scoringConfig || {
+      baseScores: { Easy: 200, Medium: 300, Hard: 400 },
+      problemBaseScores: {},
+      problemDifficulties: {},
+      timeComplexityDeductions: { ...DEFAULT_TIME_COMPLEXITY_DEDUCTIONS },
+      spaceComplexityDeductions: { ...DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS },
+      wrongSubmissionPenalty: 5
+    };
+  }
+
+  updateScoringConfig(newConfig = {}) {
+    if (!this.state.scoringConfig) {
+      this.state.scoringConfig = this.getScoringConfig();
+    }
+    if (newConfig.baseScores) {
+      this.state.scoringConfig.baseScores = {
+        ...this.state.scoringConfig.baseScores,
+        ...newConfig.baseScores
+      };
+    }
+    if (newConfig.problemBaseScores) {
+      this.state.scoringConfig.problemBaseScores = {
+        ...this.state.scoringConfig.problemBaseScores,
+        ...newConfig.problemBaseScores
+      };
+    }
+    if (newConfig.problemDifficulties) {
+      this.state.scoringConfig.problemDifficulties = {
+        ...this.state.scoringConfig.problemDifficulties,
+        ...newConfig.problemDifficulties
+      };
+    }
+    if (newConfig.timeComplexityDeductions) {
+      this.state.scoringConfig.timeComplexityDeductions = {
+        ...this.state.scoringConfig.timeComplexityDeductions,
+        ...newConfig.timeComplexityDeductions
+      };
+    }
+    if (newConfig.spaceComplexityDeductions) {
+      this.state.scoringConfig.spaceComplexityDeductions = {
+        ...this.state.scoringConfig.spaceComplexityDeductions,
+        ...newConfig.spaceComplexityDeductions
+      };
+    }
+    if (typeof newConfig.wrongSubmissionPenalty === 'number') {
+      this.state.scoringConfig.wrongSubmissionPenalty = newConfig.wrongSubmissionPenalty;
+    }
+
+    // Recalculate scores for all active teams
+    for (const team of Object.values(this.state.teams)) {
+      this.recalculateTeamScore(team.name);
+    }
+    this.save();
+    return this.getScoringConfig();
+  }
+
+  setProblemBaseScore(problemId, baseScore) {
+    if (!problemId) throw new Error('Problem ID is required');
+    const num = Number(baseScore);
+    if (isNaN(num) || num < 0) throw new Error('Base score must be a non-negative number');
+    if (!this.state.scoringConfig) this.state.scoringConfig = this.getScoringConfig();
+    if (!this.state.scoringConfig.problemBaseScores) this.state.scoringConfig.problemBaseScores = {};
+    this.state.scoringConfig.problemBaseScores[problemId] = num;
+
+    for (const team of Object.values(this.state.teams)) {
+      if ((team.solved || []).includes(problemId)) {
+        this.recalculateTeamScore(team.name);
+      }
+    }
+    this.save();
+    return { problemId, baseScore: num };
+  }
+
+  setProblemDifficulty(problemId, difficulty) {
+    if (!problemId) throw new Error('Problem ID is required');
+    const diff = String(difficulty || '').trim();
+    if (!['Easy', 'Medium', 'Hard'].includes(diff)) {
+      throw new Error('Difficulty must be Easy, Medium, or Hard');
+    }
+    if (!this.state.scoringConfig) this.state.scoringConfig = this.getScoringConfig();
+    if (!this.state.scoringConfig.problemDifficulties) this.state.scoringConfig.problemDifficulties = {};
+    this.state.scoringConfig.problemDifficulties[problemId] = diff;
+
+    const prob = this.state.problems.find(p => p.id === problemId);
+    if (prob) {
+      prob.diff = diff;
+      prob.pts = this.getProblemDifficultyPoints(prob);
+    }
+
+    for (const team of Object.values(this.state.teams)) {
+      if ((team.solved || []).includes(problemId)) {
+        this.recalculateTeamScore(team.name);
+      }
+    }
+    this.save();
+    return { problemId, difficulty: diff };
+  }
+
+  getTimeComplexityDeduction(key) {
+    const norm = normalizeTimeComplexityKey(key);
+    const deductions = this.state.scoringConfig?.timeComplexityDeductions || DEFAULT_TIME_COMPLEXITY_DEDUCTIONS;
+    if (deductions[key] !== undefined) return deductions[key];
+    if (deductions[norm] !== undefined) return deductions[norm];
+    return DEFAULT_TIME_COMPLEXITY_DEDUCTIONS[norm] ?? DEFAULT_TIME_COMPLEXITY_DEDUCTIONS[key] ?? 10;
+  }
+
+  getSpaceComplexityDeduction(key) {
+    const norm = normalizeSpaceComplexityKey(key);
+    const deductions = this.state.scoringConfig?.spaceComplexityDeductions || DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS;
+    if (deductions[key] !== undefined) return deductions[key];
+    if (deductions[norm] !== undefined) return deductions[norm];
+    return DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS[norm] ?? DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS[key] ?? 0;
+  }
+
+  recalculateTeamScore(teamName) {
+    const team = this.getTeam(teamName);
+    if (!team) return null;
+
+    if (!team.problemStatuses) team.problemStatuses = {};
+    if (!team.solved) team.solved = [];
+
+    const wrongPenaltyPerSubmission = this.state.scoringConfig?.wrongSubmissionPenalty ?? 5;
+    let totalProblemScores = 0;
+
+    for (const pid of team.solved) {
+      const prob = this.getFullProblem(pid) || this.findProblemByKey(pid) || { id: pid, diff: 'Easy' };
+      const status = team.problemStatuses[pid] || {};
+      const baseScore = this.getProblemDifficultyPoints(prob);
+      const timeComp = status.timeComplexity || 'O(n)';
+      const spaceComp = status.spaceComplexity || 'O(1)';
+      const timeDed = this.getTimeComplexityDeduction(timeComp);
+      const spaceDed = this.getSpaceComplexityDeduction(spaceComp);
+      const complexityAdjustedScore = Math.max(0, baseScore - timeDed - spaceDed);
+
+      team.problemStatuses[pid] = {
+        ...status,
+        status: 'SOLVED',
+        baseScore,
+        difficulty: this.state.scoringConfig?.problemDifficulties?.[pid] || prob.diff,
+        timeComplexity: timeComp,
+        spaceComplexity: spaceComp,
+        timeDeduction: timeDed,
+        spaceDeduction: spaceDed,
+        complexityAdjustedScore,
+        wrongSubmissions: team.problemWrong?.[pid] || 0,
+        wrongPenalty: (team.problemWrong?.[pid] || 0) * wrongPenaltyPerSubmission,
+        finalProblemScore: complexityAdjustedScore
+      };
+
+      totalProblemScores += complexityAdjustedScore;
+    }
+
+    const totalWrong = team.wrong || 0;
+    const totalWrongPenalty = totalWrong * wrongPenaltyPerSubmission;
+    const rawScore = totalProblemScores - totalWrongPenalty;
+    const finalScore = Math.max(0, rawScore);
+
+    team.score = finalScore;
+    team.rawScore = rawScore;
+    team.totalProblemScores = totalProblemScores;
+    team.totalWrongPenalty = totalWrongPenalty;
+    this.updateTeam(team);
+    return {
+      team,
+      finalScore,
+      totalProblemScores,
+      totalWrong,
+      totalWrongPenalty
+    };
+  }
+
+  adminOverrideComplexity({ teamName, problemId, submissionId, timeComplexity, spaceComplexity, reviewStatus = 'ADMIN_VERIFIED' }) {
+    const team = this.getTeam(teamName);
+    if (!team) throw new Error(`Team "${teamName}" not found.`);
+
+    const normTime = normalizeTimeComplexityKey(timeComplexity);
+    const normSpace = normalizeSpaceComplexityKey(spaceComplexity);
+
+    if (!team.problemStatuses) team.problemStatuses = {};
+    if (team.problemStatuses[problemId]) {
+      team.problemStatuses[problemId].timeComplexity = normTime;
+      team.problemStatuses[problemId].spaceComplexity = normSpace;
+      team.problemStatuses[problemId].timeDeduction = this.getTimeComplexityDeduction(normTime);
+      team.problemStatuses[problemId].spaceDeduction = this.getSpaceComplexityDeduction(normSpace);
+      team.problemStatuses[problemId].reviewStatus = reviewStatus;
+      team.problemStatuses[problemId].reason = `Admin reviewed: Time ${normTime}, Space ${normSpace}`;
+    }
+
+    const targetSub = submissionId
+      ? (this.state.submissions || []).find(s => s.id === submissionId)
+      : (this.state.submissions || []).find(s => s.teamName === team.name && s.problemId === problemId && s.passed);
+    if (targetSub) {
+      targetSub.timeComplexity = normTime;
+      targetSub.spaceComplexity = normSpace;
+      targetSub.timeDeduction = this.getTimeComplexityDeduction(normTime);
+      targetSub.spaceDeduction = this.getSpaceComplexityDeduction(normSpace);
+      targetSub.reviewStatus = reviewStatus;
+    }
+    const attempt = submissionId
+      ? (team.attempts || []).find(s => s.id === submissionId)
+      : (team.attempts || []).find(s => s.problemId === problemId && s.passed);
+    if (attempt) {
+      attempt.timeComplexity = normTime;
+      attempt.spaceComplexity = normSpace;
+      attempt.timeDeduction = this.getTimeComplexityDeduction(normTime);
+      attempt.spaceDeduction = this.getSpaceComplexityDeduction(normSpace);
+      attempt.reviewStatus = reviewStatus;
+    }
+
+    const res = this.recalculateTeamScore(team.name);
+    this.save();
+    return {
+      success: true,
+      team: res.team,
+      problemStatus: team.problemStatuses[problemId]
+    };
+  }
+
+  getAllComplexityReviews() {
+    const submissions = this.state.submissions || [];
+    return submissions
+      .filter(s => s.passed && s.timeComplexity)
+      .slice(0, 100);
   }
 
   seedProblems() {
@@ -525,15 +791,28 @@ class Database {
         solved: [...(t.solved || [])],
         balance: t.balance ?? (this.state.config.initialTeamBalance || 1000),
         wrongAttempts: t.wrong || 0,
-        problemWrong: {},
+        problemWrong: { ...(t.problemWrong || {}) },
+        problemStatuses: { ...(t.problemStatuses || {}) },
         hintsUsed: Object.keys(t.revealedHints || {}).length,
         sabotagesCount: t.sabotageCardsCount || 0,
         violationsCount: (t.violations || []).length,
-        isLocked: Boolean(t.isLocked)
+        isLocked: Boolean(t.isLocked),
+        lastScoreTime: t.lastScoreTime || 0
       };
     })
     .filter(Boolean)
-    .sort((a, b) => b.score - a.score || b.balance - a.balance)
+    .sort((a, b) => {
+      // 1. Final score descending
+      if (b.score !== a.score) return b.score - a.score;
+      // 2. Higher number of correctly solved problems
+      if (b.solvedCount !== a.solvedCount) return b.solvedCount - a.solvedCount;
+      // 3. Earlier time of reaching final score (ascending)
+      if (a.lastScoreTime && b.lastScoreTime && a.lastScoreTime !== b.lastScoreTime) {
+        return a.lastScoreTime - b.lastScoreTime;
+      }
+      // 4. ByteCoins balance descending
+      return b.balance - a.balance;
+    })
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
   }
 
@@ -1069,16 +1348,14 @@ class Database {
     return team;
   }
 
-  // --- CONTEST SUBMISSIONS & SCORING RULES ---
-  // Easy problem → 200 points
-  // Medium problem → 300 points
-  // Hard problem → 400 points
-  // Every Wrong Answer submission → −10 points (applies independently)
-  // When eventually accepted → award full difficulty score
-  // Final problem score = Difficulty Points − (Number of Wrong Submissions × 10)
-  // Record: Team ID, Member ID, Problem ID, result, penalty, timestamp
-  // ByteCoins/balance is NOT touched (separate currencies)
-  processSubmissionResult({ teamName, memberId, problemId, verdict, passed, details = '' }) {
+  // --- CONTEST SUBMISSIONS & COMPLEXITY-AWARE SCORING ---
+  // Easy problem → default 200 points
+  // Medium problem → default 300 points
+  // Hard problem → default 400 points
+  // Complexity-Adjusted Score = max(0, Base Score − Time Complexity Deduction − Space Complexity Deduction)
+  // Wrong submission attempt → −5 points penalty
+  // Final Score = max(0, Sum of Complexity-Adjusted Scores − (Total Wrong Submissions × 5))
+  processSubmissionResult({ teamName, memberId, problemId, verdict, passed, details = '', lang = 'python', code = '', complexity = null }) {
     const team = this.getTeam(teamName);
     if (!team) return null;
 
@@ -1089,6 +1366,7 @@ class Database {
     };
 
     const diffPoints = this.getProblemDifficultyPoints(problem);
+    const penaltyPerWrong = this.state.scoringConfig?.wrongSubmissionPenalty ?? 5;
 
     if (!team.problemWrong) team.problemWrong = {};
     if (!team.problemStatuses) team.problemStatuses = {};
@@ -1100,42 +1378,84 @@ class Database {
     };
 
     const now = Date.now();
+    const isAlreadySolved = (team.solved || []).includes(problem.id);
     let penalty = 0;
     let awardedPoints = 0;
-    const isAlreadySolved = (team.solved || []).includes(problem.id);
+    let assessedComplexity = complexity;
 
     if (passed) {
+      if (!assessedComplexity && code) {
+        assessedComplexity = analyzeComplexity(code, lang, problem);
+      } else if (!assessedComplexity) {
+        assessedComplexity = {
+          timeComplexity: 'O(n)',
+          spaceComplexity: 'O(1)',
+          timeDeduction: this.getTimeComplexityDeduction('O(n)'),
+          spaceDeduction: this.getSpaceComplexityDeduction('O(1)'),
+          reviewStatus: 'AUTOMATED',
+          reason: 'Standard linear time evaluation'
+        };
+      }
+
+      const timeComp = assessedComplexity.timeComplexity || 'O(n)';
+      const spaceComp = assessedComplexity.spaceComplexity || 'O(1)';
+      const timeDed = this.getTimeComplexityDeduction(timeComp);
+      const spaceDed = this.getSpaceComplexityDeduction(spaceComp);
+      const complexityAdjustedScore = Math.max(0, diffPoints - timeDed - spaceDed);
+
       if (!isAlreadySolved) {
         team.solved.push(problem.id);
-        awardedPoints = diffPoints;
-        team.score = (team.score || 0) + diffPoints;
+        awardedPoints = complexityAdjustedScore;
+        team.lastScoreTime = now;
+
+        const wrongCount = team.problemWrong[problem.id] || 0;
+        team.problemStatuses[problem.id] = {
+          ...team.problemStatuses[problem.id],
+          status: 'SOLVED',
+          solvedBy: member.memberId,
+          solvedByName: member.name,
+          solvedAt: new Date(now).toISOString(),
+          baseScore: diffPoints,
+          difficulty: this.state.scoringConfig?.problemDifficulties?.[problem.id] || problem.diff,
+          timeComplexity: timeComp,
+          spaceComplexity: spaceComp,
+          timeDeduction: timeDed,
+          spaceDeduction: spaceDed,
+          complexityAdjustedScore,
+          wrongSubmissions: wrongCount,
+          wrongPenalty: wrongCount * penaltyPerWrong,
+          reviewStatus: assessedComplexity.reviewStatus || 'AUTOMATED',
+          reason: assessedComplexity.reason || '',
+          finalProblemScore: complexityAdjustedScore
+        };
+      } else {
+        const currentScore = team.problemStatuses[problem.id]?.complexityAdjustedScore || 0;
+        if (complexityAdjustedScore > currentScore) {
+          team.problemStatuses[problem.id] = {
+            ...team.problemStatuses[problem.id],
+            timeComplexity: timeComp,
+            spaceComplexity: spaceComp,
+            timeDeduction: timeDed,
+            spaceDeduction: spaceDed,
+            complexityAdjustedScore,
+            reviewStatus: assessedComplexity.reviewStatus || 'AUTOMATED',
+            reason: assessedComplexity.reason || '',
+            finalProblemScore: complexityAdjustedScore
+          };
+          awardedPoints = complexityAdjustedScore - currentScore;
+          team.lastScoreTime = now;
+        } else {
+          awardedPoints = 0;
+        }
       }
-
-      const wrongCount = team.problemWrong[problem.id] || 0;
-      const finalProblemScore = diffPoints - (wrongCount * 10);
-
-      team.problemStatuses[problem.id] = {
-        ...team.problemStatuses[problem.id],
-        status: 'SOLVED',
-        solvedBy: member.memberId,
-        solvedByName: member.name,
-        solvedAt: new Date(now).toISOString(),
-        difficultyPoints: diffPoints,
-        wrongSubmissions: wrongCount,
-        penaltyDeduction: wrongCount * 10,
-        finalProblemScore: finalProblemScore
-      };
     } else {
-      // Wrong answer or runtime error
-      // Penalty applies if problem not already solved
-      if (!isAlreadySolved) {
-        penalty = -10;
-        team.score = (team.score || 0) - 10;
-        team.wrong = (team.wrong || 0) + 1;
-        team.problemWrong[problem.id] = (team.problemWrong[problem.id] || 0) + 1;
-      }
+      // Unsuccessful attempt (Wrong Answer, failed test cases, compile error, runtime error)
+      penalty = -penaltyPerWrong;
+      team.wrong = (team.wrong || 0) + 1;
+      team.problemWrong[problem.id] = (team.problemWrong[problem.id] || 0) + 1;
+      team.lastScoreTime = now;
 
-      const wrongCount = team.problemWrong[problem.id] || 0;
+      const wrongCount = team.problemWrong[problem.id];
 
       if (!team.problemStatuses[problem.id] || team.problemStatuses[problem.id].status !== 'SOLVED') {
         team.problemStatuses[problem.id] = {
@@ -1144,14 +1464,19 @@ class Database {
           workingBy: member.memberId,
           workingByName: member.name,
           updatedAt: new Date(now).toISOString(),
-          difficultyPoints: diffPoints,
+          baseScore: diffPoints,
+          difficulty: this.state.scoringConfig?.problemDifficulties?.[problem.id] || problem.diff,
           wrongSubmissions: wrongCount,
-          penaltyDeduction: wrongCount * 10
+          wrongPenalty: wrongCount * penaltyPerWrong
         };
       }
     }
 
-    // Required audit log fields: Team ID, Member ID, Problem ID, result, penalty, timestamp
+    // Recalculate team total score deterministically
+    this.recalculateTeamScore(team.name);
+
+    // Audit log record
+    const statusObj = team.problemStatuses[problem.id] || {};
     const subRecord = {
       id: `SUB-${now}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
       teamId: team.name,
@@ -1161,18 +1486,28 @@ class Database {
       problemId: problem.id,
       problemTitle: problem.title,
       difficulty: problem.diff,
-      difficultyPoints: diffPoints,
+      baseScore: diffPoints,
+      eventId: team.currentEventId || this.state.currentEvent?.id || null,
       result: verdict || (passed ? 'ACCEPTED' : 'WRONG_ANSWER'),
       verdict: verdict || (passed ? 'ACCEPTED' : 'WRONG_ANSWER'),
       passed: Boolean(passed),
-      penalty: penalty, // -10 or 0
-      awardedPoints: awardedPoints,
+      penalty: penalty,
+      awardedPoints: passed ? (statusObj.complexityAdjustedScore || 0) : 0,
+      timeComplexity: passed ? statusObj.timeComplexity : null,
+      spaceComplexity: passed ? statusObj.spaceComplexity : null,
+      timeDeduction: passed ? statusObj.timeDeduction : 0,
+      spaceDeduction: passed ? statusObj.spaceDeduction : 0,
+      complexityAdjustedScore: passed ? statusObj.complexityAdjustedScore : 0,
+      reviewStatus: statusObj.reviewStatus || 'AUTOMATED',
+      reason: statusObj.reason || '',
       wrongCountOnProblem: team.problemWrong[problem.id] || 0,
       totalTeamWrong: team.wrong || 0,
       currentTeamScore: team.score,
       details: details || '',
       timestamp: now,
-      isoTime: new Date(now).toISOString()
+      isoTime: new Date(now).toISOString(),
+      lang,
+      code: code ? code.slice(0, 10000) : ''
     };
 
     team.attempts.unshift(subRecord);

@@ -31,7 +31,14 @@ import {
   Square,
   FileDown,
   Image,
-  CheckSquare
+  CheckSquare,
+  Sliders,
+  Calculator,
+  Edit2,
+  Save,
+  HelpCircle,
+  Sparkles,
+  Filter
 } from 'lucide-react';
 import {
   fetchAdminOverview,
@@ -49,7 +56,14 @@ import {
   startEventSession,
   endEventSession,
   fetchArchivedEvents,
-  batchAcceptRegistrations
+  batchAcceptRegistrations,
+  fetchScoringConfig,
+  updateScoringConfig,
+  setProblemBaseScore,
+  setProblemDifficulty,
+  fetchComplexityReviews,
+  overrideComplexity,
+  fetchTeamScoreBreakdown
 } from '../services/api';
 import {
   exportLeaderboardToPDF,
@@ -103,6 +117,39 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [unlockModal, setUnlockModal] = useState(null);
   const [unlockSubmitting, setUnlockSubmitting] = useState(false);
 
+  // Scoring & Complexity Management State
+  const [scoringConfig, setScoringConfig] = useState({
+    baseScores: { Easy: 200, Medium: 300, Hard: 400 },
+    problemBaseScores: {},
+    problemDifficulties: {},
+    timeComplexityDeductions: {
+      'O(1)': 0,
+      'O(log n)': 5,
+      'O(n)': 10,
+      'O(n log n)': 15,
+      'O(n²)': 25,
+      'O(n³)': 40,
+      'O(2ⁿ)': 60,
+      'O(n!)': 80
+    },
+    spaceComplexityDeductions: {
+      'O(1)': 0,
+      'O(log n)': 5,
+      'O(n)': 10,
+      'O(n²)': 20,
+      'O(n³+)': 30
+    },
+    wrongSubmissionPenalty: 5
+  });
+  const [complexityReviews, setComplexityReviews] = useState([]);
+  const [reviewFilter, setReviewFilter] = useState('ALL'); // 'ALL' | 'PENDING_REVIEW' | 'ADMIN_VERIFIED' | 'AUTOMATED'
+  const [scoringSaving, setScoringSaving] = useState(false);
+  const [overrideModal, setOverrideModal] = useState(null); // { teamName, problemId, submissionId, current, newTime, newSpace }
+  const [inspectTeamBreakdown, setInspectTeamBreakdown] = useState(''); // teamName
+  const [teamBreakdownData, setTeamBreakdownData] = useState(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [editProblemModal, setEditProblemModal] = useState(null); // { problemId, title, diff, baseScore }
+
   const regUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}#register`
     : '';
@@ -131,6 +178,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       setUnlockHistory(data.unlockHistory || []);
       if (data.eventState) setEventState(data.eventState);
       if (data.registrations) setRegistrations(data.registrations);
+      if (data.scoringConfig) setScoringConfig(data.scoringConfig);
+      if (data.complexityReviews) setComplexityReviews(data.complexityReviews);
 
       // Default to first active team or first permanent team
       setSelectedTeamName(prev => {
@@ -638,6 +687,105 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     }
   };
 
+  // --- SCORING & COMPLEXITY HANDLERS ---
+  const handleSaveScoringConfig = async () => {
+    setScoringSaving(true);
+    try {
+      const res = await updateScoringConfig(scoringConfig);
+      if (res.scoringConfig) setScoringConfig(res.scoringConfig);
+      showToast('Scoring configuration updated! Active team scores recalculated.', true);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to update scoring configuration', false);
+    } finally {
+      setScoringSaving(false);
+    }
+  };
+
+  const handleOpenComplexityOverride = (review) => {
+    setOverrideModal({
+      submissionId: review.id,
+      teamName: review.teamName,
+      problemId: review.problemId,
+      problemTitle: review.problemTitle || review.problemId,
+      currentTime: review.timeComplexity || 'O(n)',
+      currentSpace: review.spaceComplexity || 'O(1)',
+      newTime: review.timeComplexity || 'O(n)',
+      newSpace: review.spaceComplexity || 'O(1)',
+      reviewStatus: 'ADMIN_VERIFIED',
+      reason: review.reason || ''
+    });
+  };
+
+  const handleConfirmComplexityOverride = async () => {
+    if (!overrideModal) return;
+    setScoringSaving(true);
+    try {
+      await overrideComplexity({
+        teamName: overrideModal.teamName,
+        problemId: overrideModal.problemId,
+        submissionId: overrideModal.submissionId,
+        timeComplexity: overrideModal.newTime,
+        spaceComplexity: overrideModal.newSpace,
+        reviewStatus: overrideModal.reviewStatus || 'ADMIN_VERIFIED'
+      });
+      showToast(`Complexity updated for team "${overrideModal.teamName}"! Score recalculated.`, true);
+      setOverrideModal(null);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to override complexity assessment', false);
+    } finally {
+      setScoringSaving(false);
+    }
+  };
+
+  const handleOpenEditProblemModal = (prob) => {
+    setEditProblemModal({
+      problemId: prob.id,
+      title: prob.title,
+      diff: scoringConfig?.problemDifficulties?.[prob.id] || prob.diff || 'Easy',
+      baseScore: scoringConfig?.problemBaseScores?.[prob.id] ?? (prob.pts || (prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200)))
+    });
+  };
+
+  const handleSaveProblemSettings = async () => {
+    if (!editProblemModal) return;
+    setScoringSaving(true);
+    try {
+      if (editProblemModal.diff) {
+        await setProblemDifficulty(editProblemModal.problemId, editProblemModal.diff);
+      }
+      if (editProblemModal.baseScore !== undefined) {
+        await setProblemBaseScore(editProblemModal.problemId, editProblemModal.baseScore);
+      }
+      showToast(`Problem ${editProblemModal.problemId} configuration updated!`, true);
+      setEditProblemModal(null);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to update problem settings', false);
+    } finally {
+      setScoringSaving(false);
+    }
+  };
+
+  const handleInspectTeamScoreBreakdown = async (teamName) => {
+    if (!teamName) {
+      setInspectTeamBreakdown('');
+      setTeamBreakdownData(null);
+      return;
+    }
+    setInspectTeamBreakdown(teamName);
+    setBreakdownLoading(true);
+    try {
+      const data = await fetchTeamScoreBreakdown(teamName);
+      setTeamBreakdownData(data);
+    } catch (err) {
+      showToast(err.message || 'Failed to fetch team score breakdown', false);
+    } finally {
+      setBreakdownLoading(false);
+    }
+  };
+
   // Filter registrations
   const filteredRegistrations = registrations
     .filter(r => {
@@ -1110,11 +1258,19 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           flexWrap: 'wrap',
           gap: '14px'
         }}>
-          {/* Main 5 Tabs */}
-          <div style={{ display: 'flex', gap: '4px' }}>
+          {/* Main 6 Tabs */}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {[
               { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
               { id: 'problems', label: 'Problems', icon: Lock },
+              {
+                id: 'scoring',
+                label: 'Scoring & Complexity',
+                icon: Calculator,
+                badge: (complexityReviews || []).filter(r => r.reviewStatus === 'PENDING_REVIEW').length > 0
+                  ? (complexityReviews || []).filter(r => r.reviewStatus === 'PENDING_REVIEW').length
+                  : null
+              },
               { id: 'hints', label: 'Hints', icon: Lightbulb },
               { id: 'sabotage', label: 'Sabotage', icon: Zap },
               {
@@ -1609,10 +1765,29 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
                           {prob.id} &nbsp;{prob.title}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
-                          <span style={{ color: diffColor, fontWeight: 600 }}>{prob.diff}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px', flexWrap: 'wrap' }}>
+                          <span style={{ color: diffColor, fontWeight: 600 }}>{scoringConfig?.problemDifficulties?.[prob.id] || prob.diff}</span>
                           <span>•</span>
-                          <span>{pts} pts</span>
+                          <span>Base: {pts} pts</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditProblemModal(prob)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#58a6ff',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '0 4px',
+                              fontSize: '11px',
+                              textDecoration: 'underline'
+                            }}
+                            title="Edit difficulty & base score"
+                          >
+                            <Edit2 size={11} /> Edit Scoring
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -2537,6 +2712,721 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* TAB 6: SCORING & COMPLEXITY RULES, AUDIT & OVERRIDES         */}
+        {/* ============================================================ */}
+        {activeTab === 'scoring' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Header info banner */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(88, 166, 255, 0.08), rgba(188, 140, 255, 0.08))',
+              border: '1px solid rgba(88, 166, 255, 0.25)',
+              borderRadius: '12px',
+              padding: '18px 22px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <Calculator size={20} color="#58a6ff" />
+                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>
+                    Difficulty-Based, Complexity-Aware Scoring System
+                  </span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38bdf8',
+                    border: '1px solid rgba(56, 189, 248, 0.3)'
+                  }}>
+                    Active Formula
+                  </span>
+                </div>
+                <div style={{ fontSize: '13px', color: '#c9d1d9', lineHeight: 1.5, maxWidth: '820px' }}>
+                  Points are awarded upon passing all test cases: <b>Score = max(0, Base Score − Time Deduction − Space Deduction)</b>. Unsuccessful attempts incur a <b>−{scoringConfig?.wrongSubmissionPenalty ?? 5} pts penalty</b> per failed attempt.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveScoringConfig}
+                disabled={scoringSaving}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 20px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #1f6feb 0%, #238636 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  cursor: scoringSaving ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(35, 134, 54, 0.35)'
+                }}
+              >
+                {scoringSaving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />}
+                <span>{scoringSaving ? 'Saving & Recalculating...' : 'Save & Recalculate Scores'}</span>
+              </button>
+            </div>
+
+            {/* Row 1: Difficulty Base Scores & Penalties */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '16px'
+            }}>
+              {/* Easy Base Score */}
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(63, 185, 80, 0.3)',
+                borderRadius: '10px',
+                padding: '16px 20px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#3fb950' }}>EASY PROBLEMS</span>
+                  <span style={{ fontSize: '11px', color: 'var(--txt-dim)', padding: '2px 6px', background: 'rgba(63, 185, 80, 0.12)', borderRadius: '4px' }}>Base Score</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={scoringConfig?.baseScores?.Easy ?? 200}
+                    onChange={(e) => setScoringConfig(prev => ({
+                      ...prev,
+                      baseScores: { ...prev.baseScores, Easy: parseInt(e.target.value) || 0 }
+                    }))}
+                    style={{
+                      width: '120px',
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 200)</span>
+                </div>
+              </div>
+
+              {/* Medium Base Score */}
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(210, 153, 34, 0.3)',
+                borderRadius: '10px',
+                padding: '16px 20px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#d29922' }}>MEDIUM PROBLEMS</span>
+                  <span style={{ fontSize: '11px', color: 'var(--txt-dim)', padding: '2px 6px', background: 'rgba(210, 153, 34, 0.12)', borderRadius: '4px' }}>Base Score</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={scoringConfig?.baseScores?.Medium ?? 300}
+                    onChange={(e) => setScoringConfig(prev => ({
+                      ...prev,
+                      baseScores: { ...prev.baseScores, Medium: parseInt(e.target.value) || 0 }
+                    }))}
+                    style={{
+                      width: '120px',
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 300)</span>
+                </div>
+              </div>
+
+              {/* Hard Base Score */}
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(248, 81, 73, 0.3)',
+                borderRadius: '10px',
+                padding: '16px 20px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#ff7b72' }}>HARD PROBLEMS</span>
+                  <span style={{ fontSize: '11px', color: 'var(--txt-dim)', padding: '2px 6px', background: 'rgba(248, 81, 73, 0.12)', borderRadius: '4px' }}>Base Score</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={scoringConfig?.baseScores?.Hard ?? 400}
+                    onChange={(e) => setScoringConfig(prev => ({
+                      ...prev,
+                      baseScores: { ...prev.baseScores, Hard: parseInt(e.target.value) || 0 }
+                    }))}
+                    style={{
+                      width: '120px',
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 400)</span>
+                </div>
+              </div>
+
+              {/* Wrong Penalty */}
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(188, 140, 255, 0.3)',
+                borderRadius: '10px',
+                padding: '16px 20px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#bc8cff' }}>WRONG SUBMISSION PENALTY</span>
+                  <span style={{ fontSize: '11px', color: 'var(--txt-dim)', padding: '2px 6px', background: 'rgba(188, 140, 255, 0.12)', borderRadius: '4px' }}>Per Failed Attempt</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={scoringConfig?.wrongSubmissionPenalty ?? 5}
+                    onChange={(e) => setScoringConfig(prev => ({
+                      ...prev,
+                      wrongSubmissionPenalty: parseInt(e.target.value) || 0
+                    }))}
+                    style={{
+                      width: '120px',
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>pts deducted (Default: 5)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Deduction Tables side by side */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+              gap: '18px'
+            }}>
+              {/* Time Complexity Deductions Table */}
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '10px',
+                padding: '18px 20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#58a6ff' }}>Time Complexity Deductions</h4>
+                    <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--txt-dim)' }}>Deducted from base score upon passing tests</p>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--txt-muted)', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                    8 Categories
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { key: 'O(1)', label: 'O(1) — Constant', defaultVal: 0, desc: 'Direct lookup, mathematical formulas' },
+                    { key: 'O(log n)', label: 'O(log n) — Logarithmic', defaultVal: 5, desc: 'Binary search, divide & conquer halving' },
+                    { key: 'O(n)', label: 'O(n) — Linear', defaultVal: 10, desc: 'Single loop pass, linear scan, frequency map' },
+                    { key: 'O(n log n)', label: 'O(n log n) — Linearithmic', defaultVal: 15, desc: 'Built-in sorting, merge sort, heap operations' },
+                    { key: 'O(n^2)', label: 'O(n²) — Quadratic', defaultVal: 25, desc: 'Nested loops, brute force pairs' },
+                    { key: 'O(n^3)', label: 'O(n³) — Cubic', defaultVal: 40, desc: 'Triple nested loops, cubic matrix ops' },
+                    { key: 'O(2^n)', label: 'O(2ⁿ) — Exponential', defaultVal: 60, desc: 'Unmemoized branching recursion, subsets' },
+                    { key: 'O(n!)', label: 'O(n!) — Factorial', defaultVal: 80, desc: 'Permutations generator, brute-force TSP' }
+                  ].map(item => (
+                    <div key={item.key} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      borderRadius: '6px'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>{item.label}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>{item.desc}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '13px', color: '#ff7b72', fontWeight: 700 }}>−</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={scoringConfig?.timeComplexityDeductions?.[item.key] ?? item.defaultVal}
+                          onChange={(e) => setScoringConfig(prev => ({
+                            ...prev,
+                            timeComplexityDeductions: {
+                              ...prev.timeComplexityDeductions,
+                              [item.key]: parseInt(e.target.value) || 0
+                            }
+                          }))}
+                          style={{
+                            width: '75px',
+                            padding: '6px 8px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: '4px',
+                            color: '#ffffff',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-mono)',
+                            textAlign: 'right'
+                          }}
+                        />
+                        <span style={{ fontSize: '12px', color: 'var(--txt-dim)' }}>pts</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Space Complexity Deductions Table */}
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '10px',
+                padding: '18px 20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#bc8cff' }}>Space Complexity Deductions</h4>
+                    <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--txt-dim)' }}>Auxiliary memory allocated (excluding input)</p>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--txt-muted)', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                    5 Categories
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { key: 'O(1)', label: 'O(1) — Constant Auxiliary Space', defaultVal: 0, desc: 'Scalars, pointers, in-place variable tracking' },
+                    { key: 'O(log n)', label: 'O(log n) — Logarithmic Auxiliary Space', defaultVal: 5, desc: 'Call stack for divide & conquer / binary recursion' },
+                    { key: 'O(n)', label: 'O(n) — Linear Auxiliary Space', defaultVal: 10, desc: '1D arrays, lists, hash maps, hash sets, queues' },
+                    { key: 'O(n^2)', label: 'O(n²) — Quadratic Auxiliary Space', defaultVal: 20, desc: '2D matrix, adjacency matrix, memoization grid' },
+                    { key: 'O(n^3+)', label: 'O(n³+) — Cubic or Higher Auxiliary Space', defaultVal: 30, desc: '3D+ arrays, tensor allocations' }
+                  ].map(item => (
+                    <div key={item.key} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      borderRadius: '6px'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>{item.label}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>{item.desc}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '13px', color: '#ff7b72', fontWeight: 700 }}>−</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={scoringConfig?.spaceComplexityDeductions?.[item.key] ?? item.defaultVal}
+                          onChange={(e) => setScoringConfig(prev => ({
+                            ...prev,
+                            spaceComplexityDeductions: {
+                              ...prev.spaceComplexityDeductions,
+                              [item.key]: parseInt(e.target.value) || 0
+                            }
+                          }))}
+                          style={{
+                            width: '75px',
+                            padding: '6px 8px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: '4px',
+                            color: '#ffffff',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-mono)',
+                            textAlign: 'right'
+                          }}
+                        />
+                        <span style={{ fontSize: '12px', color: 'var(--txt-dim)' }}>pts</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Row 3: Organizer Complexity Review & Override Station */}
+            <div style={{
+              background: 'rgba(13, 17, 28, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '20px 22px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                marginBottom: '16px'
+              }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+                    Complexity Audit & Organizer Override Station
+                  </h4>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt-dim)' }}>
+                    Review static code complexity evaluations. Admin overrides immediately recalculate team scores.
+                  </p>
+                </div>
+
+                {/* Filter buttons */}
+                <div style={{ display: 'flex', gap: '6px', background: 'rgba(255, 255, 255, 0.03)', padding: '3px', borderRadius: '6px' }}>
+                  {['ALL', 'PENDING_REVIEW', 'ADMIN_VERIFIED', 'AUTOMATED'].map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setReviewFilter(f)}
+                      style={{
+                        padding: '5px 10px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        borderRadius: '4px',
+                        border: 'none',
+                        background: reviewFilter === f ? 'rgba(88, 166, 255, 0.2)' : 'transparent',
+                        color: reviewFilter === f ? '#58a6ff' : 'var(--txt-dim)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {f === 'PENDING_REVIEW' ? 'Pending Review' : f === 'ADMIN_VERIFIED' ? 'Admin Verified' : f === 'AUTOMATED' ? 'Automated' : 'All'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table of reviews */}
+              {(!complexityReviews || complexityReviews.length === 0) ? (
+                <div style={{
+                  padding: '36px',
+                  textAlign: 'center',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  borderRadius: '8px',
+                  color: 'var(--txt-muted)',
+                  fontSize: '13px'
+                }}>
+                  No submission complexity records yet. When teams submit accepted code, evaluations will appear here.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--txt-dim)', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 10px' }}>Team</th>
+                        <th style={{ padding: '8px 10px' }}>Problem</th>
+                        <th style={{ padding: '8px 10px' }}>Language</th>
+                        <th style={{ padding: '8px 10px' }}>Time Complexity</th>
+                        <th style={{ padding: '8px 10px' }}>Space Complexity</th>
+                        <th style={{ padding: '8px 10px' }}>Score Breakdown</th>
+                        <th style={{ padding: '8px 10px' }}>Status</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {complexityReviews
+                        .filter(r => reviewFilter === 'ALL' || r.reviewStatus === reviewFilter)
+                        .map(r => (
+                          <tr key={r.id || `${r.teamName}-${r.problemId}`} style={{
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                            background: r.reviewStatus === 'PENDING_REVIEW' ? 'rgba(210, 153, 34, 0.04)' : 'transparent'
+                          }}>
+                            <td style={{ padding: '10px 10px', fontWeight: 600, color: '#ffffff' }}>
+                              {r.teamName}
+                            </td>
+                            <td style={{ padding: '10px 10px', color: '#c9d1d9' }}>
+                              <span style={{ fontWeight: 600 }}>{r.problemTitle || r.problemId}</span>
+                              <span style={{
+                                marginLeft: '6px',
+                                fontSize: '10px',
+                                padding: '1px 5px',
+                                borderRadius: '3px',
+                                background: r.difficulty === 'Hard' ? 'rgba(248, 81, 73, 0.15)' : (r.difficulty === 'Medium' ? 'rgba(210, 153, 34, 0.15)' : 'rgba(63, 185, 80, 0.15)'),
+                                color: r.difficulty === 'Hard' ? '#ff7b72' : (r.difficulty === 'Medium' ? '#d29922' : '#3fb950')
+                              }}>
+                                {r.difficulty || 'Easy'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 10px', color: 'var(--txt-muted)', textTransform: 'capitalize' }}>
+                              {r.language || 'code'}
+                            </td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: 'rgba(88, 166, 255, 0.12)',
+                                color: '#58a6ff',
+                                fontWeight: 700,
+                                fontFamily: 'var(--font-mono)'
+                              }}>
+                                {r.timeComplexity || 'O(n)'}
+                              </span>
+                              <span style={{ marginLeft: '6px', color: '#ff7b72', fontSize: '11px' }}>
+                                −{r.scoring?.timeDeduction ?? 0}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: 'rgba(188, 140, 255, 0.12)',
+                                color: '#bc8cff',
+                                fontWeight: 700,
+                                fontFamily: 'var(--font-mono)'
+                              }}>
+                                {r.spaceComplexity || 'O(1)'}
+                              </span>
+                              <span style={{ marginLeft: '6px', color: '#ff7b72', fontSize: '11px' }}>
+                                −{r.scoring?.spaceDeduction ?? 0}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 10px', fontFamily: 'var(--font-mono)' }}>
+                              <span style={{ color: 'var(--txt-muted)' }}>{r.scoring?.baseScore ?? 200}</span>
+                              <span style={{ color: '#ff7b72' }}> − {r.scoring?.timeDeduction ?? 0} − {r.scoring?.spaceDeduction ?? 0}</span>
+                              <span style={{ color: '#ffffff', fontWeight: 700 }}> = {r.scoring?.problemScore ?? 0} pts</span>
+                            </td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                background: r.reviewStatus === 'ADMIN_VERIFIED'
+                                  ? 'rgba(63, 185, 80, 0.18)'
+                                  : r.reviewStatus === 'PENDING_REVIEW'
+                                  ? 'rgba(210, 153, 34, 0.18)'
+                                  : 'rgba(88, 166, 255, 0.18)',
+                                color: r.reviewStatus === 'ADMIN_VERIFIED'
+                                  ? '#3fb950'
+                                  : r.reviewStatus === 'PENDING_REVIEW'
+                                  ? '#d29922'
+                                  : '#58a6ff'
+                              }}>
+                                {r.reviewStatus === 'ADMIN_VERIFIED' ? 'ADMIN VERIFIED' : (r.reviewStatus === 'PENDING_REVIEW' ? 'PENDING REVIEW' : 'AUTOMATED')}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 10px', textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenComplexityOverride(r)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  background: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  borderRadius: '4px',
+                                  color: '#ffffff',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Edit2 size={11} />
+                                <span>Override</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Row 4: Team Score Breakdown Inspector */}
+            <div style={{
+              background: 'rgba(13, 17, 28, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '20px 22px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                marginBottom: '16px'
+              }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+                    Team Score Breakdown Inspector
+                  </h4>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--txt-dim)' }}>
+                    Inspect exact complexity deductions, wrong submission penalties, and formula verification per team.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>Select Team:</span>
+                  <select
+                    value={inspectTeamBreakdown}
+                    onChange={(e) => handleInspectTeamScoreBreakdown(e.target.value)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 600
+                    }}
+                  >
+                    <option value="">-- Choose a team --</option>
+                    {(teams || []).map(t => (
+                      <option key={t.name} value={t.name}>{t.name} ({t.score ?? 0} pts)</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {breakdownLoading ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--txt-muted)' }}>
+                  <RefreshCw size={18} className="spin" style={{ marginBottom: '8px' }} />
+                  <div>Loading team breakdown...</div>
+                </div>
+              ) : teamBreakdownData ? (
+                <div>
+                  {/* Summary bar */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '14px 18px',
+                    marginBottom: '16px'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--txt-dim)', fontWeight: 600 }}>TEAM</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#58a6ff' }}>{teamBreakdownData.teamName}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--txt-dim)', fontWeight: 600 }}>PROBLEMS SOLVED</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#3fb950' }}>{teamBreakdownData.solvedCount}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--txt-dim)', fontWeight: 600 }}>GROSS SOLVE POINTS</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{teamBreakdownData.grossProblemPoints} pts</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--txt-dim)', fontWeight: 600 }}>WRONG SUBMISSIONS</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#ff7b72' }}>
+                        {teamBreakdownData.wrongSubmissions} (−{teamBreakdownData.wrongPenaltyTotal} pts)
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--txt-dim)', fontWeight: 600 }}>FINAL CALCULATED SCORE</div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#38bdf8' }}>
+                        {teamBreakdownData.finalScore} pts
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Solved Problems Table */}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--txt-dim)', textAlign: 'left' }}>
+                          <th style={{ padding: '8px 10px' }}>Problem</th>
+                          <th style={{ padding: '8px 10px' }}>Difficulty</th>
+                          <th style={{ padding: '8px 10px' }}>Base Points</th>
+                          <th style={{ padding: '8px 10px' }}>Time Complexity</th>
+                          <th style={{ padding: '8px 10px' }}>Space Complexity</th>
+                          <th style={{ padding: '8px 10px' }}>Complexity-Adjusted Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teamBreakdownData.solvedProblems?.map(p => (
+                          <tr key={p.problemId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                            <td style={{ padding: '10px 10px', fontWeight: 600, color: '#ffffff' }}>
+                              {p.problemTitle}
+                            </td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                background: p.difficulty === 'Hard' ? 'rgba(248, 81, 73, 0.15)' : (p.difficulty === 'Medium' ? 'rgba(210, 153, 34, 0.15)' : 'rgba(63, 185, 80, 0.15)'),
+                                color: p.difficulty === 'Hard' ? '#ff7b72' : (p.difficulty === 'Medium' ? '#d29922' : '#3fb950')
+                              }}>
+                                {p.difficulty}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 10px', fontFamily: 'var(--font-mono)' }}>{p.baseScore} pts</td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#58a6ff' }}>{p.timeComplexity}</span>
+                              <span style={{ color: '#ff7b72', marginLeft: '6px' }}>−{p.timeDeduction} pts</span>
+                            </td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#bc8cff' }}>{p.spaceComplexity}</span>
+                              <span style={{ color: '#ff7b72', marginLeft: '6px' }}>−{p.spaceDeduction} pts</span>
+                            </td>
+                            <td style={{ padding: '10px 10px', fontWeight: 700, color: '#3fb950', fontFamily: 'var(--font-mono)' }}>
+                              {p.complexityAdjustedScore} pts
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '28px',
+                  textAlign: 'center',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  borderRadius: '8px',
+                  color: 'var(--txt-muted)',
+                  fontSize: '13px'
+                }}>
+                  Select a team above to audit their difficulty base points, complexity deductions, and wrong submission penalties.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -3747,6 +4637,313 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               >
                 <Play size={13} fill="#ffffff" />
                 <span>{eventActionLoading ? 'Starting Event...' : 'Confirm & Start Event'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ============================================================ */}
+      {/* ADMIN COMPLEXITY OVERRIDE MODAL                              */}
+      {/* ============================================================ */}
+      {overrideModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !scoringSaving) {
+              setOverrideModal(null);
+            }
+          }}
+        >
+          <div
+            className="box"
+            style={{
+              maxWidth: '480px',
+              width: '100%',
+              background: '#0d111c',
+              border: '1px solid rgba(88, 166, 255, 0.3)',
+              borderRadius: '14px',
+              padding: '24px 28px',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit2 size={18} color="#58a6ff" />
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>
+                  Override Complexity Assessment
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOverrideModal(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--txt-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '18px',
+              fontSize: '13px'
+            }}>
+              <div><b>Team:</b> <span style={{ color: '#58a6ff' }}>{overrideModal.teamName}</span></div>
+              <div style={{ marginTop: '4px' }}><b>Problem:</b> <span style={{ color: '#ffffff' }}>{overrideModal.problemTitle}</span></div>
+            </div>
+
+            {/* Time Complexity Select */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--txt-dim)', marginBottom: '6px' }}>
+                Time Complexity
+              </label>
+              <select
+                value={overrideModal.newTime}
+                onChange={(e) => setOverrideModal(prev => ({ ...prev, newTime: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(88, 166, 255, 0.3)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}
+              >
+                <option value="O(1)">O(1) — Constant (0 pts deduction)</option>
+                <option value="O(log n)">O(log n) — Logarithmic (5 pts deduction)</option>
+                <option value="O(n)">O(n) — Linear (10 pts deduction)</option>
+                <option value="O(n log n)">O(n log n) — Linearithmic (15 pts deduction)</option>
+                <option value="O(n^2)">O(n²) — Quadratic (25 pts deduction)</option>
+                <option value="O(n^3)">O(n³) — Cubic (40 pts deduction)</option>
+                <option value="O(2^n)">O(2ⁿ) — Exponential (60 pts deduction)</option>
+                <option value="O(n!)">O(n!) — Factorial (80 pts deduction)</option>
+              </select>
+            </div>
+
+            {/* Space Complexity Select */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--txt-dim)', marginBottom: '6px' }}>
+                Space Complexity (Auxiliary)
+              </label>
+              <select
+                value={overrideModal.newSpace}
+                onChange={(e) => setOverrideModal(prev => ({ ...prev, newSpace: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(188, 140, 255, 0.3)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}
+              >
+                <option value="O(1)">O(1) — Constant (0 pts deduction)</option>
+                <option value="O(log n)">O(log n) — Logarithmic (5 pts deduction)</option>
+                <option value="O(n)">O(n) — Linear (10 pts deduction)</option>
+                <option value="O(n^2)">O(n²) — Quadratic (20 pts deduction)</option>
+                <option value="O(n^3+)">O(n³+) — Cubic or Higher (30 pts deduction)</option>
+              </select>
+            </div>
+
+            <p style={{ fontSize: '12px', color: 'var(--txt-dim)', margin: '0 0 20px', lineHeight: 1.4 }}>
+              * Saving will mark this assessment as <b>ADMIN_VERIFIED</b> and immediately recalculate the team's score and update the leaderboard.
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setOverrideModal(null)}
+                disabled={scoringSaving}
+                style={{ padding: '8px 16px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmComplexityOverride}
+                disabled={scoringSaving}
+                style={{
+                  padding: '8px 20px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #1f6feb 0%, #238636 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: scoringSaving ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {scoringSaving ? 'Saving...' : 'Apply & Recalculate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* EDIT PROBLEM DIFFICULTY & BASE SCORE MODAL                   */}
+      {/* ============================================================ */}
+      {editProblemModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !scoringSaving) {
+              setEditProblemModal(null);
+            }
+          }}
+        >
+          <div
+            className="box"
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              background: '#0d111c',
+              border: '1px solid rgba(88, 166, 255, 0.3)',
+              borderRadius: '14px',
+              padding: '24px 28px',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit2 size={18} color="#58a6ff" />
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>
+                  Problem Scoring Settings
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditProblemModal(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--txt-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '18px',
+              fontSize: '13px'
+            }}>
+              <div><b>Problem ID:</b> <span style={{ color: '#58a6ff', fontFamily: 'var(--font-mono)' }}>{editProblemModal.problemId}</span></div>
+              <div style={{ marginTop: '4px' }}><b>Title:</b> <span style={{ color: '#ffffff' }}>{editProblemModal.title}</span></div>
+            </div>
+
+            {/* Difficulty select */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--txt-dim)', marginBottom: '6px' }}>
+                Difficulty Level
+              </label>
+              <select
+                value={editProblemModal.diff}
+                onChange={(e) => {
+                  const newDiff = e.target.value;
+                  const defaultBase = newDiff === 'Hard' ? 400 : (newDiff === 'Medium' ? 300 : 200);
+                  setEditProblemModal(prev => ({ ...prev, diff: newDiff, baseScore: defaultBase }));
+                }}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(88, 166, 255, 0.3)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}
+              >
+                <option value="Easy">Easy (Default Base: 200 pts)</option>
+                <option value="Medium">Medium (Default Base: 300 pts)</option>
+                <option value="Hard">Hard (Default Base: 400 pts)</option>
+              </select>
+            </div>
+
+            {/* Custom Base Score input */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--txt-dim)', marginBottom: '6px' }}>
+                Base Score (Points)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={editProblemModal.baseScore}
+                onChange={(e) => setEditProblemModal(prev => ({ ...prev, baseScore: parseInt(e.target.value) || 0 }))}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(88, 166, 255, 0.3)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)'
+                }}
+              />
+              <p style={{ margin: '6px 0 0', fontSize: '11px', color: 'var(--txt-dim)' }}>
+                Allows overriding the default base points specifically for this problem.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setEditProblemModal(null)}
+                disabled={scoringSaving}
+                style={{ padding: '8px 16px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveProblemSettings}
+                disabled={scoringSaving}
+                style={{
+                  padding: '8px 20px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #1f6feb 0%, #238636 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: scoringSaving ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {scoringSaving ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
           </div>

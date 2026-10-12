@@ -1568,6 +1568,75 @@ export async function fetchAdminOverview() {
     unlockHistory: store.unlockHistory || [],
     submissions: [],
     eventState: store.eventState || { status: 'REGISTRATION_OPEN', startedAt: null },
-    registrations: Object.values(store.registrations || {})
+    registrations: Object.values(store.registrations || {}),
+    scoringConfig: store.scoringConfig || null,
+    complexityReviews: []
   };
+}
+
+// --- DIFFICULTY-BASED COMPLEXITY SCORING API CALLS ---
+export async function fetchScoringConfig() {
+  const res = await fetch(`${API_BASE}/scoring/config`);
+  if (!res.ok) throw new Error('Failed to fetch scoring configuration');
+  return await res.json();
+}
+
+export async function updateScoringConfig(config) {
+  const res = await fetch(`${API_BASE}/admin/scoring/config`, {
+    method: 'POST',
+    headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update scoring configuration');
+  return data;
+}
+
+export async function setProblemBaseScore(problemId, baseScore) {
+  const res = await fetch(`${API_BASE}/admin/problems/base-score`, {
+    method: 'POST',
+    headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId, baseScore: Number(baseScore) })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to set problem base score');
+  return data;
+}
+
+export async function setProblemDifficulty(problemId, difficulty) {
+  const res = await fetch(`${API_BASE}/admin/problems/difficulty`, {
+    method: 'POST',
+    headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId, difficulty })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to set problem difficulty');
+  return data;
+}
+
+export async function fetchComplexityReviews() {
+  const res = await fetch(`${API_BASE}/admin/scoring/reviews`, {
+    headers: getAdminHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch complexity reviews');
+  return data;
+}
+
+export async function overrideComplexity({ teamName, problemId, submissionId, timeComplexity, spaceComplexity, reviewStatus }) {
+  const res = await fetch(`${API_BASE}/admin/scoring/override`, {
+    method: 'POST',
+    headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamName, problemId, submissionId, timeComplexity, spaceComplexity, reviewStatus })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to override complexity assessment');
+  return data;
+}
+
+export async function fetchTeamScoreBreakdown(teamName) {
+  const res = await fetch(`${API_BASE}/team/score-breakdown/${encodeURIComponent(teamName)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch team score breakdown');
+  return data;
 }

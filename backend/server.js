@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { db } from './database.js';
 import { executionQueue } from './queue.js';
+import { SUPPORTED_TIME_COMPLEXITIES, SUPPORTED_SPACE_COMPLEXITIES } from './complexityAnalyzer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -999,6 +1000,121 @@ app.post('/api/admin/sabotage/unfreeze', (req, res) => {
   }
 });
 
+// --- DIFFICULTY-BASED COMPLEXITY SCORING APIS ---
+app.get('/api/scoring/config', (req, res) => {
+  res.json({
+    scoringConfig: db.getScoringConfig(),
+    supportedTimeComplexities: SUPPORTED_TIME_COMPLEXITIES,
+    supportedSpaceComplexities: SUPPORTED_SPACE_COMPLEXITIES
+  });
+});
+
+app.post('/api/admin/scoring/config', requireAdminAuth, (req, res) => {
+  try {
+    const updated = db.updateScoringConfig(req.body);
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    broadcastToAll({ type: 'SCORING_CONFIG_UPDATED', scoringConfig: updated });
+    res.json({ success: true, scoringConfig: updated });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/problems/base-score', requireAdminAuth, (req, res) => {
+  const { problemId, baseScore } = req.body;
+  try {
+    const result = db.setProblemBaseScore(problemId, baseScore);
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, ...result, scoringConfig: db.getScoringConfig() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/problems/difficulty', requireAdminAuth, (req, res) => {
+  const { problemId, difficulty } = req.body;
+  try {
+    const result = db.setProblemDifficulty(problemId, difficulty);
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, ...result, scoringConfig: db.getScoringConfig() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/scoring/reviews', requireAdminAuth, (req, res) => {
+  db.load();
+  res.json({
+    reviews: db.getAllComplexityReviews(),
+    supportedTimeComplexities: SUPPORTED_TIME_COMPLEXITIES,
+    supportedSpaceComplexities: SUPPORTED_SPACE_COMPLEXITIES
+  });
+});
+
+app.post('/api/admin/scoring/override', requireAdminAuth, (req, res) => {
+  const { teamName, problemId, submissionId, timeComplexity, spaceComplexity, reviewStatus } = req.body;
+  try {
+    const result = db.adminOverrideComplexity({
+      teamName,
+      problemId,
+      submissionId,
+      timeComplexity,
+      spaceComplexity,
+      reviewStatus: reviewStatus || 'ADMIN_VERIFIED'
+    });
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/team/score-breakdown/:teamName', (req, res) => {
+  db.load();
+  const team = db.getTeam(req.params.teamName);
+  if (!team) return res.status(404).json({ error: 'Team not found' });
+  const solvedBreakdown = (team.solved || []).map(pid => {
+    const status = team.problemStatuses?.[pid] || {};
+    const prob = db.getFullProblem(pid) || { id: pid, title: pid, diff: 'Easy' };
+    return {
+      problemId: pid,
+      title: prob.title,
+      difficulty: status.difficulty || prob.diff,
+      baseScore: status.baseScore ?? db.getProblemDifficultyPoints(prob),
+      timeComplexity: status.timeComplexity || 'O(n)',
+      spaceComplexity: status.spaceComplexity || 'O(1)',
+      timeDeduction: status.timeDeduction || 0,
+      spaceDeduction: status.spaceDeduction || 0,
+      complexityAdjustedScore: status.complexityAdjustedScore || 0,
+      wrongSubmissions: team.problemWrong?.[pid] || 0,
+      wrongPenalty: (team.problemWrong?.[pid] || 0) * (db.state.scoringConfig?.wrongSubmissionPenalty ?? 5),
+      reviewStatus: status.reviewStatus || 'AUTOMATED',
+      reason: status.reason || ''
+    };
+  });
+  const totalWrong = team.wrong || 0;
+  const wrongPenalty = totalWrong * (db.state.scoringConfig?.wrongSubmissionPenalty ?? 5);
+  const grossProblemPoints = solvedBreakdown.reduce((sum, p) => sum + (p.complexityAdjustedScore || 0), 0);
+  const data = {
+    teamName: team.name,
+    score: team.score || 0,
+    finalScore: team.score || 0,
+    totalWrong,
+    wrongSubmissions: totalWrong,
+    wrongPenalty,
+    wrongPenaltyTotal: wrongPenalty,
+    solvedCount: solvedBreakdown.length,
+    grossProblemPoints,
+    solvedBreakdown,
+    solvedProblems: solvedBreakdown
+  };
+  res.json({
+    ...data,
+    breakdown: data
+  });
+});
+
 // Admin Full Overview
 app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
   const activeTeams = db.getActiveTeams();
@@ -1014,7 +1130,9 @@ app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
     eventState: db.getEventState(),
     currentEvent: db.state.currentEvent || null,
     archivedEvents: db.getArchivedEvents(),
-    registrations: db.getAllRegistrations()
+    registrations: db.getAllRegistrations(),
+    scoringConfig: db.getScoringConfig(),
+    complexityReviews: db.getAllComplexityReviews()
   });
 });
 

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { executeCodeInSandbox, gradeSubmission } from './runner.js';
 import { db } from './database.js';
 import { wrapCodeWithHarness } from './leetcodeRegistry.js';
+import { analyzeComplexity } from './complexityAnalyzer.js';
 
 class ExecutionQueue {
   constructor(concurrency = 4) {
@@ -102,19 +103,40 @@ class ExecutionQueue {
           job.result = grade;
           job.status = 'COMPLETED';
 
-          // Process submission result, award difficulty score or deduct 10 penalty, track per-problem wrong counts, and log audit record
+          let complexity = null;
+          if (grade.passed) {
+            try {
+              complexity = analyzeComplexity(job.code, job.lang, problem);
+            } catch (err) {
+              console.error('Complexity analysis error:', err);
+            }
+          }
+
+          // Process submission result, award complexity-adjusted score or deduct 5 penalty, track per-problem wrong counts, and log audit record
           const processResult = db.processSubmissionResult({
             teamName: job.teamName,
             memberId: job.memberId,
             problemId: job.problemId,
             verdict: grade.verdict,
             passed: grade.passed,
-            details: grade.details
+            details: grade.details,
+            lang: job.lang,
+            code: job.code,
+            complexity
           });
 
           if (processResult) {
             job.submission = processResult.subRecord;
             job.team = processResult.team;
+            job.result.scoring = processResult.subRecord;
+            job.result.complexity = complexity || (processResult.subRecord ? {
+              timeComplexity: processResult.subRecord.timeComplexity,
+              spaceComplexity: processResult.subRecord.spaceComplexity,
+              timeDeduction: processResult.subRecord.timeDeduction,
+              spaceDeduction: processResult.subRecord.spaceDeduction,
+              reviewStatus: processResult.subRecord.reviewStatus,
+              reason: processResult.subRecord.reason
+            } : null);
           }
         }
       }
