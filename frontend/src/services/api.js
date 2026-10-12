@@ -1307,6 +1307,99 @@ export async function updateEventStatus(status) {
   return store.eventState;
 }
 
+export async function startEventSession({ participatingTeams, eventName }) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/event/start`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ participatingTeams, eventName })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to start event session.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  // Fallback
+  const store = getFallbackStore();
+  if (!store.eventState) store.eventState = {};
+  store.eventState.status = 'EVENT_LIVE';
+  store.eventState.startedAt = new Date().toISOString();
+  store.eventState.endedAt = null;
+  store.eventState.participatingTeams = participatingTeams;
+  (store.teams || []).forEach(t => {
+    if (participatingTeams.includes(t.name)) {
+      t.balance = 1000;
+      t.score = 0;
+      t.solved = [];
+      t.wrong = 0;
+      t.unlocked = [];
+    }
+  });
+  saveFallbackStore(store);
+  return { success: true, eventState: store.eventState };
+}
+
+export async function endEventSession() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/event/end`, {
+      method: 'POST',
+      headers: getAdminHeaders()
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to end event session.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  // Fallback
+  const store = getFallbackStore();
+  if (!store.eventState) store.eventState = {};
+  store.eventState.status = 'EVENT_ENDED';
+  store.eventState.endedAt = new Date().toISOString();
+  saveFallbackStore(store);
+  return { success: true, eventState: store.eventState };
+}
+
+export async function fetchArchivedEvents() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/event/archives`, {
+      headers: getAdminHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.archives || [];
+    }
+  } catch (e) {
+    console.error('Failed to fetch archived events:', e);
+  }
+  return [];
+}
+
+export async function batchAcceptRegistrations(registrationIds) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/registrations/batch-accept`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ registrationIds })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to batch accept registrations.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+  return { success: true, count: registrationIds.length };
+}
+
 export async function submitTeamRegistration(formData) {
   try {
     const res = await fetch(`${API_BASE}/register`, {

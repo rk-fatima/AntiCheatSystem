@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, X } from 'lucide-react';
+import { Trophy, X, FileDown, Image } from 'lucide-react';
 import { fetchLeaderboard } from '../services/api';
+import { exportLeaderboardToPDF, exportLeaderboardToPNG } from '../utils/leaderboardExport';
 
 export function LeaderboardModal({ onClose }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -24,19 +26,98 @@ export function LeaderboardModal({ onClose }) {
     return () => clearInterval(interval);
   }, []);
 
+  const handleDownloadPDF = () => {
+    if (leaderboard.length === 0) return;
+    setExporting(true);
+    try {
+      exportLeaderboardToPDF({
+        leaderboard,
+        eventName: 'QUBIT Code Auctioneer'
+      });
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDownloadPNG = async () => {
+    if (leaderboard.length === 0) return;
+    setExporting(true);
+    try {
+      await exportLeaderboardToPNG({
+        leaderboard,
+        eventName: 'QUBIT Code Auctioneer'
+      });
+    } catch (err) {
+      console.error('Failed to export PNG:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="ov" style={{ zIndex: 950 }}>
-      <div className="box" style={{ maxWidth: '640px', padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div className="box" style={{ maxWidth: '720px', padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Trophy size={20} color="#bc8cff" />
             <h2 style={{ margin: 0, color: '#ffffff', fontSize: '18px', fontWeight: 700 }}>
               Live Contest Leaderboard
             </h2>
           </div>
-          <button className="btn-ghost" onClick={onClose} style={{ padding: '6px' }}>
-            <X size={16} />
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={exporting || leaderboard.length === 0}
+              className="btn-ghost"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                padding: '6px 12px',
+                color: '#58a6ff',
+                borderColor: 'rgba(88, 166, 255, 0.3)',
+                background: 'rgba(88, 166, 255, 0.08)',
+                borderRadius: '6px',
+                cursor: (exporting || leaderboard.length === 0) ? 'not-allowed' : 'pointer'
+              }}
+              title="Download Leaderboard as PDF"
+            >
+              <FileDown size={14} />
+              <span>Download PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPNG}
+              disabled={exporting || leaderboard.length === 0}
+              className="btn-ghost"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                padding: '6px 12px',
+                color: '#bc8cff',
+                borderColor: 'rgba(188, 140, 255, 0.3)',
+                background: 'rgba(188, 140, 255, 0.08)',
+                borderRadius: '6px',
+                cursor: (exporting || leaderboard.length === 0) ? 'not-allowed' : 'pointer'
+              }}
+              title="Download Leaderboard as PNG"
+            >
+              <Image size={14} />
+              <span>Download PNG</span>
+            </button>
+
+            <button className="btn-ghost" onClick={onClose} style={{ padding: '6px', marginLeft: '4px' }}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Scoring Rules Strip */}
@@ -74,7 +155,7 @@ export function LeaderboardModal({ onClose }) {
                 <th style={{ padding: '10px 14px', width: '60px', fontWeight: 600 }}>Rank</th>
                 <th style={{ padding: '10px 14px', fontWeight: 600 }}>Team</th>
                 <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>Solved</th>
-                <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>Wrong (WA)</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>ByteCoins</th>
                 <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>Score</th>
               </tr>
             </thead>
@@ -96,8 +177,8 @@ export function LeaderboardModal({ onClose }) {
                     <td style={{ padding: '12px 14px', textAlign: 'center', color: '#58a6ff', fontWeight: 600 }}>
                       {team.solvedCount}
                     </td>
-                    <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--txt-dim)' }}>
-                      {team.wrongAttempts}
+                    <td style={{ padding: '12px 14px', textAlign: 'center', color: '#3fb950', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                      {team.balance ?? 1000} BC
                     </td>
                     <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
                       {team.score} pts
@@ -108,7 +189,7 @@ export function LeaderboardModal({ onClose }) {
               {leaderboard.length === 0 && (
                 <tr>
                   <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--txt-dim)' }}>
-                    No submissions yet. Be the first to solve!
+                    {loading ? 'Loading leaderboard standings...' : 'No submissions yet. Be the first to solve!'}
                   </td>
                 </tr>
               )}

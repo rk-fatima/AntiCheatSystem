@@ -28,7 +28,10 @@ import {
   Clock,
   ShieldCheck,
   ArrowRight,
-  Square
+  Square,
+  FileDown,
+  Image,
+  CheckSquare
 } from 'lucide-react';
 import {
   fetchAdminOverview,
@@ -42,8 +45,16 @@ import {
   updateEventStatus,
   fetchAdminRegistrations,
   approveTeamRegistration,
-  rejectTeamRegistration
+  rejectTeamRegistration,
+  startEventSession,
+  endEventSession,
+  fetchArchivedEvents,
+  batchAcceptRegistrations
 } from '../services/api';
+import {
+  exportLeaderboardToPDF,
+  exportLeaderboardToPNG
+} from '../utils/leaderboardExport';
 
 export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage' | 'registrations'
@@ -66,6 +77,16 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [eventConfirmModal, setEventConfirmModal] = useState(null);
   const [eventActionLoading, setEventActionLoading] = useState(false);
+
+  // Start Event Session Modal state
+  const [showStartEventModal, setShowStartEventModal] = useState(false);
+  const [selectedParticipatingTeams, setSelectedParticipatingTeams] = useState(new Set());
+  const [startEventSearch, setStartEventSearch] = useState('');
+  const [startEventStatusFilter, setStartEventStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [startEventConfirmModal, setStartEventConfirmModal] = useState(false);
+  const [eventNameInput, setEventNameInput] = useState('QUBIT Code Auctioneer');
+  const [batchActionLoading, setBatchActionLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Leaderboard filters
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
@@ -282,20 +303,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   const promptStartEvent = () => {
-    setEventConfirmModal({
-      targetStatus: 'EVENT_LIVE',
-      title: 'Start Event?',
-      description: 'Are you sure you want to start the event?',
-      confirmText: 'Start Event',
-      confirmColor: '#2ea043'
-    });
+    setShowStartEventModal(true);
   };
 
   const promptEndEvent = () => {
     setEventConfirmModal({
+      actionType: 'END_EVENT',
       targetStatus: 'EVENT_ENDED',
-      title: 'End Event?',
-      description: 'Are you sure you want to end the event?',
+      title: 'End Event & Conclude Competition?',
+      description: 'Are you sure you want to end the current event? Active bidding and problem unlocking will be halted. The final leaderboard, team scores, ByteCoins balances, and auction history will be safely archived. All registered team accounts and credentials will be preserved for the next event, and a fresh 1,000 ByteCoins balance will be assigned when the next event begins.',
       confirmText: 'End Event',
       confirmColor: '#da3633'
     });
@@ -315,9 +331,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     if (!eventConfirmModal) return;
     setEventActionLoading(true);
     try {
-      const updated = await updateEventStatus(eventConfirmModal.targetStatus);
-      setEventState(updated);
-      showToast(`Event status updated: ${eventConfirmModal.targetStatus.replace(/_/g, ' ')}`, true);
+      if (eventConfirmModal.targetStatus === 'EVENT_ENDED' || eventConfirmModal.actionType === 'END_EVENT') {
+        const result = await endEventSession();
+        setEventState(result.eventState || { status: 'EVENT_ENDED' });
+        showToast('🏁 Event concluded! Final leaderboard and results archived safely.', true);
+      } else {
+        const updated = await updateEventStatus(eventConfirmModal.targetStatus);
+        setEventState(updated);
+        showToast(`Event status updated: ${eventConfirmModal.targetStatus.replace(/_/g, ' ')}`, true);
+      }
       setEventConfirmModal(null);
       await loadData();
     } catch (err) {
@@ -365,6 +387,238 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   const pendingRegistrationsCount = registrations.filter(r => r.status === 'PENDING').length;
+
+  // Pre-select approved teams when Start Event Modal opens
+  useEffect(() => {
+    if (showStartEventModal) {
+      const approvedNames = (teams || []).map(t => t.name);
+      setSelectedParticipatingTeams(new Set(approvedNames));
+      setStartEventSearch('');
+      setStartEventStatusFilter('ALL');
+    }
+  }, [showStartEventModal, teams]);
+
+  // Unified list of all registered teams for Start Event selection modal
+  const allRegisteredTeams = React.useMemo(() => {
+    const map = new Map();
+    // 1. All submitted registrations
+    (registrations || []).forEach(reg => {
+      map.set(reg.teamName.toLowerCase(), {
+        id: reg.id,
+        teamName: reg.teamName,
+        leaderName: reg.leaderName || (reg.members && reg.members[0]?.name) || 'Leader',
+        leaderContact: reg.leaderContact || '',
+        memberCount: reg.memberCount || (reg.members || []).length || 1,
+        members: reg.members || [],
+        status: reg.status || 'PENDING',
+        rejectionReason: reg.rejectionReason || '',
+        createdAt: reg.createdAt,
+        registration: reg,
+        isApproved: reg.status === 'APPROVED'
+      });
+    });
+    // 2. Approved teams
+    (teams || []).forEach(t => {
+      const key = t.name.toLowerCase();
+      if (map.has(key)) {
+        const item = map.get(key);
+        item.status = 'APPROVED';
+        item.isApproved = true;
+        item.balance = t.balance;
+        item.score = t.score;
+      } else {
+        map.set(key, {
+          id: `TEAM-${t.name}`,
+          teamName: t.name,
+          leaderName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
+          leaderContact: (t.members && t.members[0]?.phone) || '',
+          memberCount: t.size || (t.members || []).length || 1,
+          members: t.members || [],
+          status: 'APPROVED',
+          rejectionReason: '',
+          createdAt: t.createdAt || new Date().toISOString(),
+          isApproved: true,
+          balance: t.balance,
+          score: t.score
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const order = { PENDING: 0, APPROVED: 1, REJECTED: 2 };
+      const diff = (order[a.status] ?? 3) - (order[b.status] ?? 3);
+      if (diff !== 0) return diff;
+      return a.teamName.localeCompare(b.teamName);
+    });
+  }, [registrations, teams]);
+
+  const filteredRegisteredTeams = React.useMemo(() => {
+    return allRegisteredTeams.filter(t => {
+      const matchesFilter =
+        startEventStatusFilter === 'ALL' ||
+        t.status === startEventStatusFilter;
+      const q = startEventSearch.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        t.teamName.toLowerCase().includes(q) ||
+        t.leaderName.toLowerCase().includes(q) ||
+        t.leaderContact.toLowerCase().includes(q);
+      return matchesFilter && matchesSearch;
+    });
+  }, [allRegisteredTeams, startEventStatusFilter, startEventSearch]);
+
+  const handleToggleTeam = (teamName) => {
+    setSelectedParticipatingTeams(prev => {
+      const next = new Set(prev);
+      if (next.has(teamName)) {
+        next.delete(teamName);
+      } else {
+        next.add(teamName);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllVisible = () => {
+    setSelectedParticipatingTeams(prev => {
+      const next = new Set(prev);
+      filteredRegisteredTeams.forEach(t => next.add(t.teamName));
+      return next;
+    });
+  };
+
+  const handleDeselectAllVisible = () => {
+    setSelectedParticipatingTeams(prev => {
+      const next = new Set(prev);
+      filteredRegisteredTeams.forEach(t => next.delete(t.teamName));
+      return next;
+    });
+  };
+
+  const handleAcceptSelectedTeams = async () => {
+    const pendingSelected = allRegisteredTeams.filter(t =>
+      selectedParticipatingTeams.has(t.teamName) && t.status === 'PENDING' && t.registration?.id
+    );
+
+    if (pendingSelected.length === 0) {
+      showToast('No pending teams selected to accept.', false);
+      return;
+    }
+
+    setBatchActionLoading(true);
+    try {
+      const regIds = pendingSelected.map(t => t.registration.id);
+      await batchAcceptRegistrations(regIds);
+      showToast(`Successfully accepted ${pendingSelected.length} team(s)!`, true);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to accept selected teams', false);
+    } finally {
+      setBatchActionLoading(false);
+    }
+  };
+
+  const handleInlineAcceptTeam = async (item) => {
+    if (!item.registration?.id) return;
+    setActionLoadingId(item.id);
+    try {
+      await approveTeamRegistration(item.registration.id);
+      showToast(`Team "${item.teamName}" accepted and approved!`, true);
+      setSelectedParticipatingTeams(prev => new Set([...prev, item.teamName]));
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to approve team', false);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handlePromptStartEventModal = () => {
+    const selectedAccepted = allRegisteredTeams.filter(t =>
+      selectedParticipatingTeams.has(t.teamName) && t.status === 'APPROVED'
+    );
+    const selectedPending = allRegisteredTeams.filter(t =>
+      selectedParticipatingTeams.has(t.teamName) && t.status === 'PENDING'
+    );
+
+    if (selectedPending.length > 0) {
+      showToast(`Please accept or deselect the ${selectedPending.length} pending team(s) before starting the event.`, false);
+      return;
+    }
+
+    if (selectedAccepted.length === 0) {
+      showToast('Cannot start event: At least 1 accepted team must be selected.', false);
+      return;
+    }
+
+    setStartEventConfirmModal(true);
+  };
+
+  const handleConfirmStartEventSession = async () => {
+    const selectedAcceptedNames = allRegisteredTeams
+      .filter(t => selectedParticipatingTeams.has(t.teamName) && t.status === 'APPROVED')
+      .map(t => t.teamName);
+
+    if (selectedAcceptedNames.length === 0) {
+      showToast('At least 1 accepted team must be selected to start the event.', false);
+      return;
+    }
+
+    setEventActionLoading(true);
+    try {
+      const res = await startEventSession({
+        participatingTeams: selectedAcceptedNames,
+        eventName: eventNameInput || 'QUBIT Code Auctioneer'
+      });
+      setEventState(res.eventState || { status: 'EVENT_LIVE' });
+      showToast(`🚀 Event live! ${selectedAcceptedNames.length} team(s) participating with fresh ₹1,000 ByteCoins.`, true);
+      setStartEventConfirmModal(false);
+      setShowStartEventModal(false);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to start event', false);
+    } finally {
+      setEventActionLoading(false);
+    }
+  };
+
+  // Admin Leaderboard Download Handlers
+  const handleAdminDownloadPDF = () => {
+    if (filteredLeaderboard.length === 0) {
+      showToast('No leaderboard data to export.', false);
+      return;
+    }
+    setExportLoading(true);
+    try {
+      exportLeaderboardToPDF({
+        leaderboard: filteredLeaderboard,
+        eventName: 'QUBIT Code Auctioneer'
+      });
+      showToast('Leaderboard PDF downloaded successfully!', true);
+    } catch (err) {
+      showToast(err.message || 'Failed to export PDF', false);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleAdminDownloadPNG = async () => {
+    if (filteredLeaderboard.length === 0) {
+      showToast('No leaderboard data to export.', false);
+      return;
+    }
+    setExportLoading(true);
+    try {
+      await exportLeaderboardToPNG({
+        leaderboard: filteredLeaderboard,
+        eventName: 'QUBIT Code Auctioneer'
+      });
+      showToast('Leaderboard PNG downloaded successfully!', true);
+    } catch (err) {
+      showToast(err.message || 'Failed to export PNG', false);
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   // Filter registrations
   const filteredRegistrations = registrations
@@ -958,25 +1212,74 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 />
               </div>
 
-              {/* Sort selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>Sort by:</span>
-                <select
-                  value={leaderboardSort}
-                  onChange={(e) => setLeaderboardSort(e.target.value)}
+              {/* Sort selector and Export buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>Sort by:</span>
+                  <select
+                    value={leaderboardSort}
+                    onChange={(e) => setLeaderboardSort(e.target.value)}
+                    style={{
+                      fontSize: '12px',
+                      padding: '6px 10px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '6px'
+                    }}
+                  >
+                    <option value="score">Points (Highest First)</option>
+                    <option value="solved">Problems Solved</option>
+                    <option value="balance">ByteCoin Balance</option>
+                    <option value="name">Team Name</option>
+                  </select>
+                </div>
+
+                {/* Leaderboard Export Buttons */}
+                <button
+                  type="button"
+                  onClick={handleAdminDownloadPDF}
+                  disabled={exportLoading || filteredLeaderboard.length === 0}
+                  className="btn-ghost"
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
                     fontSize: '12px',
-                    padding: '6px 10px',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '6px'
+                    padding: '6px 12px',
+                    color: '#58a6ff',
+                    borderColor: 'rgba(88, 166, 255, 0.3)',
+                    background: 'rgba(88, 166, 255, 0.08)',
+                    borderRadius: '6px',
+                    cursor: (exportLoading || filteredLeaderboard.length === 0) ? 'not-allowed' : 'pointer'
                   }}
+                  title="Download Leaderboard as PDF"
                 >
-                  <option value="score">Points (Highest First)</option>
-                  <option value="solved">Problems Solved</option>
-                  <option value="balance">ByteCoin Balance</option>
-                  <option value="name">Team Name</option>
-                </select>
+                  <FileDown size={13} />
+                  <span>Download PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAdminDownloadPNG}
+                  disabled={exportLoading || filteredLeaderboard.length === 0}
+                  className="btn-ghost"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    padding: '6px 12px',
+                    color: '#bc8cff',
+                    borderColor: 'rgba(188, 140, 255, 0.3)',
+                    background: 'rgba(188, 140, 255, 0.08)',
+                    borderRadius: '6px',
+                    cursor: (exportLoading || filteredLeaderboard.length === 0) ? 'not-allowed' : 'pointer'
+                  }}
+                  title="Download Leaderboard as PNG"
+                >
+                  <Image size={13} />
+                  <span>Download PNG</span>
+                </button>
               </div>
             </div>
 
@@ -2814,6 +3117,614 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 }}
               >
                 {eventActionLoading ? 'Applying...' : eventConfirmModal.confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* START EVENT — SELECT & ACCEPT TEAMS MODAL                     */}
+      {/* ============================================================ */}
+      {showStartEventModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !eventActionLoading) {
+              setShowStartEventModal(false);
+            }
+          }}
+        >
+          <div style={{
+            background: '#0d111c',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '16px',
+            maxWidth: '880px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.9)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(255, 255, 255, 0.02)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: 'rgba(46, 160, 67, 0.15)',
+                  border: '1px solid rgba(46, 160, 67, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#2ea043'
+                }}>
+                  <Play size={20} fill="#2ea043" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
+                    Start Event — Select & Accept Teams
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--txt-muted)' }}>
+                    Review registered teams, accept pending entries, and select participating teams for this competition session.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !eventActionLoading && setShowStartEventModal(false)}
+                disabled={eventActionLoading}
+                style={{ background: 'none', border: 'none', color: 'var(--txt-muted)', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Event Name Input & Info */}
+            <div style={{
+              padding: '14px 24px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '280px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--txt-dim)', whiteSpace: 'nowrap' }}>
+                  Event Session Name:
+                </span>
+                <input
+                  type="text"
+                  value={eventNameInput}
+                  onChange={(e) => setEventNameInput(e.target.value)}
+                  placeholder="e.g., QUBIT Code Auctioneer 2026"
+                  style={{
+                    flex: 1,
+                    fontSize: '13px',
+                    padding: '7px 12px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#ffffff'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                fontSize: '11px',
+                color: '#58a6ff',
+                background: 'rgba(88, 166, 255, 0.1)',
+                border: '1px solid rgba(88, 166, 255, 0.25)',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontWeight: 600
+              }}>
+                Starting Balance: ₹1,000 ByteCoins / Team
+              </div>
+            </div>
+
+            {/* Search, Filter & Batch Action Toolbar */}
+            <div style={{
+              padding: '14px 24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              {/* Search */}
+              <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                <Search size={14} color="var(--txt-dim)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Search team name, leader, mobile..."
+                  value={startEventSearch}
+                  onChange={(e) => setStartEventSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    paddingLeft: '32px',
+                    paddingRight: '12px',
+                    paddingTop: '6px',
+                    paddingBottom: '6px',
+                    fontSize: '12px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#ffffff'
+                  }}
+                />
+              </div>
+
+              {/* Status filter pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(f => {
+                  const count = f === 'ALL'
+                    ? allRegisteredTeams.length
+                    : allRegisteredTeams.filter(t => t.status === f).length;
+                  const isActive = startEventStatusFilter === f;
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setStartEventStatusFilter(f)}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        background: isActive ? 'rgba(88, 166, 255, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                        borderColor: isActive ? 'rgba(88, 166, 255, 0.5)' : 'rgba(255, 255, 255, 0.08)',
+                        color: isActive ? '#58a6ff' : 'var(--txt-muted)'
+                      }}
+                    >
+                      {f} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Batch Actions */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={handleSelectAllVisible}
+                  style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <CheckSquare size={13} />
+                  <span>Select All</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={handleDeselectAllVisible}
+                  style={{ fontSize: '11px', padding: '5px 10px' }}
+                >
+                  <span>Deselect All</span>
+                </button>
+
+                {selectedPendingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleAcceptSelectedTeams}
+                    disabled={batchActionLoading}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(46, 160, 67, 0.2)',
+                      border: '1px solid rgba(46, 160, 67, 0.5)',
+                      color: '#3fb950',
+                      cursor: batchActionLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <UserCheck size={13} />
+                    <span>Accept Selected ({selectedPendingCount})</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Teams Selection Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: 'var(--txt-muted)',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    position: 'sticky',
+                    top: 0,
+                    background: '#0d111c',
+                    zIndex: 2
+                  }}>
+                    <th style={{ padding: '12px 10px', width: '36px' }}>
+                      <input
+                        type="checkbox"
+                        checked={filteredRegisteredTeams.length > 0 && filteredRegisteredTeams.every(t => selectedParticipatingTeams.has(t.teamName))}
+                        onChange={(e) => {
+                          if (e.target.checked) handleSelectAllVisible();
+                          else handleDeselectAllVisible();
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </th>
+                    <th style={{ padding: '12px 10px' }}>Team Name</th>
+                    <th style={{ padding: '12px 10px' }}>Team Leader & Contact</th>
+                    <th style={{ padding: '12px 10px' }}>Members</th>
+                    <th style={{ padding: '12px 10px' }}>Status</th>
+                    <th style={{ padding: '12px 10px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRegisteredTeams.map(item => {
+                    const isSelected = selectedParticipatingTeams.has(item.teamName);
+                    const isPending = item.status === 'PENDING';
+                    const isApproved = item.status === 'APPROVED';
+                    const isRejected = item.status === 'REJECTED';
+
+                    return (
+                      <tr
+                        key={item.teamName}
+                        style={{
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                          background: isSelected ? 'rgba(88, 166, 255, 0.05)' : 'transparent',
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        {/* Checkbox */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleTeam(item.teamName)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </td>
+
+                        {/* Team Name */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '13px' }}>
+                            {item.teamName}
+                          </div>
+                          {item.balance !== undefined && (
+                            <div style={{ fontSize: '11px', color: '#3fb950', fontFamily: 'monospace' }}>
+                              ₹{item.balance} ByteCoins
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Leader & Contact */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <div style={{ color: '#c9d1d9', fontWeight: 600 }}>{item.leaderName}</div>
+                          {item.leaderContact && (
+                            <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>
+                              📞 {item.leaderContact}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Members */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            color: 'var(--txt-muted)'
+                          }}>
+                            {item.memberCount} Member{item.memberCount !== 1 ? 's' : ''}
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td style={{ padding: '12px 10px' }}>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            letterSpacing: '0.4px',
+                            background: isApproved
+                              ? 'rgba(46, 160, 67, 0.18)'
+                              : isPending
+                              ? 'rgba(210, 153, 34, 0.18)'
+                              : 'rgba(248, 81, 73, 0.18)',
+                            color: isApproved
+                              ? '#3fb950'
+                              : isPending
+                              ? '#d29922'
+                              : '#f85149',
+                            border: `1px solid ${
+                              isApproved
+                                ? 'rgba(46, 160, 67, 0.4)'
+                                : isPending
+                                ? 'rgba(210, 153, 34, 0.4)'
+                                : 'rgba(248, 81, 73, 0.4)'
+                            }`
+                          }}>
+                            {item.status}
+                          </span>
+                        </td>
+
+                        {/* Inline Actions */}
+                        <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                          {isPending && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleInlineAcceptTeam(item)}
+                                disabled={actionLoadingId === item.id}
+                                style={{
+                                  padding: '4px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  borderRadius: '5px',
+                                  background: 'rgba(46, 160, 67, 0.2)',
+                                  border: '1px solid rgba(46, 160, 67, 0.5)',
+                                  color: '#3fb950',
+                                  cursor: actionLoadingId === item.id ? 'not-allowed' : 'pointer'
+                                }}
+                                title="Accept this team"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => item.registration && setRejectModal({ reg: item.registration, reason: '' })}
+                                disabled={actionLoadingId === item.id}
+                                style={{
+                                  padding: '4px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  borderRadius: '5px',
+                                  background: 'rgba(248, 81, 73, 0.15)',
+                                  border: '1px solid rgba(248, 81, 73, 0.4)',
+                                  color: '#ff7b72',
+                                  cursor: actionLoadingId === item.id ? 'not-allowed' : 'pointer'
+                                }}
+                                title="Reject this registration"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+
+                          {isApproved && (
+                            <span style={{ fontSize: '11px', color: '#3fb950', fontWeight: 600 }}>
+                              Accepted ✓
+                            </span>
+                          )}
+
+                          {isRejected && (
+                            <span style={{ fontSize: '11px', color: '#ff7b72' }}>
+                              Declined
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filteredRegisteredTeams.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: 'var(--txt-dim)' }}>
+                        No teams found matching the current filter.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(255, 255, 255, 0.02)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}>
+              {/* Status indicators */}
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
+                  <span style={{ color: selectedAcceptedCount > 0 ? '#3fb950' : 'var(--txt-muted)' }}>
+                    {selectedAcceptedCount} Accepted Team{selectedAcceptedCount !== 1 ? 's' : ''} Selected
+                  </span>
+                </div>
+                {selectedPendingCount > 0 && (
+                  <div style={{ fontSize: '11px', color: '#d29922', marginTop: '2px' }}>
+                    ⚠️ {selectedPendingCount} pending team(s) selected. Click "Accept Selected" before starting.
+                  </div>
+                )}
+                {selectedAcceptedCount === 0 && selectedPendingCount === 0 && (
+                  <div style={{ fontSize: '11px', color: '#f85149', marginTop: '2px' }}>
+                    ⚠️ At least 1 accepted team must be selected to start the event.
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setShowStartEventModal(false)}
+                  disabled={eventActionLoading}
+                  style={{ padding: '8px 18px', fontSize: '12px' }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePromptStartEventModal}
+                  disabled={selectedAcceptedCount === 0 || selectedPendingCount > 0 || eventActionLoading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 22px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    background: (selectedAcceptedCount === 0 || selectedPendingCount > 0)
+                      ? 'rgba(46, 160, 67, 0.25)'
+                      : 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                    border: '1px solid rgba(46, 160, 67, 0.5)',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    cursor: (selectedAcceptedCount === 0 || selectedPendingCount > 0 || eventActionLoading) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(46, 160, 67, 0.35)',
+                    opacity: (selectedAcceptedCount === 0 || selectedPendingCount > 0) ? 0.6 : 1
+                  }}
+                >
+                  <Play size={13} fill="#ffffff" />
+                  <span>Start Event ({selectedAcceptedCount})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* CONFIRM START EVENT DIALOG                                   */}
+      {/* ============================================================ */}
+      {startEventConfirmModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1050,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !eventActionLoading) setStartEventConfirmModal(false);
+          }}
+        >
+          <div style={{
+            background: '#0d111c',
+            border: '1px solid rgba(46, 160, 67, 0.4)',
+            borderRadius: '16px',
+            maxWidth: '480px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.9)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(46, 160, 67, 0.18)',
+                border: '1px solid rgba(46, 160, 67, 0.45)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#2ea043'
+              }}>
+                <Play size={20} fill="#2ea043" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
+                  Are you sure you want to start the event?
+                </h3>
+                <div style={{ fontSize: '12px', color: '#58a6ff', marginTop: '2px' }}>
+                  {eventNameInput || 'QUBIT Code Auctioneer'}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--txt-muted)', lineHeight: 1.5 }}>
+              Launching the event will transition status to <b>EVENT LIVE</b>:
+            </p>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              fontSize: '12px',
+              color: '#c9d1d9',
+              lineHeight: 1.6
+            }}>
+              <div>• <b>{selectedAcceptedCount} accepted team(s)</b> will participate in the live auction.</div>
+              <div>• Each participating team receives a fresh balance of <b>₹1,000 ByteCoins</b>.</div>
+              <div>• Only accepted teams will be allowed to log in and submit code.</div>
+              <div>• Unapproved or unaccepted teams cannot access the active session.</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setStartEventConfirmModal(false)}
+                disabled={eventActionLoading}
+                style={{ padding: '8px 16px', fontSize: '12px' }}
+              >
+                Back to Selection
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmStartEventSession}
+                disabled={eventActionLoading}
+                style={{
+                  padding: '8px 22px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Play size={13} fill="#ffffff" />
+                <span>{eventActionLoading ? 'Starting Event...' : 'Confirm & Start Event'}</span>
               </button>
             </div>
           </div>

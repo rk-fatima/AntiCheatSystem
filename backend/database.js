@@ -43,9 +43,12 @@ class Database {
       teams: {},         // Clean start: populated ONLY via actual registration & admin approval
       registrations: {}, // Self-registrations submitted by teams
       eventState: {
-        status: 'REGISTRATION_OPEN', // 'REGISTRATION_OPEN' | 'REGISTRATION_CLOSED' | 'EVENT_LIVE'
-        startedAt: null
+        status: 'REGISTRATION_OPEN', // 'REGISTRATION_OPEN' | 'REGISTRATION_CLOSED' | 'EVENT_LIVE' | 'EVENT_ENDED'
+        startedAt: null,
+        endedAt: null
       },
+      archivedEvents: [], // Past completed event sessions with final leaderboards & results
+      currentEvent: null, // Active event session { id, name, status, startedAt, endedAt, participatingTeams: [] }
       transactions: [],  // Immutable audit log of problem purchases
       unlockHistory: [], // Admin unlock transactions audit log
       submissions: [],
@@ -80,6 +83,8 @@ class Database {
             status: 'REGISTRATION_OPEN',
             startedAt: null
           },
+          archivedEvents: parsed.archivedEvents || [],
+          currentEvent: parsed.currentEvent || null,
           submissions: parsed.submissions || [],
           telemetry: parsed.telemetry || []
         };
@@ -242,12 +247,18 @@ class Database {
     return this.state.problemPrices || {};
   }
 
-  // --- EVENT STATUS CONTROLS ---
+  // --- EVENT STATUS & SESSION CONTROLS ---
   getEventState() {
     if (!this.state.eventState) {
       this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
     }
-    return this.state.eventState;
+    const current = this.state.currentEvent;
+    return {
+      ...this.state.eventState,
+      currentEventId: current?.id || null,
+      currentEventName: current?.name || 'QUBIT Code Auctioneer',
+      participatingTeams: current?.participatingTeams || []
+    };
   }
 
   setEventStatus(status) {
@@ -255,21 +266,214 @@ class Database {
     if (!valid.includes(status)) {
       throw new Error(`Invalid event status: ${status}. Must be one of: ${valid.join(', ')}`);
     }
+
+    if (status === 'EVENT_ENDED') {
+      return this.endEventSession().eventState;
+    }
+
+    if (status === 'EVENT_LIVE') {
+      // If there are approved teams, launch with all approved teams
+      const approvedNames = Object.keys(this.state.teams || {});
+      if (approvedNames.length > 0) {
+        return this.startEventSession({ participatingTeams: approvedNames }).eventState;
+      }
+    }
+
     if (!this.state.eventState) {
       this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
     }
     this.state.eventState.status = status;
-    if (status === 'EVENT_LIVE') {
-      if (!this.state.eventState.startedAt) {
-        this.state.eventState.startedAt = new Date().toISOString();
-      }
-      this.state.eventState.endedAt = null;
-    }
-    if (status === 'EVENT_ENDED') {
-      this.state.eventState.endedAt = new Date().toISOString();
-    }
     this.save();
-    return this.state.eventState;
+    return this.getEventState();
+  }
+
+  startEventSession({ participatingTeams = [], eventName = '' }) {
+    if (!Array.isArray(participatingTeams) || participatingTeams.length === 0) {
+      throw new Error('Please select at least one accepted team to start the event.');
+    }
+
+    // Validate that every selected team has been explicitly accepted by admin
+    const validatedTeamNames = [];
+    for (const teamIdOrName of participatingTeams) {
+      let team = this.getTeam(teamIdOrName);
+      if (!team) {
+        // Search in registrations to give accurate error message
+        const reg = Object.values(this.state.registrations || {}).find(
+          r => r.id === teamIdOrName || r.teamName.toLowerCase() === teamIdOrName.toLowerCase()
+        );
+        if (reg) {
+          if (reg.status === 'PENDING') {
+            throw new Error(`Team "${reg.teamName}" is still Pending. Please accept the team first before starting the event.`);
+          } else if (reg.status === 'REJECTED') {
+            throw new Error(`Team "${reg.teamName}" was Rejected and cannot participate in the event.`);
+          }
+          team = this.getTeam(reg.teamName);
+        }
+      }
+      if (!team) {
+        throw new Error(`Team "${teamIdOrName}" is not an accepted team. Only accepted teams can participate.`);
+      }
+      if (!validatedTeamNames.includes(team.name)) {
+        validatedTeamNames.push(team.name);
+      }
+    }
+
+    const initialBalance = this.state.config.initialTeamBalance || 1000;
+    const sessionNum = (this.state.archivedEvents?.length || 0) + 1;
+    const sessionTitle = (eventName || '').trim() || `QUBIT Code Auctioneer #${sessionNum}`;
+    const sessionId = `EVT-${Date.now().toString(36).toUpperCase()}`;
+
+    // Reset event-specific participation, scores, and bidding data for the new session
+    // Initialize new-event ByteCoins balances according to the configured starting balance, exactly once per participating team per event
+    for (const name of validatedTeamNames) {
+      const team = this.getTeam(name);
+      if (team) {
+        team.balance = initialBalance;
+        team.score = 0;
+        team.solved = [];
+        team.wrong = 0;
+        team.unlocked = [];
+        team.unlockedCards = [];
+        team.problemStatuses = {};
+        team.revealedHints = {};
+        team.hintPassesCount = 0;
+        team.sabotageCardsCount = 0;
+        team.violations = [];
+        team.isLocked = false;
+        team.lockReason = '';
+        team.attempts = [];
+        team.frozenUntil = 0;
+        this.updateTeam(team);
+      }
+    }
+
+    const startedAt = new Date().toISOString();
+    this.state.currentEvent = {
+      id: sessionId,
+      name: sessionTitle,
+      status: 'EVENT_LIVE',
+      startedAt,
+      endedAt: null,
+      participatingTeams: validatedTeamNames
+    };
+
+    if (!this.state.eventState) this.state.eventState = {};
+    this.state.eventState.status = 'EVENT_LIVE';
+    this.state.eventState.startedAt = startedAt;
+    this.state.eventState.endedAt = null;
+
+    this.save();
+    return {
+      eventState: this.getEventState(),
+      currentEvent: this.state.currentEvent,
+      participatingTeams: validatedTeamNames
+    };
+  }
+
+  endEventSession() {
+    const endedAt = new Date().toISOString();
+    const current = this.state.currentEvent || {
+      id: `EVT-${Date.now().toString(36).toUpperCase()}`,
+      name: `QUBIT Code Auctioneer #${(this.state.archivedEvents?.length || 0) + 1}`,
+      startedAt: this.state.eventState?.startedAt || endedAt,
+      participatingTeams: Object.keys(this.state.teams || {})
+    };
+
+    const participatingNames = (current.participatingTeams && current.participatingTeams.length > 0)
+      ? current.participatingTeams
+      : Object.keys(this.state.teams || {});
+
+    // Save final leaderboard for this completed session
+    const finalLeaderboard = participatingNames.map(name => {
+      const t = this.getTeam(name);
+      if (!t) return null;
+      return {
+        name: t.name,
+        captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
+        size: t.size || (t.members || []).length || 1,
+        score: t.score || 0,
+        solvedCount: (t.solved || []).length,
+        solved: [...(t.solved || [])],
+        balance: t.balance ?? 1000,
+        wrongAttempts: t.wrong || 0,
+        hintsUsed: Object.keys(t.revealedHints || {}).length,
+        sabotagesCount: t.sabotageCardsCount || 0,
+        violationsCount: (t.violations || []).length
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || b.balance - a.balance)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+    // Snapshot team states for this session
+    const teamSnapshots = {};
+    for (const name of participatingNames) {
+      const t = this.getTeam(name);
+      if (t) {
+        teamSnapshots[t.name] = {
+          score: t.score || 0,
+          balance: t.balance ?? 1000,
+          solved: [...(t.solved || [])],
+          unlocked: [...(t.unlocked || [])],
+          wrong: t.wrong || 0,
+          problemStatuses: { ...(t.problemStatuses || {}) }
+        };
+      }
+    }
+
+    const archiveRecord = {
+      id: current.id || `EVT-${Date.now().toString(36).toUpperCase()}`,
+      name: current.name || `QUBIT Code Auctioneer #${(this.state.archivedEvents?.length || 0) + 1}`,
+      startedAt: current.startedAt || this.state.eventState?.startedAt || endedAt,
+      endedAt,
+      participatingTeams: [...participatingNames],
+      finalLeaderboard,
+      teamSnapshots,
+      transactions: [...(this.state.transactions || [])],
+      unlockHistory: [...(this.state.unlockHistory || [])]
+    };
+
+    if (!this.state.archivedEvents) {
+      this.state.archivedEvents = [];
+    }
+    this.state.archivedEvents.push(archiveRecord);
+
+    // Mark current event as completed and clear active participation list to prepare for next session
+    if (!this.state.eventState) this.state.eventState = {};
+    this.state.eventState.status = 'EVENT_ENDED';
+    this.state.eventState.endedAt = endedAt;
+
+    this.state.currentEvent = {
+      id: null,
+      name: null,
+      status: 'EVENT_ENDED',
+      startedAt: null,
+      endedAt,
+      participatingTeams: []
+    };
+
+    this.save();
+    return {
+      eventState: this.getEventState(),
+      archiveRecord
+    };
+  }
+
+  getArchivedEvents() {
+    return this.state.archivedEvents || [];
+  }
+
+  batchApproveRegistrations(regIds = []) {
+    const results = [];
+    for (const id of regIds) {
+      try {
+        const approved = this.approveRegistration(id);
+        results.push(approved);
+      } catch (err) {
+        console.error(`Failed to approve registration ${id}:`, err);
+      }
+    }
+    return results;
   }
 
   // --- SELF-REGISTRATION (STATUS: PENDING) ---
@@ -511,6 +715,15 @@ class Database {
       if (team.passwordHash) {
         if (!password || !verifyPassword(password, team.passwordHash)) {
           throw new Error('Invalid team password. Please check your credentials.');
+        }
+      }
+
+      // Check if team is accepted/participating in the active competition
+      const eventState = this.getEventState();
+      if (eventState.status === 'EVENT_LIVE') {
+        const participating = this.state.currentEvent?.participatingTeams || eventState.participatingTeams || [];
+        if (participating.length > 0 && !participating.map(p => p.toLowerCase()).includes(team.name.toLowerCase())) {
+          throw new Error(`Team "${team.name}" has not been accepted for the active competition. Please contact the administrator.`);
         }
       }
 

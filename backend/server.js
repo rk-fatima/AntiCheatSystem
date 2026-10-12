@@ -761,12 +761,13 @@ app.get('/api/leaderboard', (req, res) => {
       size: t.size,
       score: t.score || 0,
       solvedCount: (t.solved || []).length,
+      balance: t.balance ?? 1000,
       wrongAttempts: t.wrong || 0,
       problemWrong: t.problemWrong || {},
       violationsCount: (t.violations || []).length,
       isLocked: Boolean(t.isLocked)
     }))
-    .sort((a, b) => b.score - a.score || a.wrongAttempts - b.wrongAttempts);
+    .sort((a, b) => b.score - a.score || b.balance - a.balance);
 
   res.json({ leaderboard: teams });
 });
@@ -797,16 +798,72 @@ app.post('/api/admin/login', (req, res) => {
   return res.status(401).json({ error: 'Invalid Admin ID or Password. Access denied.' });
 });
 
-// Admin Event Status Control
+// Admin Event Status & Lifecycle Control
 app.post('/api/admin/event/status', requireAdminAuth, (req, res) => {
-  const { status } = req.body;
+  const { status, participatingTeams, eventName } = req.body;
   try {
-    const eventState = db.setEventStatus(status);
+    let resultState;
+    if (status === 'EVENT_ENDED') {
+      resultState = db.endEventSession().eventState;
+    } else if (status === 'EVENT_LIVE' && Array.isArray(participatingTeams) && participatingTeams.length > 0) {
+      resultState = db.startEventSession({ participatingTeams, eventName }).eventState;
+    } else {
+      resultState = db.setEventStatus(status);
+    }
     broadcastToAll({
       type: 'EVENT_STATUS_CHANGED',
-      eventState
+      eventState: resultState
     });
-    res.json({ success: true, eventState });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, eventState: resultState });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Dedicated Start Event Session with team selection
+app.post('/api/admin/event/start', requireAdminAuth, (req, res) => {
+  const { participatingTeams, eventName } = req.body;
+  try {
+    const result = db.startEventSession({ participatingTeams, eventName });
+    broadcastToAll({
+      type: 'EVENT_STATUS_CHANGED',
+      eventState: result.eventState
+    });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Dedicated End Event Session with archiving & fresh reset
+app.post('/api/admin/event/end', requireAdminAuth, (req, res) => {
+  try {
+    const result = db.endEventSession();
+    broadcastToAll({
+      type: 'EVENT_STATUS_CHANGED',
+      eventState: result.eventState
+    });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Get Archived Event Sessions
+app.get('/api/admin/event/archives', requireAdminAuth, (req, res) => {
+  res.json({ archives: db.getArchivedEvents() });
+});
+
+// Batch Accept Teams / Registrations
+app.post('/api/admin/registrations/batch-accept', requireAdminAuth, (req, res) => {
+  const { registrationIds } = req.body;
+  try {
+    const results = db.batchApproveRegistrations(registrationIds || []);
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, count: results.length, results });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
