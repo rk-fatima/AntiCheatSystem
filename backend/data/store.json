@@ -1501,9 +1501,9 @@
     }
   },
   "eventState": {
-    "status": "EVENT_LIVE",
+    "status": "EVENT_ENDED",
     "startedAt": "2026-10-12T17:19:34.839Z",
-    "endedAt": null
+    "endedAt": "2026-10-12T17:20:49.541Z"
   },
   "archivedEvents": [
     {
@@ -1598,17 +1598,98 @@
           "displayTime": "10:49 PM"
         }
       ]
+    },
+    {
+      "id": "EVT-MV5IOM2E",
+      "name": "QUBIT Next Session",
+      "startedAt": "2026-10-12T17:19:34.839Z",
+      "endedAt": "2026-10-12T17:20:49.541Z",
+      "participatingTeams": [
+        "SYNORA"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [
+        {
+          "id": "TXN-ADM-1791825559578-hy94",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "SYNORA",
+          "problemId": "E1",
+          "problemTitle": "Two Sum",
+          "bidPrice": 150,
+          "bidAmount": 150,
+          "price": 150,
+          "previousBalance": 1000,
+          "remainingBalance": 850,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:19:19.578Z",
+          "displayTime": "10:49 PM"
+        },
+        {
+          "id": "TXN-1791824172090-1RLG3",
+          "teamId": "SYNORA",
+          "teamName": "SYNORA",
+          "problemId": "E2",
+          "problemTitle": "Palindrome Number",
+          "bidAmount": 100,
+          "price": 100,
+          "purchasedBy": "SYNORA-01",
+          "purchasedByName": "Team Member",
+          "remainingBalance": 900,
+          "purchaseTime": "2026-10-12T16:56:12.090Z",
+          "displayTime": "10:26 PM"
+        }
+      ],
+      "unlockHistory": [
+        {
+          "id": "TXN-ADM-1791825559578-hy94",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "SYNORA",
+          "problemId": "E1",
+          "problemTitle": "Two Sum",
+          "bidPrice": 150,
+          "bidAmount": 150,
+          "price": 150,
+          "previousBalance": 1000,
+          "remainingBalance": 850,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:19:19.578Z",
+          "displayTime": "10:49 PM"
+        }
+      ]
     }
   ],
   "currentEvent": {
-    "id": "EVT-MV5IOM2E",
-    "name": "QUBIT Next Session",
-    "status": "EVENT_LIVE",
-    "startedAt": "2026-10-12T17:19:34.839Z",
-    "endedAt": null,
-    "participatingTeams": [
-      "SYNORA"
-    ]
+    "id": null,
+    "name": null,
+    "status": "EVENT_ENDED",
+    "startedAt": null,
+    "endedAt": "2026-10-12T17:20:49.541Z",
+    "participatingTeams": []
   },
   "transactions": [
     {

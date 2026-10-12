@@ -466,6 +466,18 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     });
   }, [allRegisteredTeams, startEventStatusFilter, startEventSearch]);
 
+  const selectedAcceptedCount = React.useMemo(() => {
+    return allRegisteredTeams.filter(t =>
+      selectedParticipatingTeams.has(t.teamName) && t.status === 'APPROVED'
+    ).length;
+  }, [allRegisteredTeams, selectedParticipatingTeams]);
+
+  const selectedPendingCount = React.useMemo(() => {
+    return allRegisteredTeams.filter(t =>
+      selectedParticipatingTeams.has(t.teamName) && t.status === 'PENDING'
+    ).length;
+  }, [allRegisteredTeams, selectedParticipatingTeams]);
+
   const handleToggleTeam = (teamName) => {
     setSelectedParticipatingTeams(prev => {
       const next = new Set(prev);
