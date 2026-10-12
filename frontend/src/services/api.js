@@ -1292,10 +1292,13 @@ export async function updateEventStatus(status) {
   }
 
   const store = getFallbackStore();
-  if (!store.eventState) store.eventState = { status: 'REGISTRATION_OPEN', startedAt: null };
+  if (!store.eventState) store.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
   store.eventState.status = status;
   if (status === 'EVENT_LIVE' && !store.eventState.startedAt) {
     store.eventState.startedAt = new Date().toISOString();
+  }
+  if (status === 'EVENT_ENDED' && !store.eventState.endedAt) {
+    store.eventState.endedAt = new Date().toISOString();
   }
   saveFallbackStore(store);
   return store.eventState;
@@ -1323,6 +1326,16 @@ export async function submitTeamRegistration(formData) {
   }
   if (Object.values(store.registrations).some(r => r.teamName.toUpperCase() === normalized && r.status === 'PENDING')) {
     throw new Error(`Team "${formData.teamName}" registration is already pending approval.`);
+  }
+
+  // Validate mobile number
+  const normPhone = (formData.leaderContact || '').trim();
+  if (!normPhone) {
+    throw new Error('Team Leader Mobile / WhatsApp number is mandatory.');
+  }
+  const digits = normPhone.replace(/[\s\-\(\)]/g, '');
+  if (!/^(?:\+91|91|0)?[6-9]\d{9}$/.test(digits)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210 or +91 98765 43210).');
   }
 
   const regId = `REG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;

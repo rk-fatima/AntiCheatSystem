@@ -31,7 +31,7 @@ export function LandingPage({ onNavigateAdmin, onNavigateTeam, onNavigateRegiste
     loadStatus();
   }, []);
 
-  const isRegistrationClosed = eventStatus === 'REGISTRATION_CLOSED' || eventStatus === 'EVENT_LIVE';
+  const isRegistrationClosed = eventStatus === 'REGISTRATION_CLOSED' || eventStatus === 'EVENT_LIVE' || eventStatus === 'EVENT_ENDED';
 
   return (
     <div style={{
@@ -135,29 +135,43 @@ export function LandingPage({ onNavigateAdmin, onNavigateTeam, onNavigateRegiste
           fontSize: '11px',
           fontWeight: 700,
           letterSpacing: '0.6px',
-          background: isRegistrationClosed
-            ? (eventStatus === 'EVENT_LIVE' ? 'rgba(188, 140, 255, 0.12)' : 'rgba(248, 81, 73, 0.12)')
-            : 'rgba(46, 160, 67, 0.12)',
-          border: isRegistrationClosed
-            ? (eventStatus === 'EVENT_LIVE' ? '1px solid rgba(188, 140, 255, 0.35)' : '1px solid rgba(248, 81, 73, 0.35)')
-            : '1px solid rgba(46, 160, 67, 0.35)',
-          color: isRegistrationClosed
-            ? (eventStatus === 'EVENT_LIVE' ? '#d2a8ff' : '#ff7b72')
-            : '#3fb950'
+          background: eventStatus === 'EVENT_ENDED'
+            ? 'rgba(148, 163, 184, 0.15)'
+            : (eventStatus === 'EVENT_LIVE'
+              ? 'rgba(188, 140, 255, 0.12)'
+              : (isRegistrationClosed ? 'rgba(248, 81, 73, 0.12)' : 'rgba(46, 160, 67, 0.12)')),
+          border: eventStatus === 'EVENT_ENDED'
+            ? '1px solid rgba(148, 163, 184, 0.35)'
+            : (eventStatus === 'EVENT_LIVE'
+              ? '1px solid rgba(188, 140, 255, 0.35)'
+              : (isRegistrationClosed ? '1px solid rgba(248, 81, 73, 0.35)' : '1px solid rgba(46, 160, 67, 0.35)')),
+          color: eventStatus === 'EVENT_ENDED'
+            ? '#94a3b8'
+            : (eventStatus === 'EVENT_LIVE'
+              ? '#d2a8ff'
+              : (isRegistrationClosed ? '#ff7b72' : '#3fb950'))
         }}>
           <span style={{
             width: '7px',
             height: '7px',
             borderRadius: '50%',
-            background: isRegistrationClosed
-              ? (eventStatus === 'EVENT_LIVE' ? '#bc8cff' : '#f85149')
-              : '#3fb950',
-            boxShadow: `0 0 8px ${isRegistrationClosed ? '#bc8cff' : '#3fb950'}`
+            background: eventStatus === 'EVENT_ENDED'
+              ? '#94a3b8'
+              : (eventStatus === 'EVENT_LIVE'
+                ? '#bc8cff'
+                : (isRegistrationClosed ? '#f85149' : '#3fb950')),
+            boxShadow: `0 0 8px ${
+              eventStatus === 'EVENT_ENDED'
+                ? '#94a3b8'
+                : (eventStatus === 'EVENT_LIVE' ? '#bc8cff' : (isRegistrationClosed ? '#f85149' : '#3fb950'))
+            }`
           }} />
           <span>
-            {eventStatus === 'EVENT_LIVE'
-              ? 'EVENT LIVE'
-              : (isRegistrationClosed ? 'REGISTRATION CLOSED' : 'REGISTRATION OPEN')}
+            {eventStatus === 'EVENT_ENDED'
+              ? 'EVENT ENDED'
+              : (eventStatus === 'EVENT_LIVE'
+                ? 'EVENT LIVE'
+                : (isRegistrationClosed ? 'REGISTRATION CLOSED' : 'REGISTRATION OPEN'))}
           </span>
         </div>
       </header>

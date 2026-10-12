@@ -245,22 +245,25 @@ class Database {
   // --- EVENT STATUS CONTROLS ---
   getEventState() {
     if (!this.state.eventState) {
-      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null };
+      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
     }
     return this.state.eventState;
   }
 
   setEventStatus(status) {
-    const valid = ['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'EVENT_LIVE'];
+    const valid = ['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'EVENT_LIVE', 'EVENT_ENDED'];
     if (!valid.includes(status)) {
       throw new Error(`Invalid event status: ${status}. Must be one of: ${valid.join(', ')}`);
     }
     if (!this.state.eventState) {
-      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null };
+      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
     }
     this.state.eventState.status = status;
     if (status === 'EVENT_LIVE' && !this.state.eventState.startedAt) {
       this.state.eventState.startedAt = new Date().toISOString();
+    }
+    if (status === 'EVENT_ENDED' && !this.state.eventState.endedAt) {
+      this.state.eventState.endedAt = new Date().toISOString();
     }
     this.save();
     return this.state.eventState;
@@ -269,7 +272,12 @@ class Database {
   // --- SELF-REGISTRATION (STATUS: PENDING) ---
   submitRegistration({ teamName, leaderName, leaderContact, leaderEmail, password, memberCount, members }) {
     const eventState = this.getEventState();
-    if (eventState.status === 'REGISTRATION_CLOSED' || eventState.status === 'EVENT_LIVE') {
+    if (eventState.status !== 'REGISTRATION_OPEN') {
+      if (eventState.status === 'EVENT_LIVE') {
+        throw new Error('Public registration is closed. The competition is currently live.');
+      } else if (eventState.status === 'EVENT_ENDED') {
+        throw new Error('Public registration is closed. The competition has concluded.');
+      }
       throw new Error('Public registration is currently closed. Contact event organizers for late approval.');
     }
 
@@ -300,6 +308,23 @@ class Database {
       throw new Error('Team leader name is required.');
     }
 
+    // Mandatory Indian Mobile Validation
+    const normContact = (leaderContact || '').trim();
+    if (!normContact) {
+      throw new Error('Team Leader Mobile / WhatsApp number is mandatory.');
+    }
+    const phoneDigits = normContact.replace(/[\s\-\(\)]/g, '');
+    if (!/^(?:\+91|91|0)?[6-9]\d{9}$/.test(phoneDigits)) {
+      throw new Error('Please enter a valid 10-digit Indian mobile number (e.g., 9876543210 or +91 98765 43210).');
+    }
+    const standardMobile = phoneDigits.length === 10
+      ? `+91 ${phoneDigits}`
+      : (phoneDigits.startsWith('91') && phoneDigits.length === 12
+        ? `+91 ${phoneDigits.slice(2)}`
+        : (phoneDigits.startsWith('+91')
+          ? `+91 ${phoneDigits.slice(3)}`
+          : normContact));
+
     const normPassword = (password || '').trim();
     if (!normPassword || normPassword.length < 4) {
       throw new Error('Team password must be at least 4 characters for security.');
@@ -319,7 +344,7 @@ class Database {
         name: mName,
         rollNo: (m.rollNo || '').trim(),
         email: (m.email || (i === 0 ? (leaderEmail || '') : '')).trim(),
-        phone: (m.phone || (i === 0 ? (leaderContact || '') : '')).trim(),
+        phone: (m.phone || (i === 0 ? standardMobile : '')).trim(),
         college: (m.college || '').trim()
       });
     }
@@ -329,7 +354,7 @@ class Database {
       id: regId,
       teamName: normalizedName,
       leaderName: normLeader,
-      leaderContact: (leaderContact || '').trim(),
+      leaderContact: standardMobile,
       leaderEmail: (leaderEmail || '').trim(),
       passwordHash: hashPassword(normPassword),
       memberCount: count,
@@ -609,6 +634,14 @@ class Database {
 
   // --- OFFLINE BIDDING: TEAM-LEVEL PROBLEM UNLOCK & BID AMOUNT DEDUCTION ---
   purchaseProblem(teamName, memberId, problemId, bidAmount, password) {
+    const eventState = this.getEventState();
+    if (eventState.status !== 'EVENT_LIVE') {
+      if (eventState.status === 'EVENT_ENDED') {
+        throw new Error('The competition has concluded. Problem bidding is no longer active.');
+      }
+      throw new Error('The event is not live. Problem bidding will activate once the competition starts.');
+    }
+
     const team = this.getTeam(teamName);
     if (!team) {
       throw new Error('Team not found.');
@@ -1289,6 +1322,11 @@ class Database {
 
   // --- DEDICATED ADMIN MANAGEMENT METHODS ---
   adminUnlockProblem(teamName, problemId, bidPrice) {
+    const eventState = this.getEventState();
+    if (eventState.status === 'EVENT_ENDED') {
+      throw new Error('The competition has concluded. Problem unlocks are no longer allowed.');
+    }
+
     if (!teamName || teamName.toUpperCase() === 'ALL') {
       throw new Error('Please select a specific target team to unlock a problem.');
     }
@@ -1374,6 +1412,11 @@ class Database {
   }
 
   adminUnlockCard(teamName, cardType, bidPrice) {
+    const eventState = this.getEventState();
+    if (eventState.status === 'EVENT_ENDED') {
+      throw new Error('The competition has concluded. Card unlocks are no longer allowed.');
+    }
+
     const type = String(cardType || '').trim().toUpperCase();
     if (!teamName || teamName.toUpperCase() === 'ALL') {
       throw new Error('Please select a specific target team to unlock a card.');

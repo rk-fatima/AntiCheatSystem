@@ -629,6 +629,11 @@ app.post('/api/submissions/submit', (req, res) => {
     return res.status(400).json({ error: 'Missing submission parameters.' });
   }
 
+  const eventState = db.getEventState();
+  if (eventState.status === 'EVENT_ENDED') {
+    return res.status(403).json({ error: 'The competition has concluded. Problem submissions are closed.' });
+  }
+
   const team = db.getTeam(teamName);
   if (team && team.isLocked) {
     return res.status(403).json({ error: 'Session is locked by proctors.' });

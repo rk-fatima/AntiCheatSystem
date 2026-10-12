@@ -27,7 +27,8 @@ import {
   Copy,
   Clock,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  Square
 } from 'lucide-react';
 import {
   fetchAdminOverview,
@@ -63,6 +64,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [eventConfirmModal, setEventConfirmModal] = useState(null);
+  const [eventActionLoading, setEventActionLoading] = useState(false);
 
   // Leaderboard filters
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
@@ -267,15 +270,60 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     }
   };
 
-  // Event control handlers
-  const handleToggleEventStatus = async (newStatus) => {
+  // Event state change confirmation triggers
+  const promptCloseRegistration = () => {
+    setEventConfirmModal({
+      targetStatus: 'REGISTRATION_CLOSED',
+      title: 'Close Public Registration?',
+      description: 'Public self-registration via QR code and URL will be closed. New teams cannot register, but you can review and approve existing pending teams before starting the competition.',
+      confirmText: 'Close Registration',
+      confirmColor: '#d29922'
+    });
+  };
+
+  const promptStartEvent = () => {
+    setEventConfirmModal({
+      targetStatus: 'EVENT_LIVE',
+      title: 'Start Competition (Go Live)?',
+      description: 'This will officially launch the Code Auctioneer event! Problem catalog access, auction purchases, and live coding submissions will be activated for all approved teams.',
+      confirmText: 'Start Event Now',
+      confirmColor: '#2ea043'
+    });
+  };
+
+  const promptEndEvent = () => {
+    setEventConfirmModal({
+      targetStatus: 'EVENT_ENDED',
+      title: 'End Competition?',
+      description: 'Are you sure you want to officially END the competition? This will conclude all bidding, card purchases, and code submissions. Final scores, team balances, and leaderboard standings will remain permanently preserved.',
+      confirmText: 'End Event',
+      confirmColor: '#f85149'
+    });
+  };
+
+  const promptReopenRegistration = () => {
+    setEventConfirmModal({
+      targetStatus: 'REGISTRATION_OPEN',
+      title: 'Re-open Public Registration?',
+      description: 'This will allow new teams to access the registration page and submit registrations via QR code or portal link.',
+      confirmText: 'Re-open Registration',
+      confirmColor: '#38bdf8'
+    });
+  };
+
+  const handleConfirmEventAction = async () => {
+    if (!eventConfirmModal) return;
+    setEventActionLoading(true);
     try {
-      const updated = await updateEventStatus(newStatus);
+      const updated = await updateEventStatus(eventConfirmModal.targetStatus);
       setEventState(updated);
-      showToast(`Event status updated to: ${newStatus.replace(/_/g, ' ')}`, true);
+      showToast(`Event status updated: ${eventConfirmModal.targetStatus.replace(/_/g, ' ')}`, true);
+      setEventConfirmModal(null);
       await loadData();
     } catch (err) {
       showToast(err.message || 'Failed to update event status', false);
+    } finally {
+      setEventActionLoading(false);
     }
   };
 
@@ -529,13 +577,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               width: '42px',
               height: '42px',
               borderRadius: '10px',
-              background: eventState.status === 'EVENT_LIVE'
+              background: eventState.status === 'EVENT_ENDED'
+                ? 'rgba(148, 163, 184, 0.15)'
+                : eventState.status === 'EVENT_LIVE'
                 ? 'rgba(188, 140, 255, 0.15)'
                 : eventState.status === 'REGISTRATION_CLOSED'
                 ? 'rgba(210, 153, 34, 0.15)'
                 : 'rgba(56, 189, 248, 0.15)',
               border: `1px solid ${
-                eventState.status === 'EVENT_LIVE'
+                eventState.status === 'EVENT_ENDED'
+                  ? 'rgba(148, 163, 184, 0.35)'
+                  : eventState.status === 'EVENT_LIVE'
                   ? 'rgba(188, 140, 255, 0.35)'
                   : eventState.status === 'REGISTRATION_CLOSED'
                   ? 'rgba(210, 153, 34, 0.35)'
@@ -544,13 +596,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: eventState.status === 'EVENT_LIVE'
+              color: eventState.status === 'EVENT_ENDED'
+                ? '#94a3b8'
+                : eventState.status === 'EVENT_LIVE'
                 ? '#bc8cff'
                 : eventState.status === 'REGISTRATION_CLOSED'
                 ? '#d29922'
                 : '#38bdf8'
             }}>
-              {eventState.status === 'EVENT_LIVE' ? (
+              {eventState.status === 'EVENT_ENDED' ? (
+                <Square size={18} />
+              ) : eventState.status === 'EVENT_LIVE' ? (
                 <Play size={20} />
               ) : eventState.status === 'REGISTRATION_CLOSED' ? (
                 <Pause size={20} />
@@ -570,97 +626,100 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   padding: '2px 8px',
                   borderRadius: '10px',
                   letterSpacing: '0.4px',
-                  background: eventState.status === 'EVENT_LIVE'
+                  background: eventState.status === 'EVENT_ENDED'
+                    ? 'rgba(148, 163, 184, 0.18)'
+                    : eventState.status === 'EVENT_LIVE'
                     ? 'rgba(188, 140, 255, 0.18)'
                     : eventState.status === 'REGISTRATION_CLOSED'
                     ? 'rgba(210, 153, 34, 0.18)'
                     : 'rgba(56, 189, 248, 0.18)',
-                  color: eventState.status === 'EVENT_LIVE'
+                  color: eventState.status === 'EVENT_ENDED'
+                    ? '#94a3b8'
+                    : eventState.status === 'EVENT_LIVE'
                     ? '#bc8cff'
                     : eventState.status === 'REGISTRATION_CLOSED'
                     ? '#d29922'
                     : '#38bdf8',
                   border: `1px solid ${
-                    eventState.status === 'EVENT_LIVE'
+                    eventState.status === 'EVENT_ENDED'
+                      ? 'rgba(148, 163, 184, 0.4)'
+                      : eventState.status === 'EVENT_LIVE'
                       ? 'rgba(188, 140, 255, 0.4)'
                       : eventState.status === 'REGISTRATION_CLOSED'
                       ? 'rgba(210, 153, 34, 0.4)'
                       : 'rgba(56, 189, 248, 0.4)'
                   }`
                 }}>
-                  {eventState.status === 'EVENT_LIVE'
+                  {eventState.status === 'EVENT_ENDED'
+                    ? '■ EVENT ENDED'
+                    : eventState.status === 'EVENT_LIVE'
                     ? '● EVENT LIVE'
                     : eventState.status === 'REGISTRATION_CLOSED'
                     ? '■ REGISTRATION CLOSED'
-                    : '▲ REGISTRATION OPEN'}
+                    : '● REGISTRATION OPEN'}
                 </span>
               </div>
               <div style={{ fontSize: '13px', color: '#c9d1d9' }}>
-                {eventState.status === 'EVENT_LIVE'
-                  ? 'Competition is live. Public self-registration is closed.'
+                {eventState.status === 'EVENT_ENDED'
+                  ? 'Competition concluded. Final leaderboard standings, balances, and records are preserved.'
+                  : eventState.status === 'EVENT_LIVE'
+                  ? 'Competition is LIVE! Problem catalog bidding and live coding are active.'
                   : eventState.status === 'REGISTRATION_CLOSED'
-                  ? 'Public registration paused. Admin approval still enabled.'
-                  : 'Public registration is open. Teams can self-register via QR code.'}
+                  ? 'Public registration closed. Review and approve pending teams before starting the event.'
+                  : 'Public registration is open. Teams can self-register via QR code or registration link.'}
               </div>
             </div>
           </div>
 
           {/* Action buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Show QR code button */}
-            <button
-              className="btn-ghost"
-              onClick={() => setShowQrModal(true)}
-              style={{
-                fontSize: '12px',
-                padding: '7px 14px',
-                color: '#58a6ff',
-                borderColor: 'rgba(88, 166, 255, 0.3)',
-                background: 'rgba(88, 166, 255, 0.08)'
-              }}
-            >
-              <QrCode size={14} />
-              <span>Registration QR</span>
-            </button>
+            {/* Show QR code button (only when relevant before event goes live) */}
+            {(eventState.status === 'REGISTRATION_OPEN' || eventState.status === 'REGISTRATION_CLOSED') && (
+              <button
+                className="btn-ghost"
+                onClick={() => setShowQrModal(true)}
+                style={{
+                  fontSize: '12px',
+                  padding: '7px 14px',
+                  color: '#58a6ff',
+                  borderColor: 'rgba(88, 166, 255, 0.3)',
+                  background: 'rgba(88, 166, 255, 0.08)'
+                }}
+              >
+                <QrCode size={14} />
+                <span>Registration QR</span>
+              </button>
+            )}
 
-            {/* Toggle registration / start event */}
+            {/* Streamlined State Machine Actions */}
             {eventState.status === 'REGISTRATION_OPEN' ? (
-              <>
-                <button
-                  className="btn-ghost"
-                  onClick={() => handleToggleEventStatus('REGISTRATION_CLOSED')}
-                  style={{ fontSize: '12px', padding: '7px 14px' }}
-                >
-                  <Pause size={13} />
-                  <span>Close Registration</span>
-                </button>
-
-                <button
-                  onClick={() => handleToggleEventStatus('EVENT_LIVE')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '7px 16px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
-                    border: 'none',
-                    borderRadius: '6px',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(46, 160, 67, 0.35)'
-                  }}
-                >
-                  <Play size={13} />
-                  <span>Start Event (Go Live)</span>
-                </button>
-              </>
+              /* Registration Open -> Primary Action: Close Registration */
+              <button
+                onClick={promptCloseRegistration}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 16px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #d29922 0%, #b08800 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(210, 153, 34, 0.35)'
+                }}
+              >
+                <Pause size={13} />
+                <span>Close Registration</span>
+              </button>
             ) : eventState.status === 'REGISTRATION_CLOSED' ? (
+              /* Registration Closed -> Primary Action: Start Event */
               <>
                 <button
                   className="btn-ghost"
-                  onClick={() => handleToggleEventStatus('REGISTRATION_OPEN')}
+                  onClick={promptReopenRegistration}
                   style={{ fontSize: '12px', padding: '7px 14px', color: '#38bdf8' }}
                 >
                   <RefreshCw size={13} />
@@ -668,7 +727,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </button>
 
                 <button
-                  onClick={() => handleToggleEventStatus('EVENT_LIVE')}
+                  onClick={promptStartEvent}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -685,19 +744,44 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   }}
                 >
                   <Play size={13} />
-                  <span>Start Event (Go Live)</span>
+                  <span>Start Event</span>
                 </button>
               </>
-            ) : (
-              /* EVENT_LIVE */
+            ) : eventState.status === 'EVENT_LIVE' ? (
+              /* Event Live -> Primary Action: End Event */
               <button
-                className="btn-ghost"
-                onClick={() => handleToggleEventStatus('REGISTRATION_OPEN')}
-                style={{ fontSize: '12px', padding: '7px 14px', color: '#bc8cff', borderColor: 'rgba(188, 140, 255, 0.3)' }}
+                onClick={promptEndEvent}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 16px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #cf222e 0%, #da3633 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(207, 34, 46, 0.35)'
+                }}
               >
-                <RefreshCw size={13} />
-                <span>Reopen Late Registration</span>
+                <Square size={12} fill="#ffffff" />
+                <span>End Event</span>
               </button>
+            ) : (
+              /* EVENT_ENDED */
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#94a3b8',
+                padding: '6px 12px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                borderRadius: '6px',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                Event Concluded ✓
+              </div>
             )}
           </div>
         </div>
@@ -972,7 +1056,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                           <div style={{ fontWeight: 600, color: '#ffffff' }}>{team.name}</div>
                           <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>
                             {(team.members || []).length || team.size || 1} Member{((team.members || []).length || team.size || 1) !== 1 ? 's' : ''}
-                            {team.captainName ? ` · Lead: ${team.captainName}` : ''}
+                            {team.captainName ? ` · Leader: ${team.captainName}` : ''}
                           </div>
                         </td>
 
@@ -2621,6 +2705,125 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
               >
                 <ExternalLink size={14} />
                 <span>Open Page</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EVENT STATE CONFIRMATION MODAL */}
+      {eventConfirmModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !eventActionLoading) setEventConfirmModal(null);
+          }}
+        >
+          <div style={{
+            background: '#0d111c',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '16px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: `${eventConfirmModal.confirmColor}1f`,
+                  border: `1px solid ${eventConfirmModal.confirmColor}55`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: eventConfirmModal.confirmColor
+                }}>
+                  <AlertTriangle size={18} />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#ffffff' }}>
+                  {eventConfirmModal.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => !eventActionLoading && setEventConfirmModal(null)}
+                disabled={eventActionLoading}
+                style={{ background: 'none', border: 'none', color: 'var(--txt-muted)', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--txt-muted)', lineHeight: 1.5 }}>
+              {eventConfirmModal.description}
+            </p>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '20px',
+              fontSize: '12px',
+              color: 'var(--txt-dim)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span>Target State:</span>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                color: eventConfirmModal.confirmColor,
+                fontSize: '11px',
+                letterSpacing: '0.5px'
+              }}>
+                {eventConfirmModal.targetStatus}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setEventConfirmModal(null)}
+                disabled={eventActionLoading}
+                style={{ padding: '8px 16px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEventAction}
+                disabled={eventActionLoading}
+                style={{
+                  padding: '8px 20px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: eventConfirmModal.confirmColor,
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {eventActionLoading ? 'Applying...' : eventConfirmModal.confirmText}
               </button>
             </div>
           </div>

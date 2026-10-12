@@ -1499,7 +1499,8 @@
   },
   "eventState": {
     "status": "REGISTRATION_OPEN",
-    "startedAt": "2026-10-12T16:00:54.840Z"
+    "startedAt": "2026-10-12T16:00:54.840Z",
+    "endedAt": "2026-10-12T16:38:31.401Z"
   },
   "transactions": [],
   "unlockHistory": [],

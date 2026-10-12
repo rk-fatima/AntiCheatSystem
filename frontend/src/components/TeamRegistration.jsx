@@ -138,6 +138,17 @@ export function TeamRegistration({ onNavigateLogin }) {
       return;
     }
 
+    const cleanContact = leaderContact.trim();
+    if (!cleanContact) {
+      setErrorMsg('Team Leader Phone / WhatsApp number is required.');
+      return;
+    }
+    const phoneDigits = cleanContact.replace(/[\s\-\(\)]/g, '');
+    if (!/^(?:\+91|91|0)?[6-9]\d{9}$/.test(phoneDigits)) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number (e.g., 9876543210 or +91 98765 43210).');
+      return;
+    }
+
     // Validate all members up to memberCount
     for (let i = 0; i < memberCount; i++) {
       const mName = (members[i]?.name || '').trim();
@@ -152,7 +163,7 @@ export function TeamRegistration({ onNavigateLogin }) {
       const payload = {
         teamName: normTeam,
         leaderName: normLeader,
-        leaderContact: leaderContact.trim(),
+        leaderContact: cleanContact,
         leaderEmail: leaderEmail.trim(),
         password,
         memberCount,
@@ -160,7 +171,7 @@ export function TeamRegistration({ onNavigateLogin }) {
           name: m.name.trim(),
           rollNo: (m.rollNo || '').trim(),
           college: (m.college || '').trim(),
-          phone: (m.phone || (idx === 0 ? leaderContact.trim() : '')).trim(),
+          phone: (m.phone || (idx === 0 ? cleanContact : '')).trim(),
           email: (m.email || (idx === 0 ? leaderEmail.trim() : '')).trim()
         }))
       };
@@ -178,7 +189,7 @@ export function TeamRegistration({ onNavigateLogin }) {
     }
   };
 
-  const isRegistrationClosed = eventStatus === 'REGISTRATION_CLOSED' || eventStatus === 'EVENT_LIVE';
+  const isRegistrationClosed = eventStatus === 'REGISTRATION_CLOSED' || eventStatus === 'EVENT_LIVE' || eventStatus === 'EVENT_ENDED';
 
   return (
     <div style={{
@@ -228,9 +239,21 @@ export function TeamRegistration({ onNavigateLogin }) {
             fontWeight: 700,
             padding: '3px 10px',
             borderRadius: '12px',
-            background: isRegistrationClosed ? 'rgba(248, 81, 73, 0.12)' : 'rgba(56, 189, 248, 0.12)',
-            border: isRegistrationClosed ? '1px solid rgba(248, 81, 73, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
-            color: isRegistrationClosed ? '#ff7b72' : '#38bdf8',
+            background: eventStatus === 'EVENT_ENDED'
+              ? 'rgba(148, 163, 184, 0.15)'
+              : (eventStatus === 'EVENT_LIVE'
+                ? 'rgba(188, 140, 255, 0.15)'
+                : (isRegistrationClosed ? 'rgba(248, 81, 73, 0.12)' : 'rgba(56, 189, 248, 0.12)')),
+            border: eventStatus === 'EVENT_ENDED'
+              ? '1px solid rgba(148, 163, 184, 0.35)'
+              : (eventStatus === 'EVENT_LIVE'
+                ? '1px solid rgba(188, 140, 255, 0.35)'
+                : (isRegistrationClosed ? '1px solid rgba(248, 81, 73, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)')),
+            color: eventStatus === 'EVENT_ENDED'
+              ? '#94a3b8'
+              : (eventStatus === 'EVENT_LIVE'
+                ? '#d2a8ff'
+                : (isRegistrationClosed ? '#ff7b72' : '#38bdf8')),
             letterSpacing: '0.4px',
             display: 'flex',
             alignItems: 'center',
@@ -240,9 +263,17 @@ export function TeamRegistration({ onNavigateLogin }) {
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              background: isRegistrationClosed ? '#f85149' : '#38bdf8'
+              background: eventStatus === 'EVENT_ENDED'
+                ? '#94a3b8'
+                : (eventStatus === 'EVENT_LIVE'
+                  ? '#bc8cff'
+                  : (isRegistrationClosed ? '#f85149' : '#38bdf8'))
             }} />
-            {isRegistrationClosed ? 'REGISTRATION CLOSED' : 'REGISTRATION OPEN'}
+            {eventStatus === 'EVENT_ENDED'
+              ? 'EVENT ENDED'
+              : (eventStatus === 'EVENT_LIVE'
+                ? 'EVENT LIVE'
+                : (isRegistrationClosed ? 'REGISTRATION CLOSED' : 'REGISTRATION OPEN'))}
           </span>
         </div>
 
@@ -674,10 +705,11 @@ export function TeamRegistration({ onNavigateLogin }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#c9d1d9', marginBottom: '5px' }}>
-                      Phone / WhatsApp
+                      Phone / WhatsApp <span style={{ color: '#f85149' }}>*</span>
                     </label>
                     <input
                       type="tel"
+                      required
                       disabled={isRegistrationClosed}
                       placeholder="+91 98765 43210"
                       value={leaderContact}
@@ -791,7 +823,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                               background: 'rgba(188, 140, 255, 0.15)',
                               color: '#bc8cff'
                             }}>
-                              CAPTAIN
+                              LEADER
                             </span>
                           )}
                         </div>
