@@ -19,8 +19,8 @@ COPY backend/ ./backend/
 
 WORKDIR /app/backend
 
-# Railway injects $PORT (defaults to 8765 if not set)
-ENV PORT=8765
-EXPOSE 8765
+# Default PORT to 8765 if not provided by cloud platform (Railway dynamically sets PORT)
+ENV PORT=${PORT:-8765}
+EXPOSE ${PORT}
 
 CMD ["node", "server.js"]

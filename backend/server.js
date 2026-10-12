@@ -138,9 +138,14 @@ function broadcastToAll(payload) {
 }
 
 // --- HEALTH CHECK ---
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', service: 'Qubit AntiCheat Server', serverTime: Date.now() });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', serverTime: Date.now() });
 });
+
 
 // --- PROBLEMS & DYNAMIC PRICING API ---
 app.get('/api/problems', (req, res) => {
@@ -1145,6 +1150,7 @@ if (fs.existsSync(FRONTEND_DIST)) {
   });
 }
 
-server.listen(PORT, () => {
-  console.log(`Qubit AntiCheat Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Qubit AntiCheat Server running on http://0.0.0.0:${PORT}`);
 });
+
