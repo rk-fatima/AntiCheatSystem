@@ -1,26 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Send, RotateCcw, Loader2, CheckCircle, AlertTriangle, XCircle, Terminal, Lightbulb, Zap, Snowflake, Lock, Unlock } from 'lucide-react';
+import {
+  Play,
+  Send,
+  RotateCcw,
+  Loader2,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Terminal,
+  Lightbulb,
+  Zap,
+  Lock,
+  Code2,
+  Check,
+  CheckCircle2,
+  Sparkles
+} from 'lucide-react';
 import { useHintPass } from '../services/api';
-
-const STARTER_TEMPLATES = {
-  python: `import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # TODO: parse input, solve, print output\n    print()\n\nif __name__ == "__main__":\n    main()\n`,
-  c: `#include <stdio.h>\n\nint main() {\n    // TODO: read input with scanf, solve, print with printf\n    return 0;\n}\n`,
-  cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(null);\n    // TODO: read input with cin, solve, print with cout\n    return 0;\n}\n`,
-  java: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // TODO: read input, solve, print output\n    }\n}\n`
-};
-
-const WORKING_SOLUTIONS = {
-  E1: {
-    python: `import sys\n\ndef main():\n    d = sys.stdin.read().split()\n    if not d:\n        return\n    n, t = int(d[0]), int(d[1])\n    nums = [int(x) for x in d[2:n+2]]\n    seen = {}\n    for i, x in enumerate(nums):\n        if (t - x) in seen:\n            print(f"{seen[t - x]} {i}")\n            return\n        seen[x] = i\n\nif __name__ == "__main__":\n    main()\n`,
-    cpp: `#include <iostream>\n#include <vector>\n#include <unordered_map>\n\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    int n;\n    long long t;\n    if (cin >> n >> t) {\n        unordered_map<long long, int> seen;\n        for (int i = 0; i < n; i++) {\n            long long x;\n            cin >> x;\n            if (seen.count(t - x)) {\n                cout << seen[t - x] << " " << i << endl;\n                return 0;\n            }\n            seen[x] = i;\n        }\n    }\n    return 0;\n}\n`,
-    java: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        if (sc.hasNextInt()) {\n            int n = sc.nextInt();\n            long t = sc.nextLong();\n            Map<Long, Integer> seen = new HashMap<>();\n            for (int i = 0; i < n; i++) {\n                long x = sc.nextLong();\n                if (seen.containsKey(t - x)) {\n                    System.out.println(seen.get(t - x) + " " + i);\n                    return;\n                }\n                seen.put(x, i);\n            }\n        }\n    }\n}\n`
-  },
-  LC1: {
-    python: `import sys\n\ndef main():\n    d = sys.stdin.read().split()\n    if not d:\n        return\n    n, t = int(d[0]), int(d[1])\n    nums = [int(x) for x in d[2:n+2]]\n    seen = {}\n    for i, x in enumerate(nums):\n        if (t - x) in seen:\n            print(f"{seen[t - x]} {i}")\n            return\n        seen[x] = i\n\nif __name__ == "__main__":\n    main()\n`,
-    cpp: `#include <iostream>\n#include <vector>\n#include <unordered_map>\n\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    int n;\n    long long t;\n    if (cin >> n >> t) {\n        unordered_map<long long, int> seen;\n        for (int i = 0; i < n; i++) {\n            long long x;\n            cin >> x;\n            if (seen.count(t - x)) {\n                cout << seen[t - x] << " " << i << endl;\n                return 0;\n            }\n            seen[x] = i;\n        }\n    }\n    return 0;\n}\n`,
-    java: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        if (sc.hasNextInt()) {\n            int n = sc.nextInt();\n            long t = sc.nextLong();\n            Map<Long, Integer> seen = new HashMap<>();\n            for (int i = 0; i < n; i++) {\n                long x = sc.nextLong();\n                if (seen.containsKey(t - x)) {\n                    System.out.println(seen.get(t - x) + " " + i);\n                    return;\n                }\n                seen.put(x, i);\n            }\n        }\n    }\n}\n`
-  }
-};
+import { getStarterTemplate, getProblemMetadata, getWorkingSolution } from '../data/leetcodeRegistry';
 
 export function CodeEditorPane({
   problem,
@@ -37,7 +34,25 @@ export function CodeEditorPane({
   reportViolation,
   internalClipboardRef
 }) {
-  const [stdin, setStdin] = useState(problem?.si || '');
+  const meta = getProblemMetadata(problem?.id);
+
+  // LeetCode Bottom Drawer Tabs: 'testcase' | 'result'
+  const [activeBottomTab, setActiveBottomTab] = useState('testcase');
+  const [selectedCaseIdx, setSelectedCaseIdx] = useState(0);
+
+  // Local testcase cases (cloned from registry for user custom editing)
+  const defaultCases = meta?.testcases || [
+    {
+      id: 1,
+      title: 'Case 1',
+      rawStdin: problem?.si || '',
+      expected: problem?.eo || problem?.so || '',
+      formattedExpected: problem?.eo || problem?.so || '',
+      params: { input: problem?.si || '' }
+    }
+  ];
+
+  const [testCases, setTestCases] = useState(defaultCases);
   const [outputResult, setOutputResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +63,25 @@ export function CodeEditorPane({
   const isFrozen = Boolean(team?.frozenUntil && team.frozenUntil > Date.now());
   const isHintCardUnlocked = Boolean(team?.unlockedCards?.includes('HINT') || team?.hintUnlocked);
   const hasHintPass = (team?.hintPassesCount || 0) > 0;
+
+  // Refresh testcases when problem changes
+  useEffect(() => {
+    const updatedMeta = getProblemMetadata(problem?.id);
+    const newCases = updatedMeta?.testcases || [
+      {
+        id: 1,
+        title: 'Case 1',
+        rawStdin: problem?.si || '',
+        expected: problem?.eo || problem?.so || '',
+        formattedExpected: problem?.eo || problem?.so || '',
+        params: { input: problem?.si || '' }
+      }
+    ];
+    setTestCases(newCases);
+    setSelectedCaseIdx(0);
+    setOutputResult(null);
+    setActiveBottomTab('testcase');
+  }, [problem?.id]);
 
   const handleUseHintPassDirect = async () => {
     if (!problem?.id || !team?.name) return;
@@ -73,14 +107,6 @@ export function CodeEditorPane({
   const gutterRef = useRef(null);
   const prevCodeLenRef = useRef(code.length);
   const bulkAllowedRef = useRef(false);
-
-  // Sync custom input with problem sample input when problem changes
-  useEffect(() => {
-    if (problem?.si) {
-      setStdin(problem.si);
-    }
-    setOutputResult(null);
-  }, [problem?.id]);
 
   // Sync line number gutter with code textarea
   const lineCount = (code || '').split('\n').length;
@@ -149,7 +175,6 @@ export function CodeEditorPane({
     e.preventDefault();
     const clipboardText = e.clipboardData ? e.clipboardData.getData('text') : '';
 
-    // If paste is allowed (Dev / Testing mode)
     if (allowPaste) {
       if (clipboardText) {
         const target = textareaRef.current;
@@ -163,14 +188,12 @@ export function CodeEditorPane({
       return;
     }
 
-    // If clipboard differs from internal copy buffer, flag it as external insertion!
     if (clipboardText && clipboardText !== internalClipboardRef.current) {
       reportViolation(
         'EXTERNAL_PASTE_ATTEMPT',
         `Blocked attempt to paste external code (${clipboardText.length} characters).`
       );
     } else if (internalClipboardRef.current) {
-      // Paste allowed internal text
       const target = textareaRef.current;
       const start = target.selectionStart;
       const end = target.selectionEnd;
@@ -182,7 +205,7 @@ export function CodeEditorPane({
   };
 
   const handleLoadSolution = () => {
-    const sol = WORKING_SOLUTIONS[problem?.id]?.[lang];
+    const sol = getWorkingSolution(problem?.id, lang);
     if (sol) {
       bulkAllowedRef.current = true;
       onCodeChange(sol);
@@ -194,43 +217,56 @@ export function CodeEditorPane({
   };
 
   const handleReset = () => {
-    if (window.confirm('Reset code to starter template?')) {
-      onCodeChange(STARTER_TEMPLATES[lang] || '');
+    if (window.confirm('Reset code to starter LeetCode template?')) {
+      onCodeChange(getStarterTemplate(problem, lang));
       setOutputResult(null);
     }
   };
 
+  // Run Code against the currently active testcase
   const handleRun = async () => {
     setIsRunning(true);
-    setOutputResult({ status: 'QUEUED', message: 'Job enqueued on runner worker pool...' });
+    setActiveBottomTab('result');
+    setOutputResult({ status: 'QUEUED', message: 'Executing function against testcase...' });
+
+    const currentCase = testCases[selectedCaseIdx] || testCases[0];
+    const stdinToPass = currentCase.rawStdin || problem?.si || '';
+
     try {
-      const res = await onRunCode({ lang, code, stdin, memberId: currentMember?.memberId, problemId: problem?.id });
+      const res = await onRunCode({
+        lang,
+        code,
+        stdin: stdinToPass,
+        memberId: currentMember?.memberId,
+        problemId: problem?.id
+      });
       const resultData = res?.result || res?.data || {};
 
-      const stdout = resultData.stdout !== undefined ? resultData.stdout : (resultData.output || '');
+      const rawStdout = resultData.stdout !== undefined ? resultData.stdout : (resultData.output || '');
       const stderr = resultData.stderr || '';
 
       const norm = (s) => (s || '').trim().replace(/\r\n/g, '\n');
-      const normStdin = norm(stdin);
-      const normSampleIn = norm(problem?.si);
-      const expectedOut = norm(problem?.eo || problem?.so);
+      const expected = currentCase.formattedExpected || norm(problem?.eo || problem?.so);
 
-      let isCorrect = null;
-      let expected = null;
+      // Clean check comparing bracketless/commaless tokens
+      const cleanA = norm(rawStdout).replace(/[\[\],]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      const cleanB = norm(expected).replace(/[\[\],]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      const isCorrect = Boolean(cleanB && cleanA === cleanB && cleanA.length > 0);
 
-      // If stdin matches problem sample input or is blank, compare against sample expected output
-      if (normStdin === normSampleIn || !normStdin) {
-        expected = expectedOut;
-        const normActual = norm(stdout);
-        isCorrect = Boolean(expected && normActual === expected && normActual.length > 0);
+      // Format output for display in LeetCode style (e.g. bracketed if expected is bracketed)
+      let displayOutput = norm(rawStdout);
+      if (expected.startsWith('[') && !displayOutput.startsWith('[') && displayOutput.includes(' ')) {
+        displayOutput = `[${displayOutput.replace(/\s+/g, ', ')}]`;
       }
 
       setOutputResult({
         status: res?.status || 'COMPLETED',
         type: 'run',
+        selectedCaseIdx,
         data: {
           ...resultData,
-          stdout,
+          stdout: displayOutput,
+          rawStdout,
           stderr,
           expected,
           isCorrect
@@ -247,24 +283,38 @@ export function CodeEditorPane({
     }
   };
 
+  // Submit Solution for full evaluation against all hidden testcases
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    setOutputResult({ status: 'QUEUED', message: 'Submission queued for server-side evaluation...' });
+    setActiveBottomTab('result');
+    setOutputResult({ status: 'QUEUED', message: 'Submitting solution to judge for full evaluation...' });
+
     try {
-      const res = await onSubmitCode({ problemId: problem.id, lang, code, memberId: currentMember?.memberId });
+      const res = await onSubmitCode({
+        problemId: problem.id,
+        lang,
+        code,
+        memberId: currentMember?.memberId
+      });
       const resultData = res?.result || res?.data || {};
 
       const norm = (s) => (s || '').trim().replace(/\r\n/g, '\n');
-      const stdout = resultData.stdout !== undefined ? resultData.stdout : (resultData.output || '');
-      const expected = norm(problem?.eo || problem?.so);
+      const rawStdout = resultData.stdout !== undefined ? resultData.stdout : (resultData.output || '');
+      const expected = meta?.examples?.[0]?.output || norm(problem?.eo || problem?.so);
       const passed = Boolean(resultData.passed);
+
+      let displayOutput = norm(rawStdout);
+      if (expected.startsWith('[') && !displayOutput.startsWith('[') && displayOutput.includes(' ')) {
+        displayOutput = `[${displayOutput.replace(/\s+/g, ', ')}]`;
+      }
 
       setOutputResult({
         status: res?.status || 'COMPLETED',
         type: 'submit',
+        selectedCaseIdx,
         data: {
           ...resultData,
-          stdout,
+          stdout: displayOutput,
           expected,
           isCorrect: passed
         },
@@ -280,20 +330,24 @@ export function CodeEditorPane({
     }
   };
 
+  const activeCase = testCases[selectedCaseIdx] || testCases[0];
+
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-      {/* Left Pane: Problem Statement */}
+      {/* ============================================================ */}
+      {/* LEFT PANE: LEETCODE-STYLE PROBLEM STATEMENT                  */}
+      {/* ============================================================ */}
       <div style={{
-        width: '420px',
+        width: '440px',
         borderRight: '1px solid rgba(255, 255, 255, 0.08)',
         overflowY: 'auto',
-        padding: '24px',
-        background: 'rgba(8, 12, 22, 0.6)',
+        padding: '24px 26px',
+        background: '#0a0e1a',
         flexShrink: 0
       }}>
         {/* Title & Difficulty Row */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
             <span style={{
               fontSize: '11px',
               fontWeight: 600,
@@ -325,12 +379,12 @@ export function CodeEditorPane({
             )}
           </div>
 
-          <h1 style={{ margin: 0, color: '#ffffff', fontSize: '20px', fontWeight: 700, letterSpacing: '0.2px' }}>
-            {problem.id} — {problem.title}
+          <h1 style={{ margin: 0, color: '#ffffff', fontSize: '20px', fontWeight: 800, letterSpacing: '-0.2px' }}>
+            {problem.id}. {problem.title}
           </h1>
         </div>
 
-        {/* 💡 Blue Hint Card / Unlock Hint Button */}
+        {/* 💡 Algorithmic Hint Banner */}
         {team?.revealedHints?.[problem.id] ? (
           <div
             className="card-unlocked-reveal"
@@ -414,7 +468,7 @@ export function CodeEditorPane({
           </div>
         )}
 
-        {/* Shared Team Workspace Status Banner */}
+        {/* Solved Status Banner */}
         {problemStatus?.status === 'SOLVED' && (
           <div style={{
             padding: '10px 14px',
@@ -424,7 +478,7 @@ export function CodeEditorPane({
             color: '#3fb950',
             fontSize: '12px',
             fontWeight: 600,
-            marginBottom: '14px',
+            marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
@@ -434,57 +488,78 @@ export function CodeEditorPane({
           </div>
         )}
 
-        {problemStatus?.status === 'IN_PROGRESS' && problemStatus.workingBy !== currentMember?.memberId && (
-          <div style={{
-            padding: '10px 14px',
-            background: 'rgba(210, 153, 34, 0.1)',
-            border: '1px solid rgba(210, 153, 34, 0.3)',
-            borderRadius: '6px',
-            color: '#d29922',
-            fontSize: '12px',
-            fontWeight: 600,
-            marginBottom: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <AlertTriangle size={16} />
-            <span>Teammate {problemStatus.workingBy} is currently editing this problem</span>
-          </div>
-        )}
-
-        {/* Problem Specification Content */}
-        <div style={specSectionStyle}>
-          <div style={labelStyle}>Description</div>
-          <p style={{ margin: '6px 0', whiteSpace: 'pre-line', color: '#c9d1d9', lineHeight: 1.6, fontSize: '13px' }}>
+        {/* Problem Description */}
+        <div style={{ marginBottom: '22px' }}>
+          <p style={{ margin: 0, color: '#e6edf3', lineHeight: 1.65, fontSize: '14px' }}>
             {problem.desc}
           </p>
         </div>
 
-        <div style={specSectionStyle}>
-          <div style={labelStyle}>Constraints</div>
-          <pre style={codeBlockStyle}>{problem.con || 'Standard limits'}</pre>
+        {/* LeetCode Examples */}
+        <div style={{ marginBottom: '22px' }}>
+          {(meta?.examples || []).map((ex, index) => (
+            <div key={index} style={{
+              background: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.07)',
+              borderRadius: '8px',
+              padding: '14px 16px',
+              marginBottom: '12px'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
+                Example {index + 1}:
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12.5px', color: '#c9d1d9', lineHeight: 1.6 }}>
+                <div><strong style={{ color: 'var(--txt-muted)' }}>Input:</strong> {ex.input}</div>
+                <div><strong style={{ color: 'var(--txt-muted)' }}>Output:</strong> <span style={{ color: '#58a6ff' }}>{ex.output}</span></div>
+                {ex.explanation && (
+                  <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--txt-dim)' }}>
+                    <strong style={{ color: 'var(--txt-muted)' }}>Explanation:</strong> {ex.explanation}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div style={specSectionStyle}>
-          <div style={labelStyle}>Sample Input</div>
-          <pre style={codeBlockStyle}>{problem.si || '(None)'}</pre>
-        </div>
-
-        <div style={specSectionStyle}>
-          <div style={labelStyle}>Sample Output</div>
-          <pre style={codeBlockStyle}>{problem.so || '(None)'}</pre>
+        {/* Constraints */}
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#ffffff',
+            marginBottom: '8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.6px'
+          }}>
+            Constraints:
+          </div>
+          <ul style={{
+            margin: 0,
+            paddingLeft: '18px',
+            color: '#8b949e',
+            fontSize: '12.5px',
+            lineHeight: 1.7,
+            fontFamily: 'var(--font-mono)'
+          }}>
+            {(problem.con || 'Standard limits').split(',').map((conItem, idx) => (
+              <li key={idx}>
+                <code>{conItem.trim()}</code>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
-      {/* Right Pane: Code Editor + Runner & Terminal (Largest Visual Area) */}
+      {/* ============================================================ */}
+      {/* RIGHT PANE: LEETCODE CODE EDITOR & TESTCASES PANEL           */}
+      {/* ============================================================ */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
-        background: '#090d16',
-        padding: '16px 20px',
+        background: '#080c16',
+        padding: '14px 18px',
         gap: '12px'
       }}>
         {/* Editor Toolbar */}
@@ -494,28 +569,30 @@ export function CodeEditorPane({
             onChange={(e) => onLangChange(e.target.value)}
             style={{
               width: 'auto',
-              minWidth: '130px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              minWidth: '120px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '6px',
-              padding: '6px 10px',
-              fontSize: '13px'
+              padding: '6px 12px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#ffffff'
             }}
           >
-            <option value="python">Python 3</option>
-            <option value="c">C</option>
             <option value="cpp">C++</option>
             <option value="java">Java</option>
+            <option value="python">Python 3</option>
+            <option value="c">C</option>
           </select>
 
-          <button className="btn-ghost" onClick={handleReset} title="Reset starter code" style={{ fontSize: '12px' }}>
+          <button className="btn-ghost" onClick={handleReset} title="Reset starter LeetCode code" style={{ fontSize: '12px' }}>
             <RotateCcw size={13} /> Reset
           </button>
 
           <button
             className="btn-ghost"
             onClick={handleLoadSolution}
-            title="Auto-fill passing solution for testing"
+            title="Auto-fill passing LeetCode solution for testing"
             style={{
               fontSize: '12px',
               color: '#58a6ff',
@@ -539,36 +616,38 @@ export function CodeEditorPane({
 
           <div style={{ flex: 1 }} />
 
-          {/* Action Buttons */}
+          {/* Action Buttons: Run Code and Submit Solution */}
           <button
             className="btn-ghost"
             onClick={handleRun}
             disabled={isRunning || isSubmitting || isFrozen}
-            title={isFrozen ? "Screen is frozen" : "Run code against sample test"}
+            title={isFrozen ? "Screen is frozen" : "Run solution against test cases"}
             style={{
-              padding: '7px 16px',
+              padding: '7px 18px',
               fontSize: '13px',
               borderRadius: '6px',
-              borderColor: 'rgba(255, 255, 255, 0.15)'
+              borderColor: 'rgba(255, 255, 255, 0.16)',
+              fontWeight: 600
             }}
           >
-            {isRunning ? <Loader2 size={14} className="spin" /> : isFrozen ? <Zap size={14} color="#ff7b72" /> : <Play size={14} />}
-            {isFrozen ? 'Frozen' : 'Run Code'}
+            {isRunning ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+            {isRunning ? 'Running...' : 'Run Code'}
           </button>
 
           <button
             className="btn-primary"
             onClick={handleSubmit}
             disabled={isRunning || isSubmitting || isFrozen}
-            title={isFrozen ? "Screen is frozen" : "Submit solution for scoring"}
+            title={isFrozen ? "Screen is frozen" : "Submit solution to judge for full scoring"}
             style={{
-              padding: '7px 18px',
+              padding: '7px 20px',
               fontSize: '13px',
-              borderRadius: '6px'
+              borderRadius: '6px',
+              fontWeight: 700
             }}
           >
-            {isSubmitting ? <Loader2 size={14} className="spin" /> : isFrozen ? <Zap size={14} /> : <Send size={14} />}
-            {isFrozen ? 'Frozen' : 'Submit Solution'}
+            {isSubmitting ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+            {isSubmitting ? 'Evaluating...' : 'Submit Solution'}
           </button>
         </div>
 
@@ -626,254 +705,314 @@ export function CodeEditorPane({
           />
         </div>
 
-        {/* Custom Input */}
-        <div>
-          <div style={labelStyle}>Custom Input (stdin)</div>
-          <textarea
-            value={stdin}
-            onChange={(e) => setStdin(e.target.value)}
-            spellCheck="false"
-            rows={2}
-            style={{
-              width: '100%',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '12px',
-              borderRadius: '6px',
-              background: 'rgba(255, 255, 255, 0.025)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              resize: 'vertical',
-              padding: '8px 12px'
-            }}
-          />
-        </div>
-
-        {/* Terminal Execution Output Drawer */}
+        {/* ============================================================ */}
+        {/* LEETCODE BOTTOM DRAWER: TESTCASE & TEST RESULT TABS          */}
+        {/* ============================================================ */}
         <div style={{
           background: '#070a12',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px',
-          padding: '14px 18px',
-          minHeight: '130px',
-          maxHeight: '260px',
-          overflowY: 'auto'
+          padding: '12px 16px',
+          minHeight: '170px',
+          maxHeight: '270px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column'
         }}>
+          {/* Drawer Navigation Bar */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '10px',
-            color: 'var(--txt-muted)',
-            fontSize: '11px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.8px'
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            paddingBottom: '8px',
+            marginBottom: '12px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Terminal size={13} /> Execution Output
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveBottomTab('testcase')}
+                style={{
+                  background: activeBottomTab === 'testcase' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  border: 'none',
+                  color: activeBottomTab === 'testcase' ? '#ffffff' : 'var(--txt-muted)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Code2 size={14} /> Testcase
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveBottomTab('result')}
+                style={{
+                  background: activeBottomTab === 'result' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  border: 'none',
+                  color: activeBottomTab === 'result' ? '#ffffff' : 'var(--txt-muted)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Terminal size={14} /> Test Result
+                {outputResult && outputResult.status === 'COMPLETED' && (
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: outputResult.data?.isCorrect ? '#3fb950' : '#ff7b72'
+                  }} />
+                )}
+              </button>
             </div>
-            {outputResult && outputResult.status === 'COMPLETED' && outputResult.data && (
+
+            {/* Quick Status Preview in tab header */}
+            {activeBottomTab === 'result' && outputResult && outputResult.status === 'COMPLETED' && (
               <span style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                textTransform: 'none',
-                letterSpacing: 'normal',
-                color: outputResult.data.compileError
+                fontSize: '12px',
+                fontWeight: 700,
+                color: outputResult.data?.compileError
                   ? '#ff7b72'
-                  : outputResult.data.isCorrect === true
+                  : outputResult.data?.isCorrect
                   ? '#3fb950'
-                  : outputResult.data.isCorrect === false
-                  ? '#ff7b72'
-                  : '#58a6ff'
+                  : '#ff7b72'
               }}>
-                {outputResult.data.compileError
-                  ? 'Compilation Failed'
-                  : outputResult.data.isCorrect === true
-                  ? 'Status: Correct'
-                  : outputResult.data.isCorrect === false
-                  ? 'Status: Wrong Answer'
-                  : 'Status: Completed'}
+                {outputResult.data?.compileError
+                  ? 'Compile Error'
+                  : outputResult.data?.isCorrect
+                  ? 'Accepted'
+                  : 'Wrong Answer'}
               </span>
             )}
           </div>
 
-          {!outputResult && (
-            <div style={{ color: 'var(--txt-dim)', fontSize: '13px' }}>
-              Run or submit your code to view console output and test verdicts…
-            </div>
-          )}
-
-          {outputResult && outputResult.status === 'QUEUED' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#d29922', fontSize: '13px', padding: '12px 0' }}>
-              <Loader2 size={16} className="spin" />
-              <span>{outputResult.message || 'Executing code on runner pool...'}</span>
-            </div>
-          )}
-
-          {outputResult && outputResult.data && outputResult.status !== 'QUEUED' && (
-            <div>
-              {/* Status Verdict Strip */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 12px',
-                borderRadius: '6px',
-                marginBottom: '12px',
-                fontSize: '13px',
-                fontWeight: 600,
-                background: outputResult.data.compileError
-                  ? 'rgba(248, 81, 73, 0.12)'
-                  : outputResult.data.isCorrect === true
-                  ? 'rgba(63, 185, 80, 0.12)'
-                  : outputResult.data.isCorrect === false
-                  ? 'rgba(248, 81, 73, 0.12)'
-                  : 'rgba(56, 139, 253, 0.12)',
-                color: outputResult.data.compileError
-                  ? '#ff7b72'
-                  : outputResult.data.isCorrect === true
-                  ? '#3fb950'
-                  : outputResult.data.isCorrect === false
-                  ? '#ff7b72'
-                  : '#58a6ff',
-                border: `1px solid ${
-                  outputResult.data.compileError
-                    ? 'rgba(248, 81, 73, 0.3)'
-                    : outputResult.data.isCorrect === true
-                    ? 'rgba(63, 185, 80, 0.3)'
-                    : outputResult.data.isCorrect === false
-                    ? 'rgba(248, 81, 73, 0.3)'
-                    : 'rgba(56, 139, 253, 0.3)'
-                }`
-              }}>
-                {outputResult.data.compileError ? (
-                  <>
-                    <XCircle size={16} />
-                    <span>Compilation Error</span>
-                  </>
-                ) : outputResult.data.isCorrect === true ? (
-                  <>
-                    <CheckCircle size={16} />
-                    <span>Correct {outputResult.type === 'submit' ? '— ACCEPTED' : '(Matches Expected Output)'}</span>
-                  </>
-                ) : outputResult.data.isCorrect === false ? (
-                  <>
-                    <XCircle size={16} />
-                    <span>Wrong {outputResult.type === 'submit' ? 'Answer' : '(Output Mismatch)'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Terminal size={16} />
-                    <span>Program Executed Successfully</span>
-                  </>
-                )}
-
-                {outputResult.type === 'submit' && (
-                  <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 500 }}>
-                    {outputResult.data.passed
-                      ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} Difficulty Points Awarded`
-                      : `−10 WA Penalty (Passed ${outputResult.data.hiddenPassed || 0} / ${outputResult.data.totalHidden || 3})`}
-                  </span>
-                )}
+          {/* TAB 1: TESTCASE PANEL */}
+          {activeBottomTab === 'testcase' && (
+            <div style={{ flex: 1 }}>
+              {/* Case Selectors Pills (Case 1, Case 2, Case 3) */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                {testCases.map((tc, idx) => (
+                  <button
+                    key={tc.id || idx}
+                    type="button"
+                    onClick={() => setSelectedCaseIdx(idx)}
+                    style={{
+                      background: selectedCaseIdx === idx ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+                      border: `1px solid ${selectedCaseIdx === idx ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.07)'}`,
+                      borderRadius: '6px',
+                      padding: '4px 12px',
+                      color: selectedCaseIdx === idx ? '#ffffff' : 'var(--txt-muted)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {tc.title || `Case ${idx + 1}`}
+                  </button>
+                ))}
               </div>
 
-              {/* Output Comparison Grid: Your Output (Always Shown) vs Expected Output */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: outputResult.data.expected ? '1fr 1fr' : '1fr',
-                gap: '12px',
-                marginBottom: '8px'
-              }}>
-                {/* Box A: YOUR OUTPUT */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: `1px solid ${outputResult.data.isCorrect === false ? 'rgba(248, 81, 73, 0.28)' : 'rgba(255, 255, 255, 0.08)'}`,
-                  borderRadius: '6px',
-                  padding: '10px 12px'
-                }}>
-                  <div style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    color: 'var(--txt-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.6px',
-                    marginBottom: '6px'
-                  }}>
-                    Your Output
-                  </div>
-                  <pre style={{
-                    margin: 0,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '13px',
-                    color: outputResult.data.isCorrect === false ? '#ff7b72' : '#f0f6fc',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-all'
-                  }}>
-                    {outputResult.data.stdout || outputResult.data.output || '(Program exited with no standard output)'}
-                  </pre>
-                </div>
-
-                {/* Box B: EXPECTED OUTPUT */}
-                {outputResult.data.expected && (
-                  <div style={{
-                    background: 'rgba(63, 185, 80, 0.04)',
-                    border: '1px solid rgba(63, 185, 80, 0.25)',
-                    borderRadius: '6px',
-                    padding: '10px 12px'
-                  }}>
-                    <div style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#3fb950',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.6px',
-                      marginBottom: '6px'
-                    }}>
-                      Expected Output
+              {/* Formatted Parameter Inputs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {Object.entries(activeCase.params || {}).map(([paramName, paramVal]) => (
+                  <div key={paramName}>
+                    <div style={{ fontSize: '11px', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '4px' }}>
+                      {paramName} =
                     </div>
-                    <pre style={{
-                      margin: 0,
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.09)',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
                       fontFamily: 'var(--font-mono)',
                       fontSize: '13px',
-                      color: '#a6e3a1',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-all'
+                      color: '#f0f6fc'
                     }}>
-                      {outputResult.data.expected}
-                    </pre>
+                      {paramVal}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
-
-              {/* Details explanation if submit failure or diff info */}
-              {outputResult.data.details && (
-                <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '6px' }}>
-                  {outputResult.data.details}
-                </div>
-              )}
-
-              {/* Stderr Diagnostics */}
-              {outputResult.data.stderr && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: 'rgba(248, 81, 73, 0.08)',
-                  border: '1px solid rgba(248, 81, 73, 0.25)'
-                }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#ff7b72', marginBottom: '4px' }}>
-                    STDERR / COMPILER DIAGNOSTICS:
-                  </div>
-                  <pre style={{ margin: 0, fontSize: '12px', color: '#ff7b72', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' }}>
-                    {outputResult.data.stderr}
-                  </pre>
-                </div>
-              )}
             </div>
           )}
 
-          {outputResult && outputResult.error && (
-            <div style={{ color: '#ff7b72', fontSize: '13px', marginTop: '6px' }}>
-              ⚠ {outputResult.error}
+          {/* TAB 2: TEST RESULT PANEL */}
+          {activeBottomTab === 'result' && (
+            <div style={{ flex: 1 }}>
+              {!outputResult && (
+                <div style={{ color: 'var(--txt-dim)', fontSize: '13px', padding: '16px 0' }}>
+                  Run your code or submit your solution to view testcase results here…
+                </div>
+              )}
+
+              {outputResult && outputResult.status === 'QUEUED' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#d29922', fontSize: '13px', padding: '16px 0' }}>
+                  <Loader2 size={16} className="spin" />
+                  <span>{outputResult.message || 'Running code against judge...'}</span>
+                </div>
+              )}
+
+              {outputResult && outputResult.data && outputResult.status !== 'QUEUED' && (
+                <div>
+                  {/* Status Verdict Strip */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    marginBottom: '12px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    background: outputResult.data.compileError
+                      ? 'rgba(248, 81, 73, 0.12)'
+                      : outputResult.data.isCorrect === true
+                      ? 'rgba(63, 185, 80, 0.12)'
+                      : 'rgba(248, 81, 73, 0.12)',
+                    color: outputResult.data.compileError
+                      ? '#ff7b72'
+                      : outputResult.data.isCorrect === true
+                      ? '#3fb950'
+                      : '#ff7b72',
+                    border: `1px solid ${
+                      outputResult.data.compileError
+                        ? 'rgba(248, 81, 73, 0.3)'
+                        : outputResult.data.isCorrect === true
+                        ? 'rgba(63, 185, 80, 0.3)'
+                        : 'rgba(248, 81, 73, 0.3)'
+                    }`
+                  }}>
+                    {outputResult.data.compileError ? (
+                      <>
+                        <XCircle size={16} />
+                        <span>Compilation Error</span>
+                      </>
+                    ) : outputResult.data.isCorrect === true ? (
+                      <>
+                        <CheckCircle size={16} />
+                        <span>Accepted {outputResult.type === 'submit' ? '— All Testcases Passed' : ''}</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={16} />
+                        <span>Wrong Answer</span>
+                      </>
+                    )}
+
+                    {outputResult.type === 'submit' && (
+                      <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 600 }}>
+                        {outputResult.data.passed
+                          ? `+${problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200)} pts awarded`
+                          : `−10 WA Penalty (Passed ${outputResult.data.hiddenPassed || 0} / ${outputResult.data.totalHidden || 3})`}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* LeetCode Result Output vs Expected */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: outputResult.data.expected ? '1fr 1fr' : '1fr',
+                    gap: '12px',
+                    marginBottom: '10px'
+                  }}>
+                    {/* Your Output */}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: `1px solid ${outputResult.data.isCorrect === false ? 'rgba(248, 81, 73, 0.28)' : 'rgba(255, 255, 255, 0.08)'}`,
+                      borderRadius: '6px',
+                      padding: '10px 12px'
+                    }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: 'var(--txt-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.6px',
+                        marginBottom: '6px'
+                      }}>
+                        Output
+                      </div>
+                      <pre style={{
+                        margin: 0,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '13px',
+                        color: outputResult.data.isCorrect === false ? '#ff7b72' : '#f0f6fc',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all'
+                      }}>
+                        {outputResult.data.stdout || '(No return value)'}
+                      </pre>
+                    </div>
+
+                    {/* Expected Output */}
+                    {outputResult.data.expected && (
+                      <div style={{
+                        background: 'rgba(63, 185, 80, 0.04)',
+                        border: '1px solid rgba(63, 185, 80, 0.25)',
+                        borderRadius: '6px',
+                        padding: '10px 12px'
+                      }}>
+                        <div style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#3fb950',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.6px',
+                          marginBottom: '6px'
+                        }}>
+                          Expected
+                        </div>
+                        <pre style={{
+                          margin: 0,
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '13px',
+                          color: '#a6e3a1',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all'
+                        }}>
+                          {outputResult.data.expected}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stderr Diagnostics if any */}
+                  {outputResult.data.stderr && (
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(248, 81, 73, 0.08)',
+                      border: '1px solid rgba(248, 81, 73, 0.25)'
+                    }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#ff7b72', marginBottom: '4px' }}>
+                        COMPILER / RUNTIME DIAGNOSTICS:
+                      </div>
+                      <pre style={{ margin: 0, fontSize: '12px', color: '#ff7b72', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' }}>
+                        {outputResult.data.stderr}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {outputResult && outputResult.error && (
+                <div style={{ color: '#ff7b72', fontSize: '13px', marginTop: '6px' }}>
+                  ⚠ {outputResult.error}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -881,28 +1020,3 @@ export function CodeEditorPane({
     </div>
   );
 }
-
-const specSectionStyle = {
-  marginBottom: '18px'
-};
-
-const labelStyle = {
-  fontSize: '11px',
-  color: 'var(--txt-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '1px',
-  fontWeight: 700,
-  marginBottom: '4px'
-};
-
-const codeBlockStyle = {
-  background: 'rgba(255, 255, 255, 0.03)',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  borderRadius: '6px',
-  padding: '8px 12px',
-  margin: '4px 0 0',
-  font: '12px var(--font-mono)',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word',
-  color: '#c9d1d9'
-};

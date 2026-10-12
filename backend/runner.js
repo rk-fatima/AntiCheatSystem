@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
+import { wrapCodeWithHarness } from './leetcodeRegistry.js';
 
 const TIMEOUT_MS = 3000;
 const MAX_OUTPUT_BYTES = 64 * 1024; // 64 KB
@@ -16,6 +17,17 @@ export function normalizeOutput(str) {
     .map(line => line.trimEnd())
     .join('\n')
     .trim();
+}
+
+export function areOutputsEqual(actual, expected) {
+  const normActual = normalizeOutput(actual);
+  const normExpected = normalizeOutput(expected);
+  if (normActual === normExpected) return true;
+
+  // Bracket, comma, and case insensitivity: e.g. "[0, 1]" vs "0 1", "True" vs "true"
+  const cleanA = normActual.replace(/[\[\],]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const cleanB = normExpected.replace(/[\[\],]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  return cleanA === cleanB && cleanA.length > 0;
 }
 
 export function parseHiddenTests(htString) {
@@ -193,8 +205,11 @@ export async function executeCodeInSandbox(lang, code, stdin = '') {
 }
 
 export async function gradeSubmission(problem, lang, code) {
+  // Wrap candidate code with driver harness if function-only LeetCode style
+  const runnableCode = wrapCodeWithHarness(problem, lang, code);
+
   // 1. Grade against Sample Input first
-  const sampleRes = await executeCodeInSandbox(lang, code, problem.si || '');
+  const sampleRes = await executeCodeInSandbox(lang, runnableCode, problem.si || '');
   if (sampleRes.compileError) {
     return {
       verdict: 'COMPILATION_ERROR',
@@ -233,7 +248,7 @@ export async function gradeSubmission(problem, lang, code) {
 
   const expectedSample = normalizeOutput(problem.eo || problem.so || '');
   const actualSample = normalizeOutput(sampleRes.stdout);
-  const samplePassed = actualSample === expectedSample;
+  const samplePassed = areOutputsEqual(actualSample, expectedSample);
 
   if (!samplePassed) {
     return {
@@ -253,8 +268,8 @@ export async function gradeSubmission(problem, lang, code) {
 
   for (let i = 0; i < hiddenTests.length; i++) {
     const ht = hiddenTests[i];
-    const htRes = await executeCodeInSandbox(lang, code, ht.input);
-    if (htRes.ok && normalizeOutput(htRes.stdout) === normalizeOutput(ht.expected)) {
+    const htRes = await executeCodeInSandbox(lang, runnableCode, ht.input);
+    if (htRes.ok && areOutputsEqual(htRes.stdout, ht.expected)) {
       hiddenPassed++;
     } else {
       break; // Stop at first failed hidden test

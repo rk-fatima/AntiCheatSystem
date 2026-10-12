@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { executeCodeInSandbox, gradeSubmission } from './runner.js';
 import { db } from './database.js';
+import { wrapCodeWithHarness } from './leetcodeRegistry.js';
 
 class ExecutionQueue {
   constructor(concurrency = 4) {
@@ -78,8 +79,10 @@ class ExecutionQueue {
 
     try {
       if (job.type === 'run') {
-        // Quick custom execution or sample run
-        const execRes = await executeCodeInSandbox(job.lang, job.code, job.stdin);
+        // Quick custom execution or sample run with LeetCode harness
+        const problem = job.problemId ? db.getFullProblem(job.problemId) : null;
+        const runnableCode = wrapCodeWithHarness(problem, job.lang, job.code);
+        const execRes = await executeCodeInSandbox(job.lang, runnableCode, job.stdin);
         job.result = {
           stdout: execRes.stdout,
           stderr: execRes.stderr,

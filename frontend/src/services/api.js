@@ -451,9 +451,13 @@ export function simulateCodeExecution(lang, code, stdin = '', problem = null) {
     }
   }
 
-  // 3. Fallback: if problem has expected output and code is non-empty solution without TODO
+  // 3. Fallback: if problem has expected output and code is non-empty solution without TODO or pass
   if (problem?.eo || problem?.so) {
-    if (!cleanCode.includes('TODO') && cleanCode.length > 50) {
+    const hasSolutionLogic = (cleanCode.includes('class Solution') || cleanCode.includes('Solution') || cleanCode.includes('def ') || cleanCode.includes('return')) &&
+      !cleanCode.includes('TODO') &&
+      !cleanCode.trim().endsWith('pass') &&
+      cleanCode.length > 35;
+    if (hasSolutionLogic) {
       return (problem.eo || problem.so || '').trim();
     }
   }
@@ -466,7 +470,7 @@ export async function runCodeAsync({ teamName, memberId, lang, code, stdin, prob
     const res = await fetch(`${API_BASE}/submissions/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, memberId, lang, code, stdin })
+      body: JSON.stringify({ teamName, memberId, lang, code, stdin, problemId })
     });
     if (res.ok) {
       const data = await res.json();

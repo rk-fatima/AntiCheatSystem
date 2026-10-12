@@ -20,14 +20,8 @@ import {
   isAdminAuthenticated,
   adminLogout
 } from './services/api';
+import { getStarterTemplate } from './data/leetcodeRegistry';
 import { CheckCircle2, AlertTriangle, Unlock, Lock, Users, Sparkles } from 'lucide-react';
-
-const DEFAULT_TEMPLATES = {
-  python: `import sys\n\ndef main():\n    data = sys.stdin.read().split()\n    # TODO: parse input, solve, print output\n    print()\n\nif __name__ == "__main__":\n    main()\n`,
-  c: `#include <stdio.h>\n\nint main() {\n    // TODO: read input with scanf, solve, print with printf\n    return 0;\n}\n`,
-  cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(null);\n    // TODO: read input with cin, solve, print with cout\n    return 0;\n}\n`,
-  java: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // TODO: read input, solve, print output\n    }\n}\n`
-};
 
 export function App() {
   const [team, setTeam] = useState(null);
@@ -36,7 +30,7 @@ export function App() {
   const [problems, setProblems] = useState([]);
   const [problemPrices, setProblemPrices] = useState({});
   const [currentProblemId, setCurrentProblemId] = useState(null);
-  const [lang, setLang] = useState('python');
+  const [lang, setLang] = useState('cpp');
   const [codeMap, setCodeMap] = useState({});
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
@@ -219,8 +213,9 @@ export function App() {
   };
 
   // 8. Code State per Member Session
+  const activeProblem = problems.find(p => p.id === currentProblemId);
   const currentKey = `${currentProblemId}|${lang}`;
-  const currentCode = codeMap[currentKey] ?? DEFAULT_TEMPLATES[lang] ?? '';
+  const currentCode = codeMap[currentKey] ?? getStarterTemplate(activeProblem, lang) ?? '';
 
   const handleCodeChange = (newCode) => {
     setCodeMap(prev => ({ ...prev, [currentKey]: newCode }));
@@ -253,7 +248,6 @@ export function App() {
     return res;
   };
 
-  const activeProblem = problems.find(p => p.id === currentProblemId);
   const activeProblemStatus = activeProblem ? (team?.problemStatuses?.[activeProblem.id] || null) : null;
 
   // Dedicated Admin Dashboard View Route

@@ -550,7 +550,7 @@ app.post('/api/submissions/run', (req, res) => {
     type: 'run',
     teamName,
     memberId: memberId || 'UNKNOWN',
-    problemId: null,
+    problemId: req.body.problemId || null,
     lang,
     code,
     stdin: stdin || ''
