@@ -754,22 +754,7 @@ app.post('/api/proctor/reset-all', (req, res) => {
 
 // --- LEADERBOARD ---
 app.get('/api/leaderboard', (req, res) => {
-  const teams = db.getAllTeams()
-    .map(t => ({
-      name: t.name,
-      captainName: t.captainName,
-      size: t.size,
-      score: t.score || 0,
-      solvedCount: (t.solved || []).length,
-      balance: t.balance ?? 1000,
-      wrongAttempts: t.wrong || 0,
-      problemWrong: t.problemWrong || {},
-      violationsCount: (t.violations || []).length,
-      isLocked: Boolean(t.isLocked)
-    }))
-    .sort((a, b) => b.score - a.score || b.balance - a.balance);
-
-  res.json({ leaderboard: teams });
+  res.json({ leaderboard: db.getActiveLeaderboard() });
 });
 
 // --- DEDICATED ADMIN DASHBOARD APIS ---
@@ -1016,15 +1001,19 @@ app.post('/api/admin/sabotage/unfreeze', (req, res) => {
 
 // Admin Full Overview
 app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
-  const teams = db.getAllTeams();
+  const activeTeams = db.getActiveTeams();
+  const allTeams = db.getAllTeams();
   const problems = db.getAllProblems();
   res.json({
-    teams,
+    teams: activeTeams,
+    allTeams,
     problems,
     transactions: db.getAllTransactions(),
     unlockHistory: db.getUnlockHistory(),
     submissions: db.getAllSubmissions().slice(0, 100),
     eventState: db.getEventState(),
+    currentEvent: db.state.currentEvent || null,
+    archivedEvents: db.getArchivedEvents(),
     registrations: db.getAllRegistrations()
   });
 });

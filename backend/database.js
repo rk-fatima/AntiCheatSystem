@@ -323,11 +323,17 @@ class Database {
     const sessionTitle = (eventName || '').trim() || `QUBIT Code Auctioneer #${sessionNum}`;
     const sessionId = `EVT-${Date.now().toString(36).toUpperCase()}`;
 
+    // Clear active session logs for this fresh competition
+    this.state.transactions = [];
+    this.state.unlockHistory = [];
+    this.state.submissions = [];
+
     // Reset event-specific participation, scores, and bidding data for the new session
     // Initialize new-event ByteCoins balances according to the configured starting balance, exactly once per participating team per event
     for (const name of validatedTeamNames) {
       const team = this.getTeam(name);
       if (team) {
+        team.currentEventId = sessionId;
         team.balance = initialBalance;
         team.score = 0;
         team.solved = [];
@@ -361,6 +367,9 @@ class Database {
     this.state.eventState.status = 'EVENT_LIVE';
     this.state.eventState.startedAt = startedAt;
     this.state.eventState.endedAt = null;
+    this.state.eventState.currentEventId = sessionId;
+    this.state.eventState.currentEventName = sessionTitle;
+    this.state.eventState.participatingTeams = validatedTeamNames;
 
     this.save();
     return {
@@ -438,10 +447,39 @@ class Database {
     }
     this.state.archivedEvents.push(archiveRecord);
 
+    // Clear active session transactions, unlock history, and submissions
+    // (all are safely preserved in archiveRecord!)
+    this.state.transactions = [];
+    this.state.unlockHistory = [];
+    this.state.submissions = [];
+
+    // Reset each team's session data while preserving their permanent account
+    for (const team of Object.values(this.state.teams)) {
+      team.currentEventId = null;
+      team.balance = this.state.config.initialTeamBalance || 1000;
+      team.score = 0;
+      team.solved = [];
+      team.wrong = 0;
+      team.unlocked = [];
+      team.unlockedCards = [];
+      team.problemStatuses = {};
+      team.revealedHints = {};
+      team.hintPassesCount = 0;
+      team.sabotageCardsCount = 0;
+      team.violations = [];
+      team.isLocked = false;
+      team.lockReason = '';
+      team.attempts = [];
+      team.frozenUntil = 0;
+    }
+
     // Mark current event as completed and clear active participation list to prepare for next session
     if (!this.state.eventState) this.state.eventState = {};
     this.state.eventState.status = 'EVENT_ENDED';
     this.state.eventState.endedAt = endedAt;
+    this.state.eventState.currentEventId = null;
+    this.state.eventState.currentEventName = null;
+    this.state.eventState.participatingTeams = [];
 
     this.state.currentEvent = {
       id: null,
@@ -461,6 +499,53 @@ class Database {
 
   getArchivedEvents() {
     return this.state.archivedEvents || [];
+  }
+
+  getActiveLeaderboard() {
+    const eventState = this.getEventState();
+    // If competition is not LIVE, active leaderboard must be empty
+    if (eventState.status !== 'EVENT_LIVE' || !this.state.currentEvent) {
+      return [];
+    }
+
+    const participatingNames = this.state.currentEvent.participatingTeams || [];
+    if (participatingNames.length === 0) {
+      return [];
+    }
+
+    return participatingNames.map(name => {
+      const t = this.getTeam(name);
+      if (!t) return null;
+      return {
+        name: t.name,
+        captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
+        size: t.size || (t.members || []).length || 1,
+        score: t.score || 0,
+        solvedCount: (t.solved || []).length,
+        solved: [...(t.solved || [])],
+        balance: t.balance ?? (this.state.config.initialTeamBalance || 1000),
+        wrongAttempts: t.wrong || 0,
+        problemWrong: {},
+        hintsUsed: Object.keys(t.revealedHints || {}).length,
+        sabotagesCount: t.sabotageCardsCount || 0,
+        violationsCount: (t.violations || []).length,
+        isLocked: Boolean(t.isLocked)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || b.balance - a.balance)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+  }
+
+  getActiveTeams() {
+    const eventState = this.getEventState();
+    if (eventState.status !== 'EVENT_LIVE' || !this.state.currentEvent) {
+      return [];
+    }
+    const participating = this.state.currentEvent.participatingTeams || [];
+    return participating
+      .map(name => this.getTeam(name))
+      .filter(Boolean);
   }
 
   batchApproveRegistrations(regIds = []) {

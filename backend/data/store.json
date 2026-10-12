@@ -1462,6 +1462,69 @@
       "lockReason": "",
       "attempts": [],
       "createdAt": "2026-10-12T16:05:31.969Z",
+      "frozenUntil": 0,
+      "currentEventId": null
+    },
+    "CyberKnights": {
+      "id": "CyberKnights",
+      "name": "CyberKnights",
+      "size": 2,
+      "captainId": "CYBERKNI-001-M01",
+      "captainName": "Arjun Rao",
+      "members": [
+        {
+          "memberId": "CYBERKNI-001-M01",
+          "name": "Arjun Rao",
+          "isCaptain": true,
+          "rollNo": "",
+          "phone": "+91 9876543210",
+          "email": "arjun@example.com",
+          "college": ""
+        },
+        {
+          "memberId": "CYBERKNI-001-M02",
+          "name": "Dev Sharma",
+          "isCaptain": false,
+          "rollNo": "",
+          "phone": "+91 9876543211",
+          "email": "dev@example.com",
+          "college": ""
+        }
+      ],
+      "passwordHash": "a99e0455e44c21641b42f3d1394c13bc:b8602297e91a038c446826e10f13ebd4b3f831f17cd6d5e7cd313735a7c2883c01dc3eba9524164902a6e0794a408560262f528fd9b20be34abb9b424fccec03",
+      "balance": 1000,
+      "unlocked": [],
+      "unlockedCards": [],
+      "solved": [],
+      "problemStatuses": {},
+      "revealedHints": {},
+      "hintPassesCount": 0,
+      "sabotageCardsCount": 0,
+      "transactions": [
+        {
+          "id": "TXN-ADM-1791827049381-e55p",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "CyberKnights",
+          "problemId": "E70",
+          "problemTitle": "Transform Array by Parity",
+          "bidPrice": 200,
+          "bidAmount": 200,
+          "price": 200,
+          "previousBalance": 1000,
+          "remainingBalance": 800,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:44:09.381Z",
+          "displayTime": "11:14 PM"
+        }
+      ],
+      "score": 0,
+      "wrong": 0,
+      "violations": [],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-12T17:43:58.790Z",
+      "currentEventId": null,
       "frozenUntil": 0
     }
   },
@@ -1498,12 +1561,64 @@
           "college": "MGIT"
         }
       ]
+    },
+    "REG-MV5JJSCP-TVF7": {
+      "id": "REG-MV5JJSCP-TVF7",
+      "teamName": "CyberKnights",
+      "leaderName": "Arjun Rao",
+      "leaderContact": "+91 9876543210",
+      "leaderEmail": "arjun@example.com",
+      "passwordHash": "a99e0455e44c21641b42f3d1394c13bc:b8602297e91a038c446826e10f13ebd4b3f831f17cd6d5e7cd313735a7c2883c01dc3eba9524164902a6e0794a408560262f528fd9b20be34abb9b424fccec03",
+      "memberCount": 2,
+      "members": [
+        {
+          "name": "Arjun Rao",
+          "rollNo": "",
+          "email": "arjun@example.com",
+          "phone": "+91 9876543210",
+          "college": ""
+        },
+        {
+          "name": "Dev Sharma",
+          "rollNo": "",
+          "email": "dev@example.com",
+          "phone": "+91 9876543211",
+          "college": ""
+        }
+      ],
+      "status": "APPROVED",
+      "rejectionReason": "",
+      "createdAt": "2026-10-12T17:43:49.348Z",
+      "approvedAt": "2026-10-12T17:43:58.790Z",
+      "assignedMembers": [
+        {
+          "memberId": "CYBERKNI-001-M01",
+          "name": "Arjun Rao",
+          "isCaptain": true,
+          "rollNo": "",
+          "phone": "+91 9876543210",
+          "email": "arjun@example.com",
+          "college": ""
+        },
+        {
+          "memberId": "CYBERKNI-001-M02",
+          "name": "Dev Sharma",
+          "isCaptain": false,
+          "rollNo": "",
+          "phone": "+91 9876543211",
+          "email": "dev@example.com",
+          "college": ""
+        }
+      ]
     }
   },
   "eventState": {
     "status": "EVENT_ENDED",
-    "startedAt": "2026-10-12T17:19:34.839Z",
-    "endedAt": "2026-10-12T17:20:49.541Z"
+    "startedAt": "2026-10-12T17:44:31.203Z",
+    "endedAt": "2026-10-12T17:45:16.425Z",
+    "currentEventId": null,
+    "currentEventName": null,
+    "participatingTeams": []
   },
   "archivedEvents": [
     {
@@ -1681,6 +1796,205 @@
           "displayTime": "10:49 PM"
         }
       ]
+    },
+    {
+      "id": "EVT-MV5J2N2W",
+      "name": "QUBIT Code Auctioneer",
+      "startedAt": "2026-10-12T17:30:29.337Z",
+      "endedAt": "2026-10-12T17:30:34.017Z",
+      "participatingTeams": [
+        "SYNORA"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [
+        {
+          "id": "TXN-ADM-1791825559578-hy94",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "SYNORA",
+          "problemId": "E1",
+          "problemTitle": "Two Sum",
+          "bidPrice": 150,
+          "bidAmount": 150,
+          "price": 150,
+          "previousBalance": 1000,
+          "remainingBalance": 850,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:19:19.578Z",
+          "displayTime": "10:49 PM"
+        },
+        {
+          "id": "TXN-1791824172090-1RLG3",
+          "teamId": "SYNORA",
+          "teamName": "SYNORA",
+          "problemId": "E2",
+          "problemTitle": "Palindrome Number",
+          "bidAmount": 100,
+          "price": 100,
+          "purchasedBy": "SYNORA-01",
+          "purchasedByName": "Team Member",
+          "remainingBalance": 900,
+          "purchaseTime": "2026-10-12T16:56:12.090Z",
+          "displayTime": "10:26 PM"
+        }
+      ],
+      "unlockHistory": [
+        {
+          "id": "TXN-ADM-1791825559578-hy94",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "SYNORA",
+          "problemId": "E1",
+          "problemTitle": "Two Sum",
+          "bidPrice": 150,
+          "bidAmount": 150,
+          "price": 150,
+          "previousBalance": 1000,
+          "remainingBalance": 850,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:19:19.578Z",
+          "displayTime": "10:49 PM"
+        }
+      ]
+    },
+    {
+      "id": "EVT-MV5JK2B4",
+      "name": "Test Event Session 1",
+      "startedAt": "2026-10-12T17:44:02.224Z",
+      "endedAt": "2026-10-12T17:44:18.604Z",
+      "participatingTeams": [
+        "CyberKnights"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "CyberKnights",
+          "captainName": "Arjun Rao",
+          "size": 2,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 800,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "CyberKnights": {
+          "score": 0,
+          "balance": 800,
+          "solved": [],
+          "unlocked": [
+            "E70"
+          ],
+          "wrong": 0,
+          "problemStatuses": {
+            "E70": {
+              "status": "UNLOCKED",
+              "unlockedBy": "ADMIN",
+              "unlockedByName": "Administrator",
+              "unlockedAt": "2026-10-12T17:44:09.381Z",
+              "bidPrice": 200
+            }
+          }
+        }
+      },
+      "transactions": [
+        {
+          "id": "TXN-ADM-1791827049381-e55p",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "CyberKnights",
+          "problemId": "E70",
+          "problemTitle": "Transform Array by Parity",
+          "bidPrice": 200,
+          "bidAmount": 200,
+          "price": 200,
+          "previousBalance": 1000,
+          "remainingBalance": 800,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:44:09.381Z",
+          "displayTime": "11:14 PM"
+        }
+      ],
+      "unlockHistory": [
+        {
+          "id": "TXN-ADM-1791827049381-e55p",
+          "type": "ADMIN_UNLOCK",
+          "teamName": "CyberKnights",
+          "problemId": "E70",
+          "problemTitle": "Transform Array by Parity",
+          "bidPrice": 200,
+          "bidAmount": 200,
+          "price": 200,
+          "previousBalance": 1000,
+          "remainingBalance": 800,
+          "status": "UNLOCKED",
+          "timestamp": "2026-10-12T17:44:09.381Z",
+          "displayTime": "11:14 PM"
+        }
+      ]
+    },
+    {
+      "id": "EVT-MV5JKOO3",
+      "name": "Test Event Session 2",
+      "startedAt": "2026-10-12T17:44:31.203Z",
+      "endedAt": "2026-10-12T17:45:16.425Z",
+      "participatingTeams": [
+        "CyberKnights"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "CyberKnights",
+          "captainName": "Arjun Rao",
+          "size": 2,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "CyberKnights": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
     }
   ],
   "currentEvent": {
@@ -1688,57 +2002,11 @@
     "name": null,
     "status": "EVENT_ENDED",
     "startedAt": null,
-    "endedAt": "2026-10-12T17:20:49.541Z",
+    "endedAt": "2026-10-12T17:45:16.425Z",
     "participatingTeams": []
   },
-  "transactions": [
-    {
-      "id": "TXN-ADM-1791825559578-hy94",
-      "type": "ADMIN_UNLOCK",
-      "teamName": "SYNORA",
-      "problemId": "E1",
-      "problemTitle": "Two Sum",
-      "bidPrice": 150,
-      "bidAmount": 150,
-      "price": 150,
-      "previousBalance": 1000,
-      "remainingBalance": 850,
-      "status": "UNLOCKED",
-      "timestamp": "2026-10-12T17:19:19.578Z",
-      "displayTime": "10:49 PM"
-    },
-    {
-      "id": "TXN-1791824172090-1RLG3",
-      "teamId": "SYNORA",
-      "teamName": "SYNORA",
-      "problemId": "E2",
-      "problemTitle": "Palindrome Number",
-      "bidAmount": 100,
-      "price": 100,
-      "purchasedBy": "SYNORA-01",
-      "purchasedByName": "Team Member",
-      "remainingBalance": 900,
-      "purchaseTime": "2026-10-12T16:56:12.090Z",
-      "displayTime": "10:26 PM"
-    }
-  ],
-  "unlockHistory": [
-    {
-      "id": "TXN-ADM-1791825559578-hy94",
-      "type": "ADMIN_UNLOCK",
-      "teamName": "SYNORA",
-      "problemId": "E1",
-      "problemTitle": "Two Sum",
-      "bidPrice": 150,
-      "bidAmount": 150,
-      "price": 150,
-      "previousBalance": 1000,
-      "remainingBalance": 850,
-      "status": "UNLOCKED",
-      "timestamp": "2026-10-12T17:19:19.578Z",
-      "displayTime": "10:49 PM"
-    }
-  ],
+  "transactions": [],
+  "unlockHistory": [],
   "submissions": [],
   "telemetry": [
     {

@@ -58,7 +58,9 @@ import {
 
 export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage' | 'registrations'
-  const [teams, setTeams] = useState([]);
+  const [teams, setTeams] = useState([]); // Active participating teams in current live session
+  const [allTeams, setAllTeams] = useState([]); // All permanent team accounts in database
+  const [archivedEvents, setArchivedEvents] = useState([]);
   const [problems, setProblems] = useState([]);
   const [unlockHistory, setUnlockHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -123,15 +125,20 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       const data = await fetchAdminOverview();
       const loadedTeams = data.teams || [];
       setTeams(loadedTeams);
+      setAllTeams(data.allTeams || []);
+      setArchivedEvents(data.archivedEvents || []);
       setProblems(data.problems || []);
       setUnlockHistory(data.unlockHistory || []);
       if (data.eventState) setEventState(data.eventState);
       if (data.registrations) setRegistrations(data.registrations);
 
-      // If no team is selected yet, default to the first team
+      // Default to first active team or first permanent team
       setSelectedTeamName(prev => {
         if (prev && loadedTeams.some(t => t.name === prev)) return prev;
-        return loadedTeams[0]?.name || '';
+        if (loadedTeams.length > 0) return loadedTeams[0]?.name || '';
+        const all = data.allTeams || [];
+        if (prev && all.some(t => t.name === prev)) return prev;
+        return all[0]?.name || '';
       });
     } catch (err) {
       console.error('Failed to load admin data:', err);
@@ -388,15 +395,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
   const pendingRegistrationsCount = registrations.filter(r => r.status === 'PENDING').length;
 
-  // Pre-select approved teams when Start Event Modal opens
+  // Open clean Start Event Modal (clean slate, no auto-selected teams)
   useEffect(() => {
     if (showStartEventModal) {
-      const approvedNames = (teams || []).map(t => t.name);
-      setSelectedParticipatingTeams(new Set(approvedNames));
+      setSelectedParticipatingTeams(new Set());
       setStartEventSearch('');
       setStartEventStatusFilter('ALL');
     }
-  }, [showStartEventModal, teams]);
+  }, [showStartEventModal]);
 
   // Unified list of all registered teams for Start Event selection modal
   const allRegisteredTeams = React.useMemo(() => {
@@ -417,8 +423,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
         isApproved: reg.status === 'APPROVED'
       });
     });
-    // 2. Approved teams
-    (teams || []).forEach(t => {
+    // 2. Approved permanent teams in database
+    (allTeams || []).forEach(t => {
       const key = t.name.toLowerCase();
       if (map.has(key)) {
         const item = map.get(key);
@@ -449,7 +455,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       if (diff !== 0) return diff;
       return a.teamName.localeCompare(b.teamName);
     });
-  }, [registrations, teams]);
+  }, [registrations, allTeams]);
 
   const filteredRegisteredTeams = React.useMemo(() => {
     return allRegisteredTeams.filter(t => {
@@ -1178,7 +1184,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   fontWeight: 600
                 }}
               >
-                {teams.map(t => (
+                {(teams.length > 0 ? teams : allTeams).map(t => (
                   <option key={t.name} value={t.name}>
                     👥 {t.name} ({t.balance ?? 1000} BC · {t.score || 0} pts)
                   </option>
@@ -1423,7 +1429,11 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   {filteredLeaderboard.length === 0 && (
                     <tr>
                       <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: 'var(--txt-dim)' }}>
-                        No teams match query.
+                        {eventState.status === 'EVENT_ENDED'
+                          ? 'Event has ended. No active competition in progress. Final results and leaderboard have been safely archived.'
+                          : teams.length === 0
+                          ? 'No active competition session in progress. Start an event to initiate the active leaderboard.'
+                          : 'No teams match query.'}
                       </td>
                     </tr>
                   )}

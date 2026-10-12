@@ -189,7 +189,7 @@ export function LeaderboardModal({ onClose }) {
               {leaderboard.length === 0 && (
                 <tr>
                   <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--txt-dim)' }}>
-                    {loading ? 'Loading leaderboard standings...' : 'No submissions yet. Be the first to solve!'}
+                    {loading ? 'Loading leaderboard standings...' : 'No active competition session or submissions yet.'}
                   </td>
                 </tr>
               )}
