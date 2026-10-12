@@ -85,8 +85,12 @@ export function App() {
   useEffect(() => {
     if (!team?.name || !isExamStarted) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = import.meta.env.VITE_WS_URL
+      ? `${import.meta.env.VITE_WS_URL}/ws`
+      : (() => {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${protocol}//${window.location.host}/ws`;
+        })();
 
     let ws;
     try {

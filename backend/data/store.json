@@ -1765,9 +1765,9 @@
     }
   },
   "eventState": {
-    "status": "REGISTRATION_OPEN",
-    "startedAt": null,
-    "endedAt": null,
+    "status": "EVENT_ENDED",
+    "startedAt": "2026-10-12T19:11:24.088Z",
+    "endedAt": "2026-10-12T19:11:29.003Z",
     "currentEventId": null,
     "currentEventName": null,
     "participatingTeams": []
@@ -3258,14 +3258,120 @@
       },
       "transactions": [],
       "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5MOEYG",
+      "name": "QUBIT Code Auctioneer",
+      "startedAt": "2026-10-12T19:11:24.088Z",
+      "endedAt": "2026-10-12T19:11:29.003Z",
+      "participatingTeams": [
+        "SYNORA",
+        "CyberKnights",
+        "AlphaTeam",
+        "BetaTeam"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        },
+        {
+          "name": "CyberKnights",
+          "captainName": "Arjun Rao",
+          "size": 2,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 2
+        },
+        {
+          "name": "AlphaTeam",
+          "captainName": "Alpha Leader",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 3
+        },
+        {
+          "name": "BetaTeam",
+          "captainName": "Beta Leader",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 4
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "CyberKnights": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "AlphaTeam": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "BetaTeam": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
     }
   ],
   "currentEvent": {
     "id": null,
     "name": null,
-    "status": "REGISTRATION_OPEN",
+    "status": "EVENT_ENDED",
     "startedAt": null,
-    "endedAt": null,
+    "endedAt": "2026-10-12T19:11:29.003Z",
     "participatingTeams": [],
     "teamParticipationRecords": {}
   },
