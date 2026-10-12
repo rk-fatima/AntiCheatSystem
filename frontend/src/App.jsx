@@ -10,6 +10,7 @@ import { SabotageFreezeOverlay } from './components/SabotageFreezeOverlay';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TeamRegistration } from './components/TeamRegistration';
+import { LandingPage } from './components/LandingPage';
 import { useAntiCheat } from './hooks/useAntiCheat';
 import {
   fetchProblems,
@@ -37,23 +38,26 @@ export function App() {
   const [showTransactions, setShowTransactions] = useState(false);
 
   const [viewMode, setViewMode] = useState(() => {
-    const hash = window.location.hash;
+    const hash = window.location.hash.toLowerCase();
     if (hash.includes('register')) return 'register';
     if (hash.includes('admin')) return 'admin';
-    return 'workspace';
+    if (hash.includes('team') || hash.includes('workspace') || hash.includes('login')) return 'workspace';
+    return 'landing';
   });
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => isAdminAuthenticated());
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash;
+      const hash = window.location.hash.toLowerCase();
       if (hash.includes('register')) {
         setViewMode('register');
       } else if (hash.includes('admin')) {
         setViewMode('admin');
         setIsAdminLoggedIn(isAdminAuthenticated());
-      } else {
+      } else if (hash.includes('team') || hash.includes('workspace') || hash.includes('login')) {
         setViewMode('workspace');
+      } else {
+        setViewMode('landing');
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -259,12 +263,33 @@ export function App() {
 
   const activeProblemStatus = activeProblem ? (team?.problemStatuses?.[activeProblem.id] || null) : null;
 
+  // Main Landing Page Route (Root / #landing / #home)
+  if (viewMode === 'landing') {
+    return (
+      <LandingPage
+        onNavigateAdmin={() => {
+          window.location.hash = '#admin';
+          setViewMode('admin');
+          setIsAdminLoggedIn(isAdminAuthenticated());
+        }}
+        onNavigateTeam={() => {
+          window.location.hash = '#team';
+          setViewMode('workspace');
+        }}
+        onNavigateRegister={() => {
+          window.location.hash = '#register';
+          setViewMode('register');
+        }}
+      />
+    );
+  }
+
   // Dedicated Team Self-Registration View Route
   if (viewMode === 'register') {
     return (
       <TeamRegistration
         onNavigateLogin={() => {
-          window.location.hash = '';
+          window.location.hash = '#team';
           setViewMode('workspace');
         }}
       />
@@ -280,10 +305,10 @@ export function App() {
             adminLogout();
             setIsAdminLoggedIn(false);
             window.location.hash = '';
-            setViewMode('workspace');
+            setViewMode('landing');
           }}
           onSwitchToWorkspace={() => {
-            window.location.hash = '';
+            window.location.hash = '#team';
             setViewMode('workspace');
           }}
         />
@@ -296,7 +321,7 @@ export function App() {
         }}
         onBackToWorkspace={() => {
           window.location.hash = '';
-          setViewMode('workspace');
+          setViewMode('landing');
         }}
       />
     );
@@ -520,6 +545,10 @@ export function App() {
           onOpenRegister={() => {
             window.location.hash = '#register';
             setViewMode('register');
+          }}
+          onBackToLanding={() => {
+            window.location.hash = '';
+            setViewMode('landing');
           }}
         />
       )}

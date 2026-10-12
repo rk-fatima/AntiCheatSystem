@@ -1397,16 +1397,142 @@
     }
   ],
   "problemPrices": {},
-  "teams": {},
-  "registrations": {},
+  "teams": {
+    "SYNORA": {
+      "id": "SYNORA",
+      "name": "SYNORA",
+      "size": 1,
+      "captainId": "SYNORA-001-M01",
+      "captainName": "Mohd Salman",
+      "members": [
+        {
+          "memberId": "SYNORA-001-M01",
+          "name": "Mohd Salman",
+          "isCaptain": true,
+          "rollNo": "24261A0537",
+          "phone": "6302530236",
+          "email": "mohammedsalman080405@gmail.com",
+          "college": "MGIT"
+        }
+      ],
+      "passwordHash": "600fc0b7d3f7c0a4ba2b68aec0d45ff8:3ef04f94259ed162c6da02bad7117ed1de7e9ef91d0a92783a8cc0a7f024bc58f98d7493bee6b0bbc30acc855b684389dba9229fda1337d2849299e2874e19e4",
+      "balance": 1000,
+      "unlocked": [],
+      "unlockedCards": [],
+      "solved": [],
+      "problemStatuses": {},
+      "revealedHints": {},
+      "hintPassesCount": 0,
+      "sabotageCardsCount": 0,
+      "transactions": [],
+      "score": 0,
+      "wrong": 0,
+      "violations": [
+        {
+          "id": "1791821142690-u62n5z",
+          "teamName": "SYNORA",
+          "memberId": "SYNORA-001-M01",
+          "event": "FOCUS_LOST",
+          "details": "Window lost focus (switched to external application).",
+          "timestamp": 1791821142690,
+          "isoTime": "2026-10-12T16:05:42.690Z"
+        },
+        {
+          "id": "1791821143679-5a5t3c",
+          "teamName": "SYNORA",
+          "memberId": "SYNORA-001-M01",
+          "event": "FULLSCREEN_EXIT",
+          "details": "Exited fullscreen examination mode.",
+          "timestamp": 1791821143679,
+          "isoTime": "2026-10-12T16:05:43.679Z"
+        },
+        {
+          "id": "1791821144999-2bvdz4",
+          "teamName": "SYNORA",
+          "memberId": "SYNORA-001-M01",
+          "event": "TAB_SWITCH",
+          "details": "Switched away from browser tab or minimized window.",
+          "timestamp": 1791821144999,
+          "isoTime": "2026-10-12T16:05:44.999Z"
+        }
+      ],
+      "isLocked": false,
+      "lockReason": "",
+      "attempts": [],
+      "createdAt": "2026-10-12T16:05:31.969Z"
+    }
+  },
+  "registrations": {
+    "REG-MV5FZMLV-CAPZ": {
+      "id": "REG-MV5FZMLV-CAPZ",
+      "teamName": "SYNORA",
+      "leaderName": "Mohd Salman",
+      "leaderContact": "+916302530236",
+      "leaderEmail": "mohammedsalman080405@gmail.com",
+      "passwordHash": "600fc0b7d3f7c0a4ba2b68aec0d45ff8:3ef04f94259ed162c6da02bad7117ed1de7e9ef91d0a92783a8cc0a7f024bc58f98d7493bee6b0bbc30acc855b684389dba9229fda1337d2849299e2874e19e4",
+      "memberCount": 1,
+      "members": [
+        {
+          "name": "Mohd Salman",
+          "rollNo": "24261A0537",
+          "email": "mohammedsalman080405@gmail.com",
+          "phone": "6302530236",
+          "college": "MGIT"
+        }
+      ],
+      "status": "APPROVED",
+      "rejectionReason": "",
+      "createdAt": "2026-10-12T16:04:09.947Z",
+      "approvedAt": "2026-10-12T16:05:31.969Z",
+      "assignedMembers": [
+        {
+          "memberId": "SYNORA-001-M01",
+          "name": "Mohd Salman",
+          "isCaptain": true,
+          "rollNo": "24261A0537",
+          "phone": "6302530236",
+          "email": "mohammedsalman080405@gmail.com",
+          "college": "MGIT"
+        }
+      ]
+    }
+  },
   "eventState": {
     "status": "REGISTRATION_OPEN",
-    "startedAt": null
+    "startedAt": "2026-10-12T16:00:54.840Z"
   },
   "transactions": [],
   "unlockHistory": [],
   "submissions": [],
-  "telemetry": [],
+  "telemetry": [
+    {
+      "id": "1791821144999-2bvdz4",
+      "teamName": "SYNORA",
+      "memberId": "SYNORA-001-M01",
+      "event": "TAB_SWITCH",
+      "details": "Switched away from browser tab or minimized window.",
+      "timestamp": 1791821144999,
+      "isoTime": "2026-10-12T16:05:44.999Z"
+    },
+    {
+      "id": "1791821143679-5a5t3c",
+      "teamName": "SYNORA",
+      "memberId": "SYNORA-001-M01",
+      "event": "FULLSCREEN_EXIT",
+      "details": "Exited fullscreen examination mode.",
+      "timestamp": 1791821143679,
+      "isoTime": "2026-10-12T16:05:43.679Z"
+    },
+    {
+      "id": "1791821142690-u62n5z",
+      "teamName": "SYNORA",
+      "memberId": "SYNORA-001-M01",
+      "event": "FOCUS_LOST",
+      "details": "Window lost focus (switched to external application).",
+      "timestamp": 1791821142690,
+      "isoTime": "2026-10-12T16:05:42.690Z"
+    }
+  ],
   "config": {
     "adminPin": "qubit",
     "maxFlags": 3,

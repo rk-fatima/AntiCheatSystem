@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Maximize2, Search, Check, RefreshCw, AlertCircle, Crown, Lock, Eye, EyeOff, QrCode, Clock } from 'lucide-react';
+import { ShieldCheck, Maximize2, Search, Check, RefreshCw, AlertCircle, Crown, Lock, Eye, EyeOff, QrCode, Clock, ArrowLeft } from 'lucide-react';
 import { getTeamStatus, loginTeam, verifyTeamCredentials } from '../services/api';
 
-export function GateModal({ onTeamSessionReady, onOpenAdmin, onOpenRegister }) {
+export function GateModal({ onTeamSessionReady, onOpenAdmin, onOpenRegister, onBackToLanding }) {
   const [teamInput, setTeamInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -546,6 +546,26 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin, onOpenRegister }) {
           >
             <QrCode size={12} color="#58a6ff" /> Register Team via QR
           </a>
+
+          {onBackToLanding && (
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--txt-dim)',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 8px'
+              }}
+            >
+              <ArrowLeft size={11} /> Main Portal
+            </button>
+          )}
 
           {onOpenAdmin && (
             <button

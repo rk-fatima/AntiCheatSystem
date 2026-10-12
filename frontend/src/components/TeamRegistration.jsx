@@ -191,6 +191,9 @@ export function TeamRegistration({ onNavigateLogin }) {
     }}>
       {/* Top Header */}
       <header style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -198,7 +201,6 @@ export function TeamRegistration({ onNavigateLogin }) {
         background: 'rgba(9, 13, 24, 0.94)',
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        zIndex: 50,
         flexWrap: 'wrap',
         gap: '12px'
       }}>
@@ -291,12 +293,12 @@ export function TeamRegistration({ onNavigateLogin }) {
 
       {/* Main Container */}
       <div style={{
-        flex: 1,
+        flex: '1 0 auto',
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
-        padding: '32px 16px',
-        overflowY: 'auto'
+        padding: '32px 16px 80px',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         {submittedReg ? (
           /* Confirmation Success Card */
