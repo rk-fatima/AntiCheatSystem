@@ -23,7 +23,6 @@ import {
   UserCheck,
   UserX,
   Play,
-  Pause,
   Copy,
   Clock,
   ShieldCheck,
@@ -339,22 +338,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   // Event state change confirmation triggers
-  const promptCloseRegistration = () => {
-    setEventConfirmModal({
-      targetStatus: 'REGISTRATION_CLOSED',
-      title: 'Close Public Registration?',
-      description: 'Stop accepting new public registrations. Existing registrations and pending approvals will be preserved for review.',
-      confirmText: 'Close Registration',
-      confirmColor: '#d29922'
-    });
-  };
-
   const promptStartEvent = () => {
     setEventConfirmModal({
       actionType: 'START_EVENT',
       targetStatus: 'EVENT_LIVE',
       title: 'Are you sure you want to start the event?',
-      description: 'The competition will become live, bidding will be enabled, and teams can join through registration or login.',
+      description: 'Public registration will close automatically. The competition will become live, bidding will be enabled, and registered teams can log in to participate.',
       confirmText: 'Start Event',
       confirmColor: '#2ea043'
     });
@@ -365,19 +354,9 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       actionType: 'END_EVENT',
       targetStatus: 'EVENT_ENDED',
       title: 'End Event & Conclude Competition?',
-      description: 'Are you sure you want to end the current event? Active bidding and problem unlocking will be halted. The final leaderboard, team scores, ByteCoins balances, and auction history will be safely archived. All registered team accounts and credentials will be preserved for the next event, and a fresh 1,000 ByteCoins balance will be assigned when the next event begins.',
+      description: 'Are you sure you want to end the current event? Active bidding and problem unlocking will be halted. The final leaderboard, team scores, ByteCoins balances, and auction history will be safely archived. All registered team accounts and credentials will be preserved for the next event, and public registration will remain closed until a new event is started.',
       confirmText: 'End Event',
       confirmColor: '#da3633'
-    });
-  };
-
-  const promptReopenRegistration = () => {
-    setEventConfirmModal({
-      targetStatus: 'REGISTRATION_OPEN',
-      title: 'Reopen Registration?',
-      description: 'Allow new teams to submit registrations again before the event starts.',
-      confirmText: 'Reopen Registration',
-      confirmColor: '#38bdf8'
     });
   };
 
@@ -802,16 +781,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 ? 'rgba(148, 163, 184, 0.15)'
                 : eventState.status === 'EVENT_LIVE'
                 ? 'rgba(188, 140, 255, 0.15)'
-                : eventState.status === 'REGISTRATION_CLOSED'
-                ? 'rgba(210, 153, 34, 0.15)'
                 : 'rgba(56, 189, 248, 0.15)',
               border: `1px solid ${
                 eventState.status === 'EVENT_ENDED'
                   ? 'rgba(148, 163, 184, 0.35)'
                   : eventState.status === 'EVENT_LIVE'
                   ? 'rgba(188, 140, 255, 0.35)'
-                  : eventState.status === 'REGISTRATION_CLOSED'
-                  ? 'rgba(210, 153, 34, 0.35)'
                   : 'rgba(56, 189, 248, 0.35)'
               }`,
               display: 'flex',
@@ -821,16 +796,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 ? '#94a3b8'
                 : eventState.status === 'EVENT_LIVE'
                 ? '#bc8cff'
-                : eventState.status === 'REGISTRATION_CLOSED'
-                ? '#d29922'
                 : '#38bdf8'
             }}>
               {eventState.status === 'EVENT_ENDED' ? (
                 <Square size={18} />
               ) : eventState.status === 'EVENT_LIVE' ? (
                 <Play size={20} />
-              ) : eventState.status === 'REGISTRATION_CLOSED' ? (
-                <Pause size={20} />
               ) : (
                 <ShieldCheck size={20} />
               )}
@@ -851,23 +822,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     ? 'rgba(148, 163, 184, 0.18)'
                     : eventState.status === 'EVENT_LIVE'
                     ? 'rgba(188, 140, 255, 0.18)'
-                    : eventState.status === 'REGISTRATION_CLOSED'
-                    ? 'rgba(210, 153, 34, 0.18)'
                     : 'rgba(56, 189, 248, 0.18)',
                   color: eventState.status === 'EVENT_ENDED'
                     ? '#94a3b8'
                     : eventState.status === 'EVENT_LIVE'
                     ? '#bc8cff'
-                    : eventState.status === 'REGISTRATION_CLOSED'
-                    ? '#d29922'
                     : '#38bdf8',
                   border: `1px solid ${
                     eventState.status === 'EVENT_ENDED'
                       ? 'rgba(148, 163, 184, 0.4)'
                       : eventState.status === 'EVENT_LIVE'
                       ? 'rgba(188, 140, 255, 0.4)'
-                      : eventState.status === 'REGISTRATION_CLOSED'
-                      ? 'rgba(210, 153, 34, 0.4)'
                       : 'rgba(56, 189, 248, 0.4)'
                   }`
                 }}>
@@ -875,8 +840,6 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     ? 'EVENT ENDED'
                     : eventState.status === 'EVENT_LIVE'
                     ? 'EVENT LIVE'
-                    : eventState.status === 'REGISTRATION_CLOSED'
-                    ? 'REGISTRATION CLOSED'
                     : 'REGISTRATION OPEN'}
                 </span>
               </div>
@@ -885,66 +848,13 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   ? 'The competition has ended. Results and leaderboard are available.'
                   : eventState.status === 'EVENT_LIVE'
                   ? 'The competition is live. Teams can participate in the auction.'
-                  : eventState.status === 'REGISTRATION_CLOSED'
-                  ? 'Public registration is closed. Review and approve pending teams before starting the event.'
                   : 'Public registration is open. Teams can register.'}
               </div>
             </div>
           </div>
 
-          {/* Action buttons: Start/End Event Toggle & Separate Registration Control */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Separate Registration Controls */}
-            {eventState.status === 'REGISTRATION_OPEN' && (
-              <button
-                type="button"
-                onClick={promptCloseRegistration}
-                disabled={eventActionLoading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  background: 'rgba(210, 153, 34, 0.16)',
-                  border: '1px solid rgba(210, 153, 34, 0.45)',
-                  borderRadius: '6px',
-                  color: '#d29922',
-                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <Pause size={13} />
-                <span>Close Registration</span>
-              </button>
-            )}
-
-            {eventState.status === 'REGISTRATION_CLOSED' && (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={promptReopenRegistration}
-                disabled={eventActionLoading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '12px',
-                  padding: '8px 14px',
-                  color: '#38bdf8',
-                  borderColor: 'rgba(56, 189, 248, 0.3)',
-                  background: 'rgba(56, 189, 248, 0.08)',
-                  borderRadius: '6px',
-                  cursor: eventActionLoading ? 'not-allowed' : 'pointer'
-                }}
-              >
-                <RefreshCw size={13} />
-                <span>Reopen Registration</span>
-              </button>
-            )}
-
-            {/* Primary Start / End Event Toggle */}
+          {/* Action button: Start/End Event */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {eventState.status === 'EVENT_LIVE' ? (
               /* Event Live -> Red ■ End Event button */
               <button
@@ -970,7 +880,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 <span>End Event</span>
               </button>
             ) : (
-              /* Event Not Live (REGISTRATION_OPEN, REGISTRATION_CLOSED, EVENT_ENDED) -> Green ▶ Start Event button */
+              /* Event Not Live (REGISTRATION_OPEN, EVENT_ENDED) -> Green ▶ Start Event button */
               <button
                 type="button"
                 onClick={promptStartEvent}
