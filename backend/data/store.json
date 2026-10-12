@@ -1463,7 +1463,7 @@
       "attempts": [],
       "createdAt": "2026-10-12T16:05:31.969Z",
       "frozenUntil": 0,
-      "currentEventId": "EVT-MV5L3EKA"
+      "currentEventId": null
     },
     "CyberKnights": {
       "id": "CyberKnights",
@@ -1765,14 +1765,12 @@
     }
   },
   "eventState": {
-    "status": "EVENT_LIVE",
-    "startedAt": "2026-10-12T18:27:04.188Z",
+    "status": "REGISTRATION_OPEN",
+    "startedAt": null,
     "endedAt": null,
-    "currentEventId": "EVT-MV5L3EKA",
-    "currentEventName": "QUBIT Code Auctioneer",
-    "participatingTeams": [
-      "SYNORA"
-    ]
+    "currentEventId": null,
+    "currentEventName": null,
+    "participatingTeams": []
   },
   "archivedEvents": [
     {
@@ -2444,17 +2442,318 @@
       },
       "transactions": [],
       "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5L3EKA",
+      "name": "QUBIT Code Auctioneer",
+      "startedAt": "2026-10-12T18:27:04.188Z",
+      "endedAt": "2026-10-12T18:29:18.937Z",
+      "participatingTeams": [
+        "SYNORA"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5LS432",
+      "name": "QUBIT Code Auctioneer #10",
+      "startedAt": "2026-10-12T18:27:04.188Z",
+      "endedAt": "2026-10-12T18:46:17.006Z",
+      "participatingTeams": [
+        "SYNORA",
+        "CyberKnights",
+        "AlphaTeam",
+        "BetaTeam"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        },
+        {
+          "name": "CyberKnights",
+          "captainName": "Arjun Rao",
+          "size": 2,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 2
+        },
+        {
+          "name": "AlphaTeam",
+          "captainName": "Alpha Leader",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 3
+        },
+        {
+          "name": "BetaTeam",
+          "captainName": "Beta Leader",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 4
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "CyberKnights": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "AlphaTeam": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "BetaTeam": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5LS43B",
+      "name": "QUBIT Code Auctioneer #11",
+      "startedAt": "2026-10-12T18:46:17.015Z",
+      "endedAt": "2026-10-12T18:47:19.814Z",
+      "participatingTeams": [
+        "SYNORA",
+        "CyberKnights",
+        "AlphaTeam",
+        "BetaTeam"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "SYNORA",
+          "captainName": "Mohd Salman",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        },
+        {
+          "name": "CyberKnights",
+          "captainName": "Arjun Rao",
+          "size": 2,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 2
+        },
+        {
+          "name": "AlphaTeam",
+          "captainName": "Alpha Leader",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 3
+        },
+        {
+          "name": "BetaTeam",
+          "captainName": "Beta Leader",
+          "size": 1,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 1000,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 4
+        }
+      ],
+      "teamSnapshots": {
+        "SYNORA": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "CyberKnights": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "AlphaTeam": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        },
+        "BetaTeam": {
+          "score": 0,
+          "balance": 1000,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [],
+      "unlockHistory": []
+    },
+    {
+      "id": "EVT-MV5LTGKQ",
+      "name": "QUBIT Code Auctioneer #12",
+      "startedAt": "2026-10-12T18:47:19.850Z",
+      "endedAt": "2026-10-12T18:47:19.905Z",
+      "participatingTeams": [
+        "TestTeam_mv5ltgjx"
+      ],
+      "finalLeaderboard": [
+        {
+          "name": "TestTeam_mv5ltgjx",
+          "captainName": "Alice Leader",
+          "size": 2,
+          "score": 0,
+          "solvedCount": 0,
+          "solved": [],
+          "balance": 960,
+          "wrongAttempts": 0,
+          "hintsUsed": 0,
+          "sabotagesCount": 0,
+          "violationsCount": 0,
+          "rank": 1
+        }
+      ],
+      "teamSnapshots": {
+        "TestTeam_mv5ltgjx": {
+          "score": 0,
+          "balance": 960,
+          "solved": [],
+          "unlocked": [],
+          "wrong": 0,
+          "problemStatuses": {}
+        }
+      },
+      "transactions": [
+        {
+          "id": "TXN-HINT-1791830839879-4PVW",
+          "teamId": "TestTeam_mv5ltgjx",
+          "teamName": "TestTeam_mv5ltgjx",
+          "type": "HINT_PASS",
+          "cardType": "HINT_PASS",
+          "cost": 40,
+          "price": 40,
+          "problemId": null,
+          "purchasedBy": "TestTeam_mv5ltgjx-01",
+          "purchasedByName": "Team Member",
+          "remainingBalance": 960,
+          "timestamp": 1791830839879,
+          "isoTime": "2026-10-12T18:47:19.879Z"
+        }
+      ],
+      "unlockHistory": []
     }
   ],
   "currentEvent": {
-    "id": "EVT-MV5L3EKA",
-    "name": "QUBIT Code Auctioneer",
-    "status": "EVENT_LIVE",
-    "startedAt": "2026-10-12T18:27:04.188Z",
+    "id": null,
+    "name": null,
+    "status": "REGISTRATION_OPEN",
+    "startedAt": null,
     "endedAt": null,
-    "participatingTeams": [
-      "SYNORA"
-    ]
+    "participatingTeams": [],
+    "teamParticipationRecords": {}
   },
   "transactions": [],
   "unlockHistory": [],

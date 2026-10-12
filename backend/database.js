@@ -538,11 +538,7 @@ class Database {
     }
 
     if (status === 'EVENT_LIVE') {
-      // If there are approved teams, launch with all approved teams
-      const approvedNames = Object.keys(this.state.teams || {});
-      if (approvedNames.length > 0) {
-        return this.startEventSession({ participatingTeams: approvedNames }).eventState;
-      }
+      return this.startEventSession().eventState;
     }
 
     if (!this.state.eventState) {
@@ -553,38 +549,91 @@ class Database {
     return this.getEventState();
   }
 
-  startEventSession({ participatingTeams = [], eventName = '' }) {
-    if (!Array.isArray(participatingTeams) || participatingTeams.length === 0) {
-      throw new Error('Please select at least one accepted team to start the event.');
+  ensureTeamJoinedCurrentEvent(teamName) {
+    const eventState = this.getEventState();
+    if (eventState.status !== 'EVENT_LIVE' || !this.state.currentEvent) {
+      return null;
     }
 
-    // Validate that every selected team has been explicitly accepted by admin
+    const team = this.getTeam(teamName);
+    if (!team) return null;
+
+    const currentEvent = this.state.currentEvent;
+    if (!currentEvent.participatingTeams) {
+      currentEvent.participatingTeams = [];
+    }
+    if (!currentEvent.teamParticipationRecords) {
+      currentEvent.teamParticipationRecords = {};
+    }
+
+    const alreadyJoined =
+      team.currentEventId === currentEvent.id &&
+      currentEvent.participatingTeams.some(t => t.toLowerCase() === team.name.toLowerCase());
+
+    if (alreadyJoined) {
+      // Team already joined this session - preserve balance, score, and participation record
+      return { team, joinedNow: false };
+    }
+
+    // First time joining this active event session
+    const initialBalance = this.state.config?.initialTeamBalance || 1000;
+    team.currentEventId = currentEvent.id;
+    team.balance = initialBalance;
+    team.score = 0;
+    team.solved = [];
+    team.wrong = 0;
+    team.unlocked = [];
+    team.unlockedCards = [];
+    team.problemStatuses = {};
+    team.revealedHints = {};
+    team.hintPassesCount = 0;
+    team.sabotageCardsCount = 0;
+    team.violations = [];
+    team.isLocked = false;
+    team.lockReason = '';
+    team.attempts = [];
+    team.frozenUntil = 0;
+
+    if (!currentEvent.participatingTeams.some(t => t.toLowerCase() === team.name.toLowerCase())) {
+      currentEvent.participatingTeams.push(team.name);
+    }
+    if (!this.state.eventState) this.state.eventState = {};
+    this.state.eventState.participatingTeams = [...currentEvent.participatingTeams];
+
+    currentEvent.teamParticipationRecords[team.name] = {
+      teamName: team.name,
+      joinedAt: new Date().toISOString(),
+      initialBalance,
+      initialScore: 0,
+      memberCount: (team.members || []).length || 1,
+      leaderName: team.captainName || (team.members && team.members[0]?.name) || 'Leader'
+    };
+
+    this.updateTeam(team);
+    this.save();
+    return { team, joinedNow: true };
+  }
+
+  startEventSession({ participatingTeams = [], eventName = '' } = {}) {
     const validatedTeamNames = [];
-    for (const teamIdOrName of participatingTeams) {
-      let team = this.getTeam(teamIdOrName);
-      if (!team) {
-        // Search in registrations to give accurate error message
-        const reg = Object.values(this.state.registrations || {}).find(
-          r => r.id === teamIdOrName || r.teamName.toLowerCase() === teamIdOrName.toLowerCase()
-        );
-        if (reg) {
-          if (reg.status === 'PENDING') {
-            throw new Error(`Team "${reg.teamName}" is still Pending. Please accept the team first before starting the event.`);
-          } else if (reg.status === 'REJECTED') {
-            throw new Error(`Team "${reg.teamName}" was Rejected and cannot participate in the event.`);
+    if (Array.isArray(participatingTeams) && participatingTeams.length > 0) {
+      for (const teamIdOrName of participatingTeams) {
+        let team = this.getTeam(teamIdOrName);
+        if (!team) {
+          const reg = Object.values(this.state.registrations || {}).find(
+            r => r.id === teamIdOrName || r.teamName.toLowerCase() === teamIdOrName.toLowerCase()
+          );
+          if (reg && reg.status === 'APPROVED') {
+            team = this.getTeam(reg.teamName);
           }
-          team = this.getTeam(reg.teamName);
+        }
+        if (team && !validatedTeamNames.includes(team.name)) {
+          validatedTeamNames.push(team.name);
         }
       }
-      if (!team) {
-        throw new Error(`Team "${teamIdOrName}" is not an accepted team. Only accepted teams can participate.`);
-      }
-      if (!validatedTeamNames.includes(team.name)) {
-        validatedTeamNames.push(team.name);
-      }
     }
 
-    const initialBalance = this.state.config.initialTeamBalance || 1000;
+    const initialBalance = this.state.config?.initialTeamBalance || 1000;
     const sessionNum = (this.state.archivedEvents?.length || 0) + 1;
     const sessionTitle = (eventName || '').trim() || `QUBIT Code Auctioneer #${sessionNum}`;
     const sessionId = `EVT-${Date.now().toString(36).toUpperCase()}`;
@@ -594,8 +643,8 @@ class Database {
     this.state.unlockHistory = [];
     this.state.submissions = [];
 
-    // Reset event-specific participation, scores, and bidding data for the new session
-    // Initialize new-event ByteCoins balances according to the configured starting balance, exactly once per participating team per event
+    // Reset event-specific participation, scores, and bidding data for pre-specified teams (if any)
+    const teamParticipationRecords = {};
     for (const name of validatedTeamNames) {
       const team = this.getTeam(name);
       if (team) {
@@ -616,6 +665,15 @@ class Database {
         team.attempts = [];
         team.frozenUntil = 0;
         this.updateTeam(team);
+
+        teamParticipationRecords[team.name] = {
+          teamName: team.name,
+          joinedAt: new Date().toISOString(),
+          initialBalance,
+          initialScore: 0,
+          memberCount: (team.members || []).length || 1,
+          leaderName: team.captainName || (team.members && team.members[0]?.name) || 'Leader'
+        };
       }
     }
 
@@ -626,7 +684,8 @@ class Database {
       status: 'EVENT_LIVE',
       startedAt,
       endedAt: null,
-      participatingTeams: validatedTeamNames
+      participatingTeams: validatedTeamNames,
+      teamParticipationRecords
     };
 
     if (!this.state.eventState) this.state.eventState = {};
@@ -753,7 +812,8 @@ class Database {
       status: 'EVENT_ENDED',
       startedAt: null,
       endedAt,
-      participatingTeams: []
+      participatingTeams: [],
+      teamParticipationRecords: {}
     };
 
     this.save();
@@ -1082,13 +1142,10 @@ class Database {
         }
       }
 
-      // Check if team is accepted/participating in the active competition
+      // When competition is live, automatically join the active event session
       const eventState = this.getEventState();
       if (eventState.status === 'EVENT_LIVE') {
-        const participating = this.state.currentEvent?.participatingTeams || eventState.participatingTeams || [];
-        if (participating.length > 0 && !participating.map(p => p.toLowerCase()).includes(team.name.toLowerCase())) {
-          throw new Error(`Team "${team.name}" has not been accepted for the active competition. Please contact the administrator.`);
-        }
+        this.ensureTeamJoinedCurrentEvent(team.name);
       }
 
       // If memberId is specified, locate member

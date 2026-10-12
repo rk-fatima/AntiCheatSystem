@@ -431,6 +431,7 @@ app.post('/api/auth/team-login', (req, res) => {
   try {
     const result = db.verifyTeamLogin(teamName, password, memberId);
     broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
     res.json({
       success: true,
       team: result.team,
@@ -451,6 +452,7 @@ app.post('/api/team/login', (req, res) => {
   try {
     const { team, member } = db.loginOrInitTeam(teamName, memberId, password);
     broadcastToProctors({ type: 'TEAM_UPDATED', team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
     res.json({ team, member });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -791,7 +793,7 @@ app.post('/api/admin/event/status', requireAdminAuth, (req, res) => {
     let resultState;
     if (status === 'EVENT_ENDED') {
       resultState = db.endEventSession().eventState;
-    } else if (status === 'EVENT_LIVE' && Array.isArray(participatingTeams) && participatingTeams.length > 0) {
+    } else if (status === 'EVENT_LIVE') {
       resultState = db.startEventSession({ participatingTeams, eventName }).eventState;
     } else {
       resultState = db.setEventStatus(status);
@@ -800,23 +802,23 @@ app.post('/api/admin/event/status', requireAdminAuth, (req, res) => {
       type: 'EVENT_STATUS_CHANGED',
       eventState: resultState
     });
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
     res.json({ success: true, eventState: resultState });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// Dedicated Start Event Session with team selection
+// Dedicated Start Event Session
 app.post('/api/admin/event/start', requireAdminAuth, (req, res) => {
-  const { participatingTeams, eventName } = req.body;
+  const { participatingTeams = [], eventName = '' } = req.body || {};
   try {
     const result = db.startEventSession({ participatingTeams, eventName });
     broadcastToAll({
       type: 'EVENT_STATUS_CHANGED',
       eventState: result.eventState
     });
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -831,7 +833,7 @@ app.post('/api/admin/event/end', requireAdminAuth, (req, res) => {
       type: 'EVENT_STATUS_CHANGED',
       eventState: result.eventState
     });
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
