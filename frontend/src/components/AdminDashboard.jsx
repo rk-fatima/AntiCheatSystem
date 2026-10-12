@@ -285,7 +285,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     setEventConfirmModal({
       targetStatus: 'EVENT_LIVE',
       title: 'Start Event?',
-      description: 'Confirm with the admin: activate the competition and enable auction bidding and live coding submissions for all approved teams.',
+      description: 'Are you sure you want to start the event?',
       confirmText: 'Start Event',
       confirmColor: '#2ea043'
     });
@@ -295,7 +295,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     setEventConfirmModal({
       targetStatus: 'EVENT_ENDED',
       title: 'End Event?',
-      description: 'Are you sure you want to end the competition? This will disable further bidding and code submissions. Results and the leaderboard will remain permanently available.',
+      description: 'Are you sure you want to end the event?',
       confirmText: 'End Event',
       confirmColor: '#da3633'
     });
@@ -671,10 +671,10 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             </div>
           </div>
 
-          {/* Action buttons (Only relevant actions for current state, QR button removed) */}
+          {/* Action buttons: Start/End Event Toggle & Separate Registration Control */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {eventState.status === 'REGISTRATION_OPEN' ? (
-              /* Registration Open -> Primary Action: Close Registration */
+            {/* Separate Registration Controls */}
+            {eventState.status === 'REGISTRATION_OPEN' && (
               <button
                 type="button"
                 onClick={promptCloseRegistration}
@@ -697,56 +697,35 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 <Pause size={13} />
                 <span>Close Registration</span>
               </button>
-            ) : eventState.status === 'REGISTRATION_CLOSED' ? (
-              /* Registration Closed -> Primary Action: Start Event | Secondary: Reopen Registration */
-              <>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={promptReopenRegistration}
-                  disabled={eventActionLoading}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    padding: '8px 14px',
-                    color: '#38bdf8',
-                    borderColor: 'rgba(56, 189, 248, 0.3)',
-                    background: 'rgba(56, 189, 248, 0.08)',
-                    borderRadius: '6px',
-                    cursor: eventActionLoading ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  <RefreshCw size={13} />
-                  <span>Reopen Registration</span>
-                </button>
+            )}
 
-                <button
-                  type="button"
-                  onClick={promptStartEvent}
-                  disabled={eventActionLoading}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 18px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
-                    border: '1px solid rgba(46, 160, 67, 0.4)',
-                    borderRadius: '6px',
-                    color: '#ffffff',
-                    cursor: eventActionLoading ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 14px rgba(46, 160, 67, 0.35)'
-                  }}
-                >
-                  <Play size={13} fill="#ffffff" />
-                  <span>Start Event</span>
-                </button>
-              </>
-            ) : eventState.status === 'EVENT_LIVE' ? (
-              /* Event Live -> Primary Action: End Event */
+            {eventState.status === 'REGISTRATION_CLOSED' && (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={promptReopenRegistration}
+                disabled={eventActionLoading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  padding: '8px 14px',
+                  color: '#38bdf8',
+                  borderColor: 'rgba(56, 189, 248, 0.3)',
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  borderRadius: '6px',
+                  cursor: eventActionLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <RefreshCw size={13} />
+                <span>Reopen Registration</span>
+              </button>
+            )}
+
+            {/* Primary Start / End Event Toggle */}
+            {eventState.status === 'EVENT_LIVE' ? (
+              /* Event Live -> Red ■ End Event button */
               <button
                 type="button"
                 onClick={promptEndEvent}
@@ -759,7 +738,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   fontSize: '12px',
                   fontWeight: 700,
                   background: 'linear-gradient(135deg, #cf222e 0%, #da3633 100%)',
-                  border: '1px solid rgba(218, 54, 51, 0.4)',
+                  border: '1px solid rgba(218, 54, 51, 0.5)',
                   borderRadius: '6px',
                   color: '#ffffff',
                   cursor: eventActionLoading ? 'not-allowed' : 'pointer',
@@ -770,18 +749,29 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 <span>End Event</span>
               </button>
             ) : (
-              /* Event Ended -> Actions removed */
-              <div style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#94a3b8',
-                padding: '6px 12px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.08)'
-              }}>
-                Event Concluded ✓
-              </div>
+              /* Event Not Live (REGISTRATION_OPEN, REGISTRATION_CLOSED, EVENT_ENDED) -> Green ▶ Start Event button */
+              <button
+                type="button"
+                onClick={promptStartEvent}
+                disabled={eventActionLoading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 18px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                  border: '1px solid rgba(46, 160, 67, 0.5)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(46, 160, 67, 0.35)'
+                }}
+              >
+                <Play size={13} fill="#ffffff" />
+                <span>Start Event</span>
+              </button>
             )}
           </div>
         </div>

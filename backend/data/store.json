@@ -1416,15 +1416,40 @@
         }
       ],
       "passwordHash": "600fc0b7d3f7c0a4ba2b68aec0d45ff8:3ef04f94259ed162c6da02bad7117ed1de7e9ef91d0a92783a8cc0a7f024bc58f98d7493bee6b0bbc30acc855b684389dba9229fda1337d2849299e2874e19e4",
-      "balance": 1000,
-      "unlocked": [],
+      "balance": 900,
+      "unlocked": [
+        "E2"
+      ],
       "unlockedCards": [],
       "solved": [],
-      "problemStatuses": {},
+      "problemStatuses": {
+        "E2": {
+          "status": "UNLOCKED",
+          "unlockedBy": "SYNORA-01",
+          "unlockedByName": "Team Member",
+          "bidAmount": 100,
+          "unlockedAt": "2026-10-12T16:56:12.090Z"
+        }
+      },
       "revealedHints": {},
       "hintPassesCount": 0,
       "sabotageCardsCount": 0,
-      "transactions": [],
+      "transactions": [
+        {
+          "id": "TXN-1791824172090-1RLG3",
+          "teamId": "SYNORA",
+          "teamName": "SYNORA",
+          "problemId": "E2",
+          "problemTitle": "Palindrome Number",
+          "bidAmount": 100,
+          "price": 100,
+          "purchasedBy": "SYNORA-01",
+          "purchasedByName": "Team Member",
+          "remainingBalance": 900,
+          "purchaseTime": "2026-10-12T16:56:12.090Z",
+          "displayTime": "10:26 PM"
+        }
+      ],
       "score": 0,
       "wrong": 0,
       "violations": [
@@ -1500,9 +1525,24 @@
   "eventState": {
     "status": "REGISTRATION_OPEN",
     "startedAt": "2026-10-12T16:00:54.840Z",
-    "endedAt": "2026-10-12T16:38:31.401Z"
+    "endedAt": null
   },
-  "transactions": [],
+  "transactions": [
+    {
+      "id": "TXN-1791824172090-1RLG3",
+      "teamId": "SYNORA",
+      "teamName": "SYNORA",
+      "problemId": "E2",
+      "problemTitle": "Palindrome Number",
+      "bidAmount": 100,
+      "price": 100,
+      "purchasedBy": "SYNORA-01",
+      "purchasedByName": "Team Member",
+      "remainingBalance": 900,
+      "purchaseTime": "2026-10-12T16:56:12.090Z",
+      "displayTime": "10:26 PM"
+    }
+  ],
   "unlockHistory": [],
   "submissions": [],
   "telemetry": [

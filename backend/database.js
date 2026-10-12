@@ -259,10 +259,13 @@ class Database {
       this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
     }
     this.state.eventState.status = status;
-    if (status === 'EVENT_LIVE' && !this.state.eventState.startedAt) {
-      this.state.eventState.startedAt = new Date().toISOString();
+    if (status === 'EVENT_LIVE') {
+      if (!this.state.eventState.startedAt) {
+        this.state.eventState.startedAt = new Date().toISOString();
+      }
+      this.state.eventState.endedAt = null;
     }
-    if (status === 'EVENT_ENDED' && !this.state.eventState.endedAt) {
+    if (status === 'EVENT_ENDED') {
       this.state.eventState.endedAt = new Date().toISOString();
     }
     this.save();

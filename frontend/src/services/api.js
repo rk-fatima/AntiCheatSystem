@@ -1294,10 +1294,13 @@ export async function updateEventStatus(status) {
   const store = getFallbackStore();
   if (!store.eventState) store.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
   store.eventState.status = status;
-  if (status === 'EVENT_LIVE' && !store.eventState.startedAt) {
-    store.eventState.startedAt = new Date().toISOString();
+  if (status === 'EVENT_LIVE') {
+    if (!store.eventState.startedAt) {
+      store.eventState.startedAt = new Date().toISOString();
+    }
+    store.eventState.endedAt = null;
   }
-  if (status === 'EVENT_ENDED' && !store.eventState.endedAt) {
+  if (status === 'EVENT_ENDED') {
     store.eventState.endedAt = new Date().toISOString();
   }
   saveFallbackStore(store);
