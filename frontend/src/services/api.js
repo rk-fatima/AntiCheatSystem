@@ -785,7 +785,7 @@ export async function fetchTransactions() {
   } catch (e) {}
   const store = getFallbackStore();
   const txns = [];
-  Object.values(store.teams).forEach(t => {
+  Object.values(store.teams || {}).forEach(t => {
     if (t.transactions) txns.push(...t.transactions);
   });
   return { transactions: txns };
@@ -1332,8 +1332,8 @@ export async function startEventSession({ participatingTeams, eventName }) {
   store.eventState.startedAt = new Date().toISOString();
   store.eventState.endedAt = null;
   store.eventState.participatingTeams = participatingTeams;
-  (store.teams || []).forEach(t => {
-    if (participatingTeams.includes(t.name)) {
+  Object.values(store.teams || {}).forEach(t => {
+    if ((participatingTeams || []).includes(t.name)) {
       t.balance = 1000;
       t.score = 0;
       t.solved = [];
