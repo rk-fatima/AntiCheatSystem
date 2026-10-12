@@ -388,11 +388,31 @@ app.post('/api/cards/unlock', (req, res) => {
   }
 });
 
-// --- TEAM REGISTRATION & SESSION MANAGEMENT ---
-app.post('/api/team/register', (req, res) => {
-  const { name, size, captainIdx, members } = req.body;
+// --- EVENT STATUS & PUBLIC REGISTRATION API ---
+app.get('/api/event/status', (req, res) => {
+  res.json({ eventState: db.getEventState() });
+});
+
+app.post('/api/register', (req, res) => {
   try {
-    const team = db.registerTeam({ name, size, captainIdx, members });
+    const registration = db.submitRegistration(req.body);
+    broadcastToProctors({ type: 'REGISTRATION_SUBMITTED', registration });
+    res.json({ success: true, registration });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Backward-compatible registration alias
+app.post('/api/team/register', (req, res) => {
+  try {
+    const payload = req.body;
+    if (payload.password || payload.teamName) {
+      const registration = db.submitRegistration(payload);
+      broadcastToProctors({ type: 'REGISTRATION_SUBMITTED', registration });
+      return res.json({ success: true, registration });
+    }
+    const team = db.registerTeam(payload);
     broadcastToProctors({ type: 'TEAM_REGISTERED', team });
     res.json({ success: true, team });
   } catch (err) {
@@ -400,14 +420,35 @@ app.post('/api/team/register', (req, res) => {
   }
 });
 
-app.post('/api/team/login', (req, res) => {
-  const { teamName, memberId } = req.body;
+// Secure Team Login with password verification
+app.post('/api/auth/team-login', (req, res) => {
+  const { teamName, password, memberId } = req.body;
   if (!teamName || !teamName.trim()) {
     return res.status(400).json({ error: 'Team name cannot be blank.' });
   }
 
   try {
-    const { team, member } = db.loginOrInitTeam(teamName, memberId);
+    const result = db.verifyTeamLogin(teamName, password, memberId);
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    res.json({
+      success: true,
+      team: result.team,
+      member: result.member,
+      members: result.members
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/team/login', (req, res) => {
+  const { teamName, memberId, password } = req.body;
+  if (!teamName || !teamName.trim()) {
+    return res.status(400).json({ error: 'Team name cannot be blank.' });
+  }
+
+  try {
+    const { team, member } = db.loginOrInitTeam(teamName, memberId, password);
     broadcastToProctors({ type: 'TEAM_UPDATED', team });
     res.json({ team, member });
   } catch (err) {
@@ -417,7 +458,30 @@ app.post('/api/team/login', (req, res) => {
 
 app.get('/api/team/:name', (req, res) => {
   const team = db.getTeam(req.params.name);
-  if (!team) return res.status(404).json({ error: `Team "${req.params.name}" not found in registration database.` });
+  if (!team) {
+    // Check pending registration
+    const allRegs = db.state.registrations || {};
+    const reg = Object.values(allRegs).find(
+      r => r.teamName.toLowerCase() === req.params.name.trim().toLowerCase()
+    );
+    if (reg) {
+      if (reg.status === 'PENDING') {
+        return res.status(403).json({
+          error: 'Your team registration is pending approval by the organizer.',
+          isPending: true,
+          status: 'PENDING'
+        });
+      }
+      if (reg.status === 'REJECTED') {
+        return res.status(403).json({
+          error: `Your registration was declined: ${reg.rejectionReason || 'Contact organizer.'}`,
+          isRejected: true,
+          status: 'REJECTED'
+        });
+      }
+    }
+    return res.status(404).json({ error: `Team "${req.params.name}" not found in registration database.` });
+  }
   db.isTeamFrozen(team.name);
   res.json({
     team: {
@@ -703,6 +767,19 @@ app.get('/api/leaderboard', (req, res) => {
 });
 
 // --- DEDICATED ADMIN DASHBOARD APIS ---
+function requireAdminAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = req.headers['x-admin-token'] || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '');
+  if (
+    token === 'qubit-admin-auth-token-valid' ||
+    token === 'admin-auth-valid' ||
+    req.body?.pin === db.state.config.adminPin
+  ) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized: Admin authentication required.' });
+}
+
 app.post('/api/admin/login', (req, res) => {
   const { adminId, password } = req.body;
   if (adminId === 'Qubit123' && password === 'Abcd.01@#') {
@@ -713,6 +790,62 @@ app.post('/api/admin/login', (req, res) => {
     });
   }
   return res.status(401).json({ error: 'Invalid Admin ID or Password. Access denied.' });
+});
+
+// Admin Event Status Control
+app.post('/api/admin/event/status', requireAdminAuth, (req, res) => {
+  const { status } = req.body;
+  try {
+    const eventState = db.setEventStatus(status);
+    broadcastToAll({
+      type: 'EVENT_STATUS_CHANGED',
+      eventState
+    });
+    res.json({ success: true, eventState });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Registrations Management
+app.get('/api/admin/registrations', requireAdminAuth, (req, res) => {
+  res.json({ registrations: db.getAllRegistrations() });
+});
+
+app.post('/api/admin/registrations/approve', requireAdminAuth, (req, res) => {
+  const { id, regId } = req.body;
+  const targetId = id || regId;
+  try {
+    const result = db.approveRegistration(targetId);
+    broadcastToProctors({
+      type: 'REGISTRATION_APPROVED',
+      registration: result.registration,
+      team: result.team
+    });
+    broadcastToAll({
+      type: 'TEAM_REGISTERED',
+      team: result.team
+    });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/registrations/reject', requireAdminAuth, (req, res) => {
+  const { id, regId, reason } = req.body;
+  const targetId = id || regId;
+  try {
+    const registration = db.rejectRegistration(targetId, reason);
+    broadcastToProctors({
+      type: 'REGISTRATION_REJECTED',
+      registration
+    });
+    res.json({ success: true, registration });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // Admin Problem Unlock
@@ -820,7 +953,7 @@ app.post('/api/admin/sabotage/unfreeze', (req, res) => {
 });
 
 // Admin Full Overview
-app.get('/api/admin/overview', (req, res) => {
+app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
   const teams = db.getAllTeams();
   const problems = db.getAllProblems();
   res.json({
@@ -828,7 +961,9 @@ app.get('/api/admin/overview', (req, res) => {
     problems,
     transactions: db.getAllTransactions(),
     unlockHistory: db.getUnlockHistory(),
-    submissions: db.getAllSubmissions().slice(0, 100)
+    submissions: db.getAllSubmissions().slice(0, 100),
+    eventState: db.getEventState(),
+    registrations: db.getAllRegistrations()
   });
 });
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import QRCode from 'qrcode';
 import {
   Trophy,
   Lock,
@@ -17,7 +18,16 @@ import {
   Eye,
   Snowflake,
   AlertTriangle,
-  History
+  History,
+  QrCode,
+  UserCheck,
+  UserX,
+  Play,
+  Pause,
+  Copy,
+  Clock,
+  ShieldCheck,
+  ArrowRight
 } from 'lucide-react';
 import {
   fetchAdminOverview,
@@ -26,17 +36,33 @@ import {
   adminGrantCardPass,
   adminRevealProblemHint,
   adminClearFreeze,
-  adminLogout
+  adminLogout,
+  fetchEventStatus,
+  updateEventStatus,
+  fetchAdminRegistrations,
+  approveTeamRegistration,
+  rejectTeamRegistration
 } from '../services/api';
 
 export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
-  const [activeTab, setActiveTab] = useState('problems'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage'
+  const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard' | 'problems' | 'hints' | 'sabotage' | 'registrations'
   const [teams, setTeams] = useState([]);
   const [problems, setProblems] = useState([]);
   const [unlockHistory, setUnlockHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTeamName, setSelectedTeamName] = useState('');
   const [notification, setNotification] = useState(null);
+
+  // Event controls & registrations
+  const [eventState, setEventState] = useState({ status: 'REGISTRATION_OPEN', startedAt: null });
+  const [registrations, setRegistrations] = useState([]);
+  const [regFilter, setRegFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [regSearch, setRegSearch] = useState('');
+  const [rejectModal, setRejectModal] = useState(null); // { reg, reason: '' }
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   // Leaderboard filters
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
@@ -51,6 +77,22 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [unlockModal, setUnlockModal] = useState(null);
   const [unlockSubmitting, setUnlockSubmitting] = useState(false);
 
+  const regUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}#register`
+    : '';
+
+  useEffect(() => {
+    if (regUrl && showQrModal) {
+      QRCode.toDataURL(regUrl, {
+        width: 320,
+        margin: 2,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      })
+        .then(url => setQrDataUrl(url))
+        .catch(err => console.error('QR code error:', err));
+    }
+  }, [regUrl, showQrModal]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -59,11 +101,13 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       setTeams(loadedTeams);
       setProblems(data.problems || []);
       setUnlockHistory(data.unlockHistory || []);
+      if (data.eventState) setEventState(data.eventState);
+      if (data.registrations) setRegistrations(data.registrations);
 
       // If no team is selected yet, default to the first team
       setSelectedTeamName(prev => {
         if (prev && loadedTeams.some(t => t.name === prev)) return prev;
-        return loadedTeams[0]?.name || 'Synora';
+        return loadedTeams[0]?.name || '';
       });
     } catch (err) {
       console.error('Failed to load admin data:', err);
@@ -222,6 +266,73 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       showToast(err.message || 'Failed to clear freeze', false);
     }
   };
+
+  // Event control handlers
+  const handleToggleEventStatus = async (newStatus) => {
+    try {
+      const updated = await updateEventStatus(newStatus);
+      setEventState(updated);
+      showToast(`Event status updated to: ${newStatus.replace(/_/g, ' ')}`, true);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to update event status', false);
+    }
+  };
+
+  const handleApproveRegistration = async (reg) => {
+    setActionLoadingId(reg.id);
+    try {
+      await approveTeamRegistration(reg.id);
+      showToast(`Team "${reg.teamName}" approved! Initialized with ₹1,000 ByteCoins.`, true);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to approve team registration', false);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectModal?.reg) return;
+    const { reg, reason } = rejectModal;
+    setActionLoadingId(reg.id);
+    try {
+      await rejectTeamRegistration(reg.id, reason);
+      showToast(`Registration for "${reg.teamName}" declined.`, true);
+      setRejectModal(null);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to reject registration', false);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleCopyRegLink = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(regUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const pendingRegistrationsCount = registrations.filter(r => r.status === 'PENDING').length;
+
+  // Filter registrations
+  const filteredRegistrations = registrations
+    .filter(r => {
+      const matchesFilter =
+        regFilter === 'ALL' ||
+        r.status === regFilter;
+      const q = regSearch.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        r.teamName.toLowerCase().includes(q) ||
+        (r.leaderName && r.leaderName.toLowerCase().includes(q)) ||
+        (r.id && r.id.toLowerCase().includes(q));
+      return matchesFilter && matchesSearch;
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   // Filter & sort leaderboard
   const filteredLeaderboard = [...teams]
@@ -399,6 +510,198 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           </div>
         )}
 
+        {/* EVENT CONTROL & REGISTRATION BANNER */}
+        <div style={{
+          background: 'rgba(13, 17, 28, 0.85)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}>
+          {/* Status info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              background: eventState.status === 'EVENT_LIVE'
+                ? 'rgba(188, 140, 255, 0.15)'
+                : eventState.status === 'REGISTRATION_CLOSED'
+                ? 'rgba(210, 153, 34, 0.15)'
+                : 'rgba(56, 189, 248, 0.15)',
+              border: `1px solid ${
+                eventState.status === 'EVENT_LIVE'
+                  ? 'rgba(188, 140, 255, 0.35)'
+                  : eventState.status === 'REGISTRATION_CLOSED'
+                  ? 'rgba(210, 153, 34, 0.35)'
+                  : 'rgba(56, 189, 248, 0.35)'
+              }`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: eventState.status === 'EVENT_LIVE'
+                ? '#bc8cff'
+                : eventState.status === 'REGISTRATION_CLOSED'
+                ? '#d29922'
+                : '#38bdf8'
+            }}>
+              {eventState.status === 'EVENT_LIVE' ? (
+                <Play size={20} />
+              ) : eventState.status === 'REGISTRATION_CLOSED' ? (
+                <Pause size={20} />
+              ) : (
+                <ShieldCheck size={20} />
+              )}
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase' }}>
+                  EVENT STATUS:
+                </span>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  letterSpacing: '0.4px',
+                  background: eventState.status === 'EVENT_LIVE'
+                    ? 'rgba(188, 140, 255, 0.18)'
+                    : eventState.status === 'REGISTRATION_CLOSED'
+                    ? 'rgba(210, 153, 34, 0.18)'
+                    : 'rgba(56, 189, 248, 0.18)',
+                  color: eventState.status === 'EVENT_LIVE'
+                    ? '#bc8cff'
+                    : eventState.status === 'REGISTRATION_CLOSED'
+                    ? '#d29922'
+                    : '#38bdf8',
+                  border: `1px solid ${
+                    eventState.status === 'EVENT_LIVE'
+                      ? 'rgba(188, 140, 255, 0.4)'
+                      : eventState.status === 'REGISTRATION_CLOSED'
+                      ? 'rgba(210, 153, 34, 0.4)'
+                      : 'rgba(56, 189, 248, 0.4)'
+                  }`
+                }}>
+                  {eventState.status === 'EVENT_LIVE'
+                    ? '● EVENT LIVE'
+                    : eventState.status === 'REGISTRATION_CLOSED'
+                    ? '■ REGISTRATION CLOSED'
+                    : '▲ REGISTRATION OPEN'}
+                </span>
+              </div>
+              <div style={{ fontSize: '13px', color: '#c9d1d9' }}>
+                {eventState.status === 'EVENT_LIVE'
+                  ? 'Competition is live. Public self-registration is closed.'
+                  : eventState.status === 'REGISTRATION_CLOSED'
+                  ? 'Public registration paused. Admin approval still enabled.'
+                  : 'Public registration is open. Teams can self-register via QR code.'}
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Show QR code button */}
+            <button
+              className="btn-ghost"
+              onClick={() => setShowQrModal(true)}
+              style={{
+                fontSize: '12px',
+                padding: '7px 14px',
+                color: '#58a6ff',
+                borderColor: 'rgba(88, 166, 255, 0.3)',
+                background: 'rgba(88, 166, 255, 0.08)'
+              }}
+            >
+              <QrCode size={14} />
+              <span>Registration QR</span>
+            </button>
+
+            {/* Toggle registration / start event */}
+            {eventState.status === 'REGISTRATION_OPEN' ? (
+              <>
+                <button
+                  className="btn-ghost"
+                  onClick={() => handleToggleEventStatus('REGISTRATION_CLOSED')}
+                  style={{ fontSize: '12px', padding: '7px 14px' }}
+                >
+                  <Pause size={13} />
+                  <span>Close Registration</span>
+                </button>
+
+                <button
+                  onClick={() => handleToggleEventStatus('EVENT_LIVE')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 16px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(46, 160, 67, 0.35)'
+                  }}
+                >
+                  <Play size={13} />
+                  <span>Start Event (Go Live)</span>
+                </button>
+              </>
+            ) : eventState.status === 'REGISTRATION_CLOSED' ? (
+              <>
+                <button
+                  className="btn-ghost"
+                  onClick={() => handleToggleEventStatus('REGISTRATION_OPEN')}
+                  style={{ fontSize: '12px', padding: '7px 14px', color: '#38bdf8' }}
+                >
+                  <RefreshCw size={13} />
+                  <span>Reopen Registration</span>
+                </button>
+
+                <button
+                  onClick={() => handleToggleEventStatus('EVENT_LIVE')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 16px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(46, 160, 67, 0.35)'
+                  }}
+                >
+                  <Play size={13} />
+                  <span>Start Event (Go Live)</span>
+                </button>
+              </>
+            ) : (
+              /* EVENT_LIVE */
+              <button
+                className="btn-ghost"
+                onClick={() => handleToggleEventStatus('REGISTRATION_OPEN')}
+                style={{ fontSize: '12px', padding: '7px 14px', color: '#bc8cff', borderColor: 'rgba(188, 140, 255, 0.3)' }}
+              >
+                <RefreshCw size={13} />
+                <span>Reopen Late Registration</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* 3. TOP SUMMARY CARDS (Compact 4 Cards) */}
         <div style={{
           display: 'grid',
@@ -461,13 +764,19 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           flexWrap: 'wrap',
           gap: '14px'
         }}>
-          {/* Main 4 Tabs */}
+          {/* Main 5 Tabs */}
           <div style={{ display: 'flex', gap: '4px' }}>
             {[
               { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
               { id: 'problems', label: 'Problems', icon: Lock },
               { id: 'hints', label: 'Hints', icon: Lightbulb },
-              { id: 'sabotage', label: 'Sabotage', icon: Zap }
+              { id: 'sabotage', label: 'Sabotage', icon: Zap },
+              {
+                id: 'registrations',
+                label: 'Registrations',
+                icon: UserCheck,
+                badge: pendingRegistrationsCount > 0 ? pendingRegistrationsCount : null
+              }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
@@ -492,13 +801,26 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 >
                   <Icon size={15} color={isActive ? '#58a6ff' : 'var(--txt-dim)'} />
                   <span>{tab.label}</span>
+                  {tab.badge && (
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      background: 'rgba(210, 153, 34, 0.25)',
+                      border: '1px solid rgba(210, 153, 34, 0.4)',
+                      color: '#d29922'
+                    }}>
+                      {tab.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
 
           {/* Quick Target Team Selector (for Problems, Hints, Sabotage) */}
-          {activeTab !== 'leaderboard' && (
+          {activeTab !== 'leaderboard' && activeTab !== 'registrations' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', color: 'var(--txt-muted)', fontWeight: 600 }}>
                 Target Team:
@@ -1396,6 +1718,428 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             </div>
           </div>
         )}
+
+        {/* ============================================================ */}
+        {/* TAB 5: SELF-REGISTRATIONS APPROVAL STATION                  */}
+        {/* ============================================================ */}
+        {activeTab === 'registrations' && (
+          <div>
+            {/* Header row with search and filters */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+              gap: '14px'
+            }}>
+              {/* Filter Pills */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'ALL', label: `All (${registrations.length})` },
+                  { id: 'PENDING', label: `Pending (${pendingRegistrationsCount})`, isAlert: pendingRegistrationsCount > 0 },
+                  { id: 'APPROVED', label: `Approved (${registrations.filter(r => r.status === 'APPROVED').length})` },
+                  { id: 'REJECTED', label: `Rejected (${registrations.filter(r => r.status === 'REJECTED').length})` }
+                ].map(f => {
+                  const isActive = regFilter === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setRegFilter(f.id)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: isActive ? 700 : 500,
+                        border: '1px solid',
+                        borderColor: isActive
+                          ? '#58a6ff'
+                          : f.isAlert
+                          ? 'rgba(210, 153, 34, 0.4)'
+                          : 'rgba(255, 255, 255, 0.1)',
+                        background: isActive
+                          ? 'rgba(88, 166, 255, 0.15)'
+                          : f.isAlert
+                          ? 'rgba(210, 153, 34, 0.1)'
+                          : 'rgba(255, 255, 255, 0.03)',
+                        color: isActive
+                          ? '#58a6ff'
+                          : f.isAlert
+                          ? '#d29922'
+                          : 'var(--txt-muted)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Search Bar */}
+              <div style={{
+                position: 'relative',
+                width: '260px'
+              }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--txt-dim)'
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search team or leader..."
+                  value={regSearch}
+                  onChange={(e) => setRegSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '7px 12px 7px 32px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    fontSize: '12px'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Registration Cards List */}
+            {filteredRegistrations.length === 0 ? (
+              <div style={{
+                background: 'rgba(13, 17, 28, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '48px 24px',
+                textAlign: 'center',
+                color: 'var(--txt-muted)'
+              }}>
+                <UserCheck size={36} color="var(--txt-dim)" style={{ marginBottom: '12px' }} />
+                <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', marginBottom: '4px' }}>
+                  No Registrations Found
+                </div>
+                <div style={{ fontSize: '12px', maxWidth: '360px', margin: '0 auto' }}>
+                  {regSearch
+                    ? 'No teams match your search keyword. Try clearing the filter.'
+                    : 'Share the public registration QR code with students to start receiving team submissions.'}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {filteredRegistrations.map((reg) => {
+                  const isPending = reg.status === 'PENDING';
+                  const isApproved = reg.status === 'APPROVED';
+                  const isRejected = reg.status === 'REJECTED';
+                  const isLoading = actionLoadingId === reg.id;
+
+                  const cleanCode = reg.teamName.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8) || 'TEAM';
+
+                  return (
+                    <div
+                      key={reg.id}
+                      style={{
+                        background: 'rgba(13, 17, 28, 0.85)',
+                        border: `1px solid ${
+                          isPending
+                            ? 'rgba(210, 153, 34, 0.35)'
+                            : isApproved
+                            ? 'rgba(46, 160, 67, 0.25)'
+                            : 'rgba(248, 81, 73, 0.25)'
+                        }`,
+                        borderRadius: '12px',
+                        padding: '20px 22px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)'
+                      }}
+                    >
+                      {/* Top Row: Team Name, Status, Reg ID */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '14px',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                            {reg.teamName}
+                          </span>
+
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            padding: '3px 10px',
+                            borderRadius: '10px',
+                            letterSpacing: '0.4px',
+                            background: isPending
+                              ? 'rgba(210, 153, 34, 0.15)'
+                              : isApproved
+                              ? 'rgba(46, 160, 67, 0.15)'
+                              : 'rgba(248, 81, 73, 0.15)',
+                            color: isPending
+                              ? '#d29922'
+                              : isApproved
+                              ? '#3fb950'
+                              : '#ff7b72',
+                            border: `1px solid ${
+                              isPending
+                                ? 'rgba(210, 153, 34, 0.4)'
+                                : isApproved
+                                ? 'rgba(46, 160, 67, 0.4)'
+                                : 'rgba(248, 81, 73, 0.4)'
+                            }`
+                          }}>
+                            {isPending
+                              ? '⏳ PENDING APPROVAL'
+                              : isApproved
+                              ? '✓ APPROVED'
+                              : '✕ DECLINED'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12px', color: 'var(--txt-muted)' }}>
+                          <span style={{ fontFamily: 'monospace', color: '#bc8cff' }}>
+                            {reg.id}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {new Date(reg.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at{' '}
+                            {new Date(reg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Middle Grid: Leader Contact & Member Breakdown */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                        gap: '14px',
+                        marginBottom: '16px',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '8px',
+                        padding: '12px 16px'
+                      }}>
+                        {/* Leader Info */}
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--txt-dim)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                            Team Leader Information
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>
+                            {reg.leaderName}
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>
+                            {reg.leaderContact && <span>📞 {reg.leaderContact} </span>}
+                            {reg.leaderEmail && <span>✉️ {reg.leaderEmail}</span>}
+                            {!reg.leaderContact && !reg.leaderEmail && <span>No contact provided</span>}
+                          </div>
+                        </div>
+
+                        {/* Roster Overview */}
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--txt-dim)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                            Team Size & Allocation
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#58a6ff', marginBottom: '4px' }}>
+                            {reg.memberCount} {reg.memberCount === 1 ? 'Solo Participant' : 'Members'}
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>
+                            Workspace Budget: <b style={{ color: '#3fb950' }}>₹1,000 ByteCoins</b> on approval
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Member Cards Breakdown */}
+                      <div style={{ marginBottom: '18px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--txt-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                          Registered Team Members & Generated IDs:
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                          {(reg.members || []).slice(0, reg.memberCount).map((m, idx) => {
+                            const memberId = `${cleanCode}-001-M${String(idx + 1).padStart(2, '0')}`;
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.03)',
+                                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                                  borderRadius: '6px',
+                                  padding: '8px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '8px'
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
+                                    {m.name || `Member ${idx + 1}`}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '2px' }}>
+                                    {m.college || m.rollNo || (idx === 0 ? 'Leader' : `Member ${idx + 1}`)}
+                                  </div>
+                                </div>
+
+                                <div style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  fontFamily: 'monospace',
+                                  color: '#58a6ff',
+                                  background: 'rgba(88, 166, 255, 0.1)',
+                                  padding: '3px 6px',
+                                  borderRadius: '4px'
+                                }}>
+                                  {memberId}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Action Bar */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        paddingTop: '14px',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                      }}>
+                        {isPending ? (
+                          <>
+                            <div style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>
+                              Approving will initialize the team with ₹1,000 ByteCoins and create their shared workspace.
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button
+                                type="button"
+                                disabled={isLoading}
+                                onClick={() => setRejectModal({ reg, reason: '' })}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px 16px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  color: '#ff7b72',
+                                  background: 'rgba(248, 81, 73, 0.08)',
+                                  border: '1px solid rgba(248, 81, 73, 0.25)',
+                                  borderRadius: '6px',
+                                  cursor: isLoading ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                <UserX size={14} />
+                                <span>Reject</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isLoading}
+                                onClick={() => handleApproveRegistration(reg)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '8px 18px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  color: '#ffffff',
+                                  background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                                  boxShadow: '0 4px 12px rgba(46, 160, 67, 0.35)'
+                                }}
+                              >
+                                {isLoading ? (
+                                  <RefreshCw size={14} className="spin" />
+                                ) : (
+                                  <UserCheck size={14} />
+                                )}
+                                <span>Approve & Initialize (1000 BC)</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : isApproved ? (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#3fb950', fontWeight: 600 }}>
+                              <CheckCircle2 size={15} />
+                              <span>Team is active on leaderboard and has full workspace access.</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTeamName(reg.teamName);
+                                setActiveTab('problems');
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 14px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#58a6ff',
+                                background: 'rgba(88, 166, 255, 0.08)',
+                                border: '1px solid rgba(88, 166, 255, 0.25)',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <span>Manage Problems</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </>
+                        ) : (
+                          /* REJECTED */
+                          <>
+                            <div style={{ fontSize: '12px', color: '#ff7b72' }}>
+                              <b>Reason:</b> {reg.rejectionReason || 'Declined by event administrator.'}
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isLoading}
+                              onClick={() => handleApproveRegistration(reg)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 14px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#ffffff',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '6px',
+                                cursor: isLoading ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              <RefreshCw size={13} />
+                              <span>Re-Approve Team</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ============================================================ */}
@@ -1635,6 +2379,250 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* REJECT REGISTRATION MODAL */}
+      {rejectModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !actionLoadingId) {
+              setRejectModal(null);
+            }
+          }}
+        >
+          <div style={{
+            background: '#0d111c',
+            border: '1px solid rgba(248, 81, 73, 0.3)',
+            borderRadius: '14px',
+            maxWidth: '440px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'rgba(248, 81, 73, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ff7b72'
+              }}>
+                <UserX size={18} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>
+                  Decline Registration
+                </h3>
+                <div style={{ fontSize: '12px', color: 'var(--txt-muted)' }}>
+                  Team: <b>{rejectModal.reg?.teamName}</b> ({rejectModal.reg?.id})
+                </div>
+              </div>
+            </div>
+
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--txt-muted)', lineHeight: 1.5 }}>
+              Are you sure you want to decline this registration? Provide an optional reason to display to the team.
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#c9d1d9', marginBottom: '6px' }}>
+                Decline Reason (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Duplicate team name / Incomplete members"
+                value={rejectModal.reason || ''}
+                onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '9px 12px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '13px'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setRejectModal(null)}
+                disabled={Boolean(actionLoadingId)}
+                style={{ padding: '8px 16px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                disabled={Boolean(actionLoadingId)}
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: '#da3633',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  cursor: actionLoadingId ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {actionLoadingId ? 'Declining...' : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AUDIENCE PROJECTION QR CODE MODAL */}
+      {showQrModal && (
+        <div
+          className="ov"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            position: 'fixed',
+            inset: 0,
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowQrModal(false);
+          }}
+        >
+          <div style={{
+            background: '#0d111c',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '16px',
+            maxWidth: '420px',
+            width: '100%',
+            padding: '30px',
+            textAlign: 'center',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>QUBIT</span>
+                <span style={{ color: '#bc8cff', fontWeight: 600 }}>//</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#58a6ff', textTransform: 'uppercase' }}>
+                  REGISTRATION QR
+                </span>
+              </div>
+              <button
+                onClick={() => setShowQrModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--txt-muted)', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--txt-muted)' }}>
+              Project this QR code on the auditorium screen for contestant self-registration.
+            </p>
+
+            <div style={{
+              background: '#ffffff',
+              padding: '16px',
+              borderRadius: '12px',
+              display: 'inline-block',
+              marginBottom: '16px',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)'
+            }}>
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="Registration QR"
+                  style={{ width: '240px', height: '240px', display: 'block' }}
+                />
+              ) : (
+                <div style={{ width: '240px', height: '240px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
+                  Generating QR...
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '6px',
+              padding: '8px 12px',
+              fontSize: '11px',
+              color: 'var(--txt-muted)',
+              fontFamily: 'monospace',
+              wordBreak: 'break-all',
+              marginBottom: '20px'
+            }}>
+              {regUrl}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={handleCopyRegLink}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  background: 'rgba(88, 166, 255, 0.1)',
+                  border: '1px solid rgba(88, 166, 255, 0.3)',
+                  borderRadius: '6px',
+                  color: '#58a6ff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedLink ? 'Copied Link' : 'Copy URL'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.open(regUrl, '_blank')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <ExternalLink size={14} />
+                <span>Open Page</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

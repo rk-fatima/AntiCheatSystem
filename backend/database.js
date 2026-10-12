@@ -1,7 +1,30 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { getPredefinedHint } from './hints.js';
+
+export function hashPassword(password) {
+  if (!password || typeof password !== 'string') {
+    throw new Error('Password must be a non-empty string');
+  }
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password, storedHash) {
+  if (!storedHash || typeof storedHash !== 'string') return false;
+  const parts = storedHash.split(':');
+  if (parts.length !== 2) return false;
+  const [salt, hash] = parts;
+  try {
+    const check = crypto.scryptSync(password, salt, 64).toString('hex');
+    return check === hash;
+  } catch (e) {
+    return false;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,7 +40,12 @@ class Database {
     this.state = {
       problems: [],
       problemPrices: {}, // problemId -> number (dynamically set by organizer)
-      teams: {},         // Clean start: populated ONLY via actual registration
+      teams: {},         // Clean start: populated ONLY via actual registration & admin approval
+      registrations: {}, // Self-registrations submitted by teams
+      eventState: {
+        status: 'REGISTRATION_OPEN', // 'REGISTRATION_OPEN' | 'REGISTRATION_CLOSED' | 'EVENT_LIVE'
+        startedAt: null
+      },
       transactions: [],  // Immutable audit log of problem purchases
       unlockHistory: [], // Admin unlock transactions audit log
       submissions: [],
@@ -47,6 +75,11 @@ class Database {
           transactions: parsed.transactions || [],
           unlockHistory: parsed.unlockHistory || [],
           teams: parsed.teams || {},
+          registrations: parsed.registrations || {},
+          eventState: parsed.eventState || {
+            status: 'REGISTRATION_OPEN',
+            startedAt: null
+          },
           submissions: parsed.submissions || [],
           telemetry: parsed.telemetry || []
         };
@@ -72,66 +105,6 @@ class Database {
         delete this.state.teams[key];
         modified = true;
       }
-    }
-
-    // Testing teams requested by organizer: Synora (2 members) & VisionX (1 member)
-    if (!this.getTeam('Synora')) {
-      this.state.teams['Synora'] = {
-        id: 'Synora',
-        name: 'Synora',
-        size: 2,
-        captainId: 'SYNORA-001-M01',
-        captainName: 'Salman',
-        members: [
-          { memberId: 'SYNORA-001-M01', name: 'Salman', isCaptain: true, rollNo: '', phone: '', email: '', college: '' },
-          { memberId: 'SYNORA-001-M02', name: 'Sreethan', isCaptain: false, rollNo: '', phone: '', email: '', college: '' }
-        ],
-        balance: 1000,
-        unlocked: [],
-        solved: [],
-        problemStatuses: {},
-        revealedHints: {},
-        hintPassesCount: 0,
-        sabotageCardsCount: 0,
-        transactions: [],
-        score: 0,
-        wrong: 0,
-        violations: [],
-        isLocked: false,
-        lockReason: '',
-        attempts: [],
-        createdAt: new Date().toISOString()
-      };
-      modified = true;
-    }
-
-    if (!this.getTeam('VisionX')) {
-      this.state.teams['VisionX'] = {
-        id: 'VisionX',
-        name: 'VisionX',
-        size: 1,
-        captainId: 'VISIONX-001-M01',
-        captainName: 'Rukhsaar',
-        members: [
-          { memberId: 'VISIONX-001-M01', name: 'Rukhsaar', isCaptain: true, rollNo: '', phone: '', email: '', college: '' }
-        ],
-        balance: 1000,
-        unlocked: [],
-        solved: [],
-        problemStatuses: {},
-        revealedHints: {},
-        hintPassesCount: 0,
-        sabotageCardsCount: 0,
-        transactions: [],
-        score: 0,
-        wrong: 0,
-        violations: [],
-        isLocked: false,
-        lockReason: '',
-        attempts: [],
-        createdAt: new Date().toISOString()
-      };
-      modified = true;
     }
 
     if (modified) {
@@ -269,74 +242,228 @@ class Database {
     return this.state.problemPrices || {};
   }
 
-  // --- TEAM REGISTRATION & SESSION MANAGEMENT ---
-  registerTeam({ name, size, captainIdx = 0, members = [] }) {
-    const normalized = (name || '').trim();
-    if (!normalized) {
-      throw new Error('Team name cannot be blank.');
+  // --- EVENT STATUS CONTROLS ---
+  getEventState() {
+    if (!this.state.eventState) {
+      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null };
+    }
+    return this.state.eventState;
+  }
+
+  setEventStatus(status) {
+    const valid = ['REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'EVENT_LIVE'];
+    if (!valid.includes(status)) {
+      throw new Error(`Invalid event status: ${status}. Must be one of: ${valid.join(', ')}`);
+    }
+    if (!this.state.eventState) {
+      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null };
+    }
+    this.state.eventState.status = status;
+    if (status === 'EVENT_LIVE' && !this.state.eventState.startedAt) {
+      this.state.eventState.startedAt = new Date().toISOString();
+    }
+    this.save();
+    return this.state.eventState;
+  }
+
+  // --- SELF-REGISTRATION (STATUS: PENDING) ---
+  submitRegistration({ teamName, leaderName, leaderContact, leaderEmail, password, memberCount, members }) {
+    const eventState = this.getEventState();
+    if (eventState.status === 'REGISTRATION_CLOSED' || eventState.status === 'EVENT_LIVE') {
+      throw new Error('Public registration is currently closed. Contact event organizers for late approval.');
     }
 
-    // Check if team already exists
-    const existing = Object.keys(this.state.teams).find(
-      k => k.toLowerCase() === normalized.toLowerCase()
+    const normalizedName = (teamName || '').trim();
+    if (!normalizedName || normalizedName.length < 2) {
+      throw new Error('Team name must be at least 2 characters.');
+    }
+
+    // Check duplicate team name against approved teams
+    const existingApproved = Object.keys(this.state.teams).find(
+      k => k.toLowerCase() === normalizedName.toLowerCase()
     );
-    if (existing) {
-      throw new Error(`Team "${normalized}" is already registered. Please choose a different name or log in.`);
+    if (existingApproved) {
+      throw new Error(`Team "${normalizedName}" is already registered and approved.`);
     }
 
-    const teamSize = Math.max(1, Math.min(3, parseInt(size, 10) || 1));
-    if (members.length < teamSize) {
-      throw new Error(`Please provide information for all ${teamSize} team members.`);
+    // Check duplicate team name against pending registrations
+    if (!this.state.registrations) this.state.registrations = {};
+    const existingPending = Object.values(this.state.registrations).find(
+      r => r.status === 'PENDING' && r.teamName.toLowerCase() === normalizedName.toLowerCase()
+    );
+    if (existingPending) {
+      throw new Error(`A registration for team "${normalizedName}" is already pending approval by the admin.`);
     }
 
-    const formattedMembers = [];
-    for (let i = 0; i < teamSize; i++) {
-      const m = members[i] || {};
-      const memberIndexStr = String(i + 1).padStart(2, '0');
-      const memberId = (m.memberId || `${normalized}-001-M${memberIndexStr}`).trim();
-      const isCaptain = (i === parseInt(captainIdx, 10));
+    const normLeader = (leaderName || '').trim();
+    if (!normLeader) {
+      throw new Error('Team leader name is required.');
+    }
 
-      if (!m.name || !m.name.trim()) {
+    const normPassword = (password || '').trim();
+    if (!normPassword || normPassword.length < 4) {
+      throw new Error('Team password must be at least 4 characters for security.');
+    }
+
+    const count = Math.max(1, Math.min(3, parseInt(memberCount, 10) || 1));
+    const rawMembers = Array.isArray(members) ? members : [];
+
+    const validatedMembers = [];
+    for (let i = 0; i < count; i++) {
+      const m = rawMembers[i] || {};
+      const mName = (i === 0 ? (m.name || normLeader) : (m.name || '')).trim();
+      if (!mName) {
         throw new Error(`Member ${i + 1} name is required.`);
       }
-
-      formattedMembers.push({
-        memberId,
-        name: m.name.trim(),
+      validatedMembers.push({
+        name: mName,
         rollNo: (m.rollNo || '').trim(),
-        phone: (m.phone || '').trim(),
-        email: (m.email || '').trim(),
-        college: (m.college || '').trim(),
-        isCaptain
+        email: (m.email || (i === 0 ? (leaderEmail || '') : '')).trim(),
+        phone: (m.phone || (i === 0 ? (leaderContact || '') : '')).trim(),
+        college: (m.college || '').trim()
       });
     }
 
-    const captain = formattedMembers.find(m => m.isCaptain) || formattedMembers[0];
+    const regId = `REG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const registration = {
+      id: regId,
+      teamName: normalizedName,
+      leaderName: normLeader,
+      leaderContact: (leaderContact || '').trim(),
+      leaderEmail: (leaderEmail || '').trim(),
+      passwordHash: hashPassword(normPassword),
+      memberCount: count,
+      members: validatedMembers,
+      status: 'PENDING',
+      rejectionReason: '',
+      createdAt: new Date().toISOString()
+    };
 
+    this.state.registrations[regId] = registration;
+    this.save();
+
+    const { passwordHash: _, ...safeReg } = registration;
+    return safeReg;
+  }
+
+  // Alias for backward compatibility
+  registerTeam(payload) {
+    if (payload.password) {
+      return this.submitRegistration(payload);
+    }
+    // Direct registration fallback (legacy)
+    const normalized = (payload.name || payload.teamName || '').trim();
+    if (!normalized) throw new Error('Team name cannot be blank.');
+    const count = Math.max(1, Math.min(3, parseInt(payload.size || payload.memberCount, 10) || 1));
+    return this.submitRegistration({
+      teamName: normalized,
+      leaderName: (payload.members && payload.members[0]?.name) || 'Leader',
+      password: payload.password || 'Qubit@123',
+      memberCount: count,
+      members: payload.members || [{ name: 'Leader' }]
+    });
+  }
+
+  getAllRegistrations() {
+    if (!this.state.registrations) this.state.registrations = {};
+    return Object.values(this.state.registrations)
+      .map(r => {
+        const { passwordHash: _, ...safe } = r;
+        return safe;
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  getRegistration(id) {
+    if (!this.state.registrations) this.state.registrations = {};
+    const reg = this.state.registrations[id];
+    if (!reg) return null;
+    const { passwordHash: _, ...safe } = reg;
+    return safe;
+  }
+
+  approveRegistration(regId) {
+    if (!this.state.registrations) this.state.registrations = {};
+    const reg = this.state.registrations[regId];
+    if (!reg) {
+      throw new Error(`Registration "${regId}" not found in database.`);
+    }
+
+    if (reg.status === 'APPROVED') {
+      const existingTeam = this.getTeam(reg.teamName);
+      if (existingTeam) return { team: existingTeam, registration: reg };
+    }
+
+    // Generate unique Member IDs for the approved team
+    const cleanCode = reg.teamName.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8) || 'TEAM';
+    const formattedMembers = reg.members.slice(0, reg.memberCount).map((m, idx) => {
+      const mNum = String(idx + 1).padStart(2, '0');
+      return {
+        memberId: `${cleanCode}-001-M${mNum}`,
+        name: m.name,
+        isCaptain: idx === 0,
+        rollNo: m.rollNo || '',
+        phone: m.phone || (idx === 0 ? reg.leaderContact : ''),
+        email: m.email || (idx === 0 ? reg.leaderEmail : ''),
+        college: m.college || ''
+      };
+    });
+
+    const captain = formattedMembers[0];
+    const initialBalance = this.state.config.initialTeamBalance || 1000;
+
+    // Create persistent shared workspace for the approved team
+    // Balance is assigned exactly once here: 1000 ByteCoins
     const newTeam = {
-      id: normalized,
-      name: normalized,
-      size: teamSize,
+      id: reg.teamName,
+      name: reg.teamName,
+      size: formattedMembers.length,
       captainId: captain.memberId,
       captainName: captain.name,
       members: formattedMembers,
-      balance: this.state.config.initialTeamBalance || 1000,
+      passwordHash: reg.passwordHash,
+      balance: initialBalance,
       unlocked: [],
+      unlockedCards: [],
       solved: [],
-      problemStatuses: {}, // problemId -> { status, workingBy, solvedBy, ... }
+      problemStatuses: {},
+      revealedHints: {},
+      hintPassesCount: 0,
+      sabotageCardsCount: 0,
       transactions: [],
       score: 0,
       wrong: 0,
       violations: [],
       isLocked: false,
-      lockReason: "",
+      lockReason: '',
       attempts: [],
       createdAt: new Date().toISOString()
     };
 
-    this.state.teams[normalized] = newTeam;
+    this.state.teams[reg.teamName] = newTeam;
+    reg.status = 'APPROVED';
+    reg.approvedAt = new Date().toISOString();
+    reg.assignedMembers = formattedMembers;
     this.save();
-    return newTeam;
+
+    const { passwordHash: _, ...safeReg } = reg;
+    return { team: newTeam, registration: safeReg };
+  }
+
+  rejectRegistration(regId, reason = '') {
+    if (!this.state.registrations) this.state.registrations = {};
+    const reg = this.state.registrations[regId];
+    if (!reg) {
+      throw new Error(`Registration "${regId}" not found in database.`);
+    }
+
+    reg.status = 'REJECTED';
+    reg.rejectionReason = reason || 'Registration was declined by the administrator.';
+    reg.rejectedAt = new Date().toISOString();
+    this.save();
+
+    const { passwordHash: _, ...safeReg } = reg;
+    return safeReg;
   }
 
   getTeam(teamName) {
@@ -344,34 +471,60 @@ class Database {
     return this.state.teams[k] || Object.values(this.state.teams).find(t => t.name.toLowerCase() === k.toLowerCase()) || null;
   }
 
-  loginOrInitTeam(teamName, memberId) {
+  verifyTeamLogin(teamName, password, memberId) {
     const normalized = (teamName || '').trim();
     if (!normalized) {
-      throw new Error('Team name cannot be blank.');
+      throw new Error('Please enter your team name.');
     }
 
-    let team = this.getTeam(normalized);
-    if (!team) {
-      throw new Error(`Team "${normalized}" was not found in the registration database. Please verify your team name.`);
-    }
-
-    // Determine the active member
-    let member = null;
-    const targetId = (memberId || '').trim().toLowerCase();
-    if (targetId && team.members) {
-      member = team.members.find(m => m.memberId.toLowerCase() === targetId);
-      if (!member) {
-        member = team.members.find(m => m.memberId.toLowerCase().endsWith(targetId));
+    const team = this.getTeam(normalized);
+    if (team) {
+      // Check password if set
+      if (team.passwordHash) {
+        if (!password || !verifyPassword(password, team.passwordHash)) {
+          throw new Error('Invalid team password. Please check your credentials.');
+        }
       }
-      if (!member) {
-        member = team.members.find(m => m.name.toLowerCase() === targetId);
+
+      // If memberId is specified, locate member
+      let member = null;
+      const targetId = (memberId || '').trim().toLowerCase();
+      if (targetId && team.members) {
+        member = team.members.find(m => m.memberId.toLowerCase() === targetId) ||
+                 team.members.find(m => m.memberId.toLowerCase().endsWith(targetId)) ||
+                 team.members.find(m => m.name.toLowerCase() === targetId);
+        if (!member) {
+          throw new Error(`Member identity was not found for team "${team.name}".`);
+        }
       }
-    }
-    if (!member) {
-      throw new Error(`Selected member identity was not found for team "${team.name}".`);
+
+      return { team, member, members: team.members };
     }
 
-    return { team, member };
+    // If not in approved teams, check registrations status
+    if (this.state.registrations) {
+      const reg = Object.values(this.state.registrations).find(
+        r => r.teamName.toLowerCase() === normalized.toLowerCase()
+      );
+      if (reg) {
+        if (reg.status === 'PENDING') {
+          throw new Error('Your team registration is pending administrator approval. Please wait for the admin to approve your team.');
+        }
+        if (reg.status === 'REJECTED') {
+          throw new Error(`Your team registration was rejected: ${reg.rejectionReason || 'Contact event organizers.'}`);
+        }
+      }
+    }
+
+    throw new Error(`Team "${normalized}" was not found in the registration database. Please register your team first.`);
+  }
+
+  loginOrInitTeam(teamName, memberId, password = null) {
+    const res = this.verifyTeamLogin(teamName, password, memberId);
+    if (!res.member && res.members && res.members.length > 0) {
+      res.member = res.members[0];
+    }
+    return { team: res.team, member: res.member };
   }
 
   syncTeams(teamsList) {

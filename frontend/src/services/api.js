@@ -166,15 +166,55 @@ export async function registerTeam({ name, size, captainIdx, members }) {
   return { success: true, team: teamObj };
 }
 
-export async function loginTeam({ teamName, memberId }) {
+export async function verifyTeamCredentials({ teamName, password }) {
   try {
-    const res = await fetch(`${API_BASE}/team/login`, {
+    const res = await fetch(`${API_BASE}/auth/team-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamName, memberId })
+      body: JSON.stringify({ teamName, password })
     });
-    if (res.ok) return await res.json();
-  } catch (e) {}
+    const data = await res.json();
+    if (res.ok) return data;
+    throw new Error(data.error || 'Team verification failed.');
+  } catch (err) {
+    if (err.message && !err.message.toLowerCase().includes('fetch')) throw err;
+  }
+
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams[key];
+  if (team) {
+    if (team.password && team.password !== password) {
+      throw new Error('Invalid team password. Please check your credentials.');
+    }
+    return { success: true, team, members: team.members };
+  }
+  const allRegs = store.registrations || {};
+  const reg = Object.values(allRegs).find(r => r.teamName.toUpperCase() === key);
+  if (reg) {
+    if (reg.status === 'PENDING') {
+      throw new Error('Your team registration is pending organizer approval. Please wait for the admin to approve.');
+    }
+    if (reg.status === 'REJECTED') {
+      throw new Error(`Your team registration was rejected: ${reg.rejectionReason || 'Contact organizer.'}`);
+    }
+  }
+  throw new Error(`Team "${teamName}" not found in registration database.`);
+}
+
+export async function loginTeam({ teamName, memberId, password }) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/team-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, memberId, password })
+    });
+    const data = await res.json();
+    if (res.ok) return data;
+    throw new Error(data.error || 'Login failed.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
@@ -187,15 +227,40 @@ export async function getTeamStatus(teamName) {
   try {
     const res = await fetch(`${API_BASE}/team/${encodeURIComponent(teamName)}`);
     if (res.ok) return await res.json();
-  } catch (e) {}
+    const errData = await res.json().catch(() => null);
+    if (errData?.error) {
+      const err = new Error(errData.error);
+      err.isPending = errData.isPending;
+      err.isRejected = errData.isRejected;
+      throw err;
+    }
+  } catch (e) {
+    if (e.isPending || e.isRejected || (e.message && !e.message.toLowerCase().includes('fetch'))) {
+      throw e;
+    }
+  }
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
-  if (!team) {
-    throw new Error(`Team "${teamName}" not found in registration database.`);
+  if (team) {
+    return { team };
   }
-  return { team };
+  const allRegs = store.registrations || {};
+  const reg = Object.values(allRegs).find(r => r.teamName.toUpperCase() === key);
+  if (reg) {
+    if (reg.status === 'PENDING') {
+      const err = new Error('Your team registration is pending approval by the organizer.');
+      err.isPending = true;
+      throw err;
+    }
+    if (reg.status === 'REJECTED') {
+      const err = new Error(`Your team registration was rejected: ${reg.rejectionReason || 'Contact organizer.'}`);
+      err.isRejected = true;
+      throw err;
+    }
+  }
+  throw new Error(`Team "${teamName}" not found in registration database.`);
 }
 
 export async function syncTeamsFromSheet(payload) {
@@ -934,6 +999,15 @@ export function isAdminAuthenticated() {
   }
 }
 
+export function getAdminHeaders() {
+  const token = sessionStorage.getItem(ADMIN_SESSION_KEY) || 'qubit-admin-auth-token-valid';
+  return {
+    'Authorization': `Bearer ${token}`,
+    'x-admin-token': token,
+    'Content-Type': 'application/json'
+  };
+}
+
 export function adminLogout() {
   try {
     sessionStorage.removeItem(ADMIN_SESSION_KEY);
@@ -944,7 +1018,7 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
   try {
     const res = await fetch(`${API_BASE}/admin/problems/unlock`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, problemId, bidPrice })
     });
     if (res.ok) {
@@ -1029,7 +1103,7 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
   try {
     const res = await fetch(`${API_BASE}/admin/cards/unlock`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, cardType, bidPrice })
     });
     if (res.ok) return await res.json();
@@ -1115,7 +1189,7 @@ export async function adminGrantCardPass({ teamName, cardType, amount = 1 }) {
   try {
     const res = await fetch(`${API_BASE}/admin/cards/grant`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, cardType, amount })
     });
     if (res.ok) return await res.json();
@@ -1145,7 +1219,7 @@ export async function adminRevealProblemHint({ teamName, problemId }) {
   try {
     const res = await fetch(`${API_BASE}/admin/hints/reveal`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, problemId })
     });
     if (res.ok) return await res.json();
@@ -1172,7 +1246,7 @@ export async function adminClearFreeze({ teamName }) {
   try {
     const res = await fetch(`${API_BASE}/admin/sabotage/unfreeze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminHeaders(),
       body: JSON.stringify({ teamName })
     });
     if (res.ok) return await res.json();
@@ -1187,9 +1261,193 @@ export async function adminClearFreeze({ teamName }) {
   return { success: true, team };
 }
 
+export async function fetchEventStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/event/status`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.eventState || { status: 'REGISTRATION_OPEN', startedAt: null };
+    }
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  return store.eventState || { status: 'REGISTRATION_OPEN', startedAt: null };
+}
+
+export async function updateEventStatus(status) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/event/status`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ status })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.eventState;
+    }
+    const err = await res.json().catch(() => ({}));
+    if (err.error) throw new Error(err.error);
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  const store = getFallbackStore();
+  if (!store.eventState) store.eventState = { status: 'REGISTRATION_OPEN', startedAt: null };
+  store.eventState.status = status;
+  if (status === 'EVENT_LIVE' && !store.eventState.startedAt) {
+    store.eventState.startedAt = new Date().toISOString();
+  }
+  saveFallbackStore(store);
+  return store.eventState;
+}
+
+export async function submitTeamRegistration(formData) {
+  try {
+    const res = await fetch(`${API_BASE}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+    const data = await res.json();
+    if (res.ok) return data;
+    throw new Error(data.error || 'Failed to submit registration.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  const store = getFallbackStore();
+  const normalized = (formData.teamName || '').trim().toUpperCase();
+  if (!store.registrations) store.registrations = {};
+  if (store.teams[normalized]) {
+    throw new Error(`Team "${formData.teamName}" is already registered and approved.`);
+  }
+  if (Object.values(store.registrations).some(r => r.teamName.toUpperCase() === normalized && r.status === 'PENDING')) {
+    throw new Error(`Team "${formData.teamName}" registration is already pending approval.`);
+  }
+
+  const regId = `REG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  const reg = {
+    id: regId,
+    teamName: formData.teamName,
+    leaderName: formData.leaderName,
+    leaderContact: formData.leaderContact || '',
+    leaderEmail: formData.leaderEmail || '',
+    password: formData.password,
+    memberCount: formData.memberCount,
+    members: formData.members,
+    status: 'PENDING',
+    createdAt: new Date().toISOString()
+  };
+  store.registrations[regId] = reg;
+  saveFallbackStore(store);
+  return { success: true, registration: reg };
+}
+
+export async function fetchAdminRegistrations() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/registrations`, {
+      headers: getAdminHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.registrations || [];
+    }
+  } catch (e) {}
+
+  const store = getFallbackStore();
+  return Object.values(store.registrations || {}).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+export async function approveTeamRegistration(regId) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/registrations/approve`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ id: regId })
+    });
+    const data = await res.json();
+    if (res.ok) return data;
+    throw new Error(data.error || 'Failed to approve registration.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  const store = getFallbackStore();
+  const reg = (store.registrations || {})[regId];
+  if (!reg) throw new Error('Registration not found in store.');
+
+  const norm = reg.teamName.toUpperCase();
+  const cleanCode = reg.teamName.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8) || 'TEAM';
+  const members = reg.members.map((m, idx) => ({
+    memberId: `${cleanCode}-001-M0${idx + 1}`,
+    name: m.name,
+    isCaptain: idx === 0,
+    rollNo: m.rollNo || '',
+    email: m.email || '',
+    college: m.college || ''
+  }));
+
+  const newTeam = {
+    id: reg.teamName,
+    name: reg.teamName,
+    size: members.length,
+    captainId: members[0].memberId,
+    captainName: members[0].name,
+    members,
+    password: reg.password,
+    balance: 1000,
+    unlocked: [],
+    unlockedCards: [],
+    solved: [],
+    problemStatuses: {},
+    revealedHints: {},
+    hintPassesCount: 0,
+    sabotageCardsCount: 0,
+    transactions: [],
+    score: 0,
+    wrong: 0,
+    violations: [],
+    isLocked: false,
+    lockReason: '',
+    createdAt: new Date().toISOString()
+  };
+
+  store.teams[norm] = newTeam;
+  reg.status = 'APPROVED';
+  reg.approvedAt = new Date().toISOString();
+  reg.assignedMembers = members;
+  saveFallbackStore(store);
+  return { success: true, team: newTeam, registration: reg };
+}
+
+export async function rejectTeamRegistration(regId, reason = '') {
+  try {
+    const res = await fetch(`${API_BASE}/admin/registrations/reject`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ id: regId, reason })
+    });
+    const data = await res.json();
+    if (res.ok) return data;
+    throw new Error(data.error || 'Failed to reject registration.');
+  } catch (e) {
+    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  const store = getFallbackStore();
+  const reg = (store.registrations || {})[regId];
+  if (!reg) throw new Error('Registration not found.');
+  reg.status = 'REJECTED';
+  reg.rejectionReason = reason || 'Declined by event administrator.';
+  saveFallbackStore(store);
+  return { success: true, registration: reg };
+}
+
 export async function fetchAdminOverview() {
   try {
-    const res = await fetch(`${API_BASE}/admin/overview`);
+    const res = await fetch(`${API_BASE}/admin/overview`, {
+      headers: getAdminHeaders()
+    });
     if (res.ok) return await res.json();
   } catch (e) {}
 
@@ -1199,6 +1457,8 @@ export async function fetchAdminOverview() {
     problems: fallbackProblemsData.problems || [],
     transactions: store.transactions || [],
     unlockHistory: store.unlockHistory || [],
-    submissions: []
+    submissions: [],
+    eventState: store.eventState || { status: 'REGISTRATION_OPEN', startedAt: null },
+    registrations: Object.values(store.registrations || {})
   };
 }

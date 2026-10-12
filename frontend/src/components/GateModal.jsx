@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Maximize2, Search, Check, RefreshCw, AlertCircle, Crown, Lock } from 'lucide-react';
-import { getTeamStatus, loginTeam } from '../services/api';
+import { ShieldCheck, Maximize2, Search, Check, RefreshCw, AlertCircle, Crown, Lock, Eye, EyeOff, QrCode, Clock } from 'lucide-react';
+import { getTeamStatus, loginTeam, verifyTeamCredentials } from '../services/api';
 
-export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
+export function GateModal({ onTeamSessionReady, onOpenAdmin, onOpenRegister }) {
   const [teamInput, setTeamInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifiedTeam, setVerifiedTeam] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -23,7 +25,7 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
     setSelectedMember(null);
 
     try {
-      const res = await getTeamStatus(trimmed);
+      const res = await verifyTeamCredentials({ teamName: trimmed, password: passwordInput });
       const team = res.team;
       if (!team || !team.members || team.members.length === 0) {
         throw new Error(`Team "${trimmed}" has no registered members in the database.`);
@@ -32,8 +34,10 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
     } catch (err) {
       setVerifiedTeam(null);
       setSelectedMember(null);
+      const isPending = err.isPending || (err.message && err.message.toLowerCase().includes('pending'));
+      const isRejected = err.isRejected || (err.message && err.message.toLowerCase().includes('rejected'));
       setFeedback({
-        type: 'error',
+        type: isPending ? 'pending' : isRejected ? 'rejected' : 'error',
         message: err.message || `Team "${trimmed}" not found in registration database.`
       });
     } finally {
@@ -50,7 +54,7 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
 
   const handleEnterWorkspace = async () => {
     if (!verifiedTeam) {
-      setFeedback({ type: 'error', message: 'Please verify your registered Team Name first.' });
+      setFeedback({ type: 'error', message: 'Please verify your registered Team Name and Password first.' });
       return;
     }
     if (!selectedMember) {
@@ -64,7 +68,8 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
     try {
       const res = await loginTeam({
         teamName: verifiedTeam.name,
-        memberId: selectedMember.memberId
+        memberId: selectedMember.memberId,
+        password: passwordInput
       });
 
       onTeamSessionReady(res.team, res.member);
@@ -132,22 +137,21 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
           </div>
         </div>
 
-        {/* Step 1: Team Name Verification Input */}
+        {/* Step 1: Team Name & Password Verification Input */}
         <div style={{ marginBottom: '16px' }}>
-          <label style={{
-            display: 'block',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--txt-muted)',
-            marginBottom: '6px'
-          }}>
-            Registered Team Name
-          </label>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--txt-muted)',
+              marginBottom: '5px'
+            }}>
+              Registered Team Name
+            </label>
             <input
               type="text"
-              placeholder="e.g. SYNORA"
+              placeholder="e.g. CYBER_TITANS"
               value={teamInput}
               onChange={(e) => {
                 setTeamInput(e.target.value.toUpperCase());
@@ -166,7 +170,8 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
               disabled={verifying}
               autoFocus
               style={{
-                flex: 1,
+                width: '100%',
+                boxSizing: 'border-box',
                 padding: '9px 12px',
                 fontSize: '13px',
                 fontWeight: 600,
@@ -174,70 +179,155 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
                 textTransform: 'uppercase'
               }}
             />
-
-            <button
-              type="button"
-              onClick={handleVerifyTeam}
-              disabled={verifying || !teamInput.trim()}
-              className={verifiedTeam ? 'btn-ghost' : 'btn-primary'}
-              style={{
-                padding: '8px 14px',
-                fontSize: '12px',
-                whiteSpace: 'nowrap',
-                minWidth: '100px'
-              }}
-            >
-              {verifying ? (
-                <>
-                  <RefreshCw size={13} className="spin" />
-                  <span>Checking...</span>
-                </>
-              ) : verifiedTeam ? (
-                <>
-                  <Check size={13} color="#3fb950" />
-                  <span>Verified ✓</span>
-                </>
-              ) : (
-                <>
-                  <Search size={13} />
-                  <span>Verify Team</span>
-                </>
-              )}
-            </button>
           </div>
+
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--txt-muted)',
+              marginBottom: '5px'
+            }}>
+              Team Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your team password"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  if (verifiedTeam) {
+                    setVerifiedTeam(null);
+                    setSelectedMember(null);
+                  }
+                  if (feedback) setFeedback(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleVerifyTeam();
+                  }
+                }}
+                disabled={verifying}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '9px 34px 9px 12px',
+                  fontSize: '13px'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--txt-muted)',
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleVerifyTeam}
+            disabled={verifying || !teamInput.trim()}
+            className={verifiedTeam ? 'btn-ghost' : 'btn-primary'}
+            style={{
+              width: '100%',
+              padding: '9px 14px',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            {verifying ? (
+              <>
+                <RefreshCw size={14} className="spin" />
+                <span>Authenticating Team...</span>
+              </>
+            ) : verifiedTeam ? (
+              <>
+                <Check size={14} color="#3fb950" />
+                <span>Verified & Authenticated ✓</span>
+              </>
+            ) : (
+              <>
+                <Search size={14} />
+                <span>Verify Team Credentials</span>
+              </>
+            )}
+          </button>
 
           {/* Validation Feedback States */}
           {!verifying && verifiedTeam && (
             <div style={{
-              marginTop: '8px',
-              padding: '6px 10px',
+              marginTop: '10px',
+              padding: '8px 12px',
               background: 'rgba(63, 185, 80, 0.1)',
-              border: '1px solid rgba(63, 185, 80, 0.25)',
+              border: '1px solid rgba(63, 185, 80, 0.3)',
               borderRadius: '6px',
               fontSize: '12px',
               color: '#3fb950',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              gap: '8px'
             }}>
-              <span>✓ Team found: <b>{verifiedTeam.name}</b> ({verifiedTeam.members?.length || 0} registered)</span>
+              <Check size={14} style={{ flexShrink: 0 }} />
+              <span>Team verified: <b>{verifiedTeam.name}</b>. Select your member identity below.</span>
             </div>
           )}
 
-          {!verifying && feedback?.type === 'error' && (
+          {!verifying && feedback?.type === 'pending' && (
             <div style={{
-              marginTop: '8px',
-              padding: '8px 12px',
+              marginTop: '10px',
+              padding: '10px 14px',
+              background: 'rgba(210, 153, 34, 0.12)',
+              border: '1px solid rgba(210, 153, 34, 0.35)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: '#d29922',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              lineHeight: 1.4
+            }}>
+              <Clock size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong>Registration Pending Approval:</strong>
+                <div style={{ marginTop: '2px' }}>{feedback.message}</div>
+              </div>
+            </div>
+          )}
+
+          {!verifying && (feedback?.type === 'error' || feedback?.type === 'rejected') && (
+            <div style={{
+              marginTop: '10px',
+              padding: '10px 14px',
               background: 'rgba(248, 81, 73, 0.1)',
-              border: '1px solid rgba(248, 81, 73, 0.25)',
-              borderRadius: '6px',
+              border: '1px solid rgba(248, 81, 73, 0.3)',
+              borderRadius: '8px',
               fontSize: '12px',
               color: '#ff7b72',
               display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
+              alignItems: 'flex-start',
+              gap: '8px',
+              lineHeight: 1.4
             }}>
-              <AlertCircle size={14} style={{ flexShrink: 0 }} />
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
               <span>{feedback.message}</span>
             </div>
           )}
@@ -422,8 +512,42 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
           {submitting ? 'Entering Workspace...' : 'Enter Shared Workspace in Fullscreen'}
         </button>
 
-        {onOpenAdmin && (
-          <div style={{ textAlign: 'center', marginTop: '14px' }}>
+        <div style={{
+          textAlign: 'center',
+          marginTop: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          <a
+            href="#register"
+            onClick={(e) => {
+              e.preventDefault();
+              if (onOpenRegister) {
+                onOpenRegister();
+              } else {
+                window.location.hash = '#register';
+              }
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--txt-muted)',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 8px',
+              textDecoration: 'none'
+            }}
+          >
+            <QrCode size={12} color="#58a6ff" /> Register Team via QR
+          </a>
+
+          {onOpenAdmin && (
             <button
               type="button"
               onClick={onOpenAdmin}
@@ -441,8 +565,8 @@ export function GateModal({ onTeamSessionReady, onOpenAdmin }) {
             >
               <Lock size={11} /> Admin Portal
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

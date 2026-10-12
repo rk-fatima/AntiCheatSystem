@@ -9,6 +9,7 @@ import { TransactionsModal } from './components/TransactionsModal';
 import { SabotageFreezeOverlay } from './components/SabotageFreezeOverlay';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
+import { TeamRegistration } from './components/TeamRegistration';
 import { useAntiCheat } from './hooks/useAntiCheat';
 import {
   fetchProblems,
@@ -35,12 +36,20 @@ export function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
 
-  const [viewMode, setViewMode] = useState(() => (window.location.hash.includes('admin') ? 'admin' : 'workspace'));
+  const [viewMode, setViewMode] = useState(() => {
+    const hash = window.location.hash;
+    if (hash.includes('register')) return 'register';
+    if (hash.includes('admin')) return 'admin';
+    return 'workspace';
+  });
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => isAdminAuthenticated());
 
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash.includes('admin')) {
+      const hash = window.location.hash;
+      if (hash.includes('register')) {
+        setViewMode('register');
+      } else if (hash.includes('admin')) {
         setViewMode('admin');
         setIsAdminLoggedIn(isAdminAuthenticated());
       } else {
@@ -249,6 +258,18 @@ export function App() {
   };
 
   const activeProblemStatus = activeProblem ? (team?.problemStatuses?.[activeProblem.id] || null) : null;
+
+  // Dedicated Team Self-Registration View Route
+  if (viewMode === 'register') {
+    return (
+      <TeamRegistration
+        onNavigateLogin={() => {
+          window.location.hash = '';
+          setViewMode('workspace');
+        }}
+      />
+    );
+  }
 
   // Dedicated Admin Dashboard View Route
   if (viewMode === 'admin') {
@@ -495,6 +516,10 @@ export function App() {
             window.location.hash = '#admin';
             setViewMode('admin');
             setIsAdminLoggedIn(isAdminAuthenticated());
+          }}
+          onOpenRegister={() => {
+            window.location.hash = '#register';
+            setViewMode('register');
           }}
         />
       )}
