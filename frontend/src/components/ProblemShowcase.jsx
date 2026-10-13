@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, ArrowLeft, ArrowRight, Trophy, FileText, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Copy, Check, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+
+const DIFFICULTY_SEQUENCE = ['Easy', 'Medium', 'Hard'];
 
 const SHOWCASE_PROBLEMS = [
   {
     num: 1,
     id: "E1",
     title: "Two Sum",
-    diff: "Easy",
     pts: 200,
-    desc: "Given an array of integers nums and an integer target, return the indices of the two numbers that add up to target.",
+    desc: "Given an array of integers `nums` and an integer `target`, return the indices of the two numbers that add up to `target`.",
     example: {
       input: "nums = [2,7,11,15], target = 9",
       output: "[0,1]",
@@ -24,9 +25,8 @@ const SHOWCASE_PROBLEMS = [
     num: 2,
     id: "E2",
     title: "Palindrome Number",
-    diff: "Easy",
     pts: 200,
-    desc: "Given an integer x, return true if x is a palindrome, and false otherwise.",
+    desc: "Given an integer `x`, return true if `x` is a palindrome, and false otherwise.",
     example: {
       input: "x = 121",
       output: "true",
@@ -41,9 +41,8 @@ const SHOWCASE_PROBLEMS = [
     num: 3,
     id: "E3",
     title: "Valid Parentheses",
-    diff: "Easy",
     pts: 200,
-    desc: "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
+    desc: "Given a string `s` containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
     example: {
       input: "s = \"()[]{}\"",
       output: "true",
@@ -58,9 +57,8 @@ const SHOWCASE_PROBLEMS = [
     num: 4,
     id: "E4",
     title: "Merge Two Sorted Lists",
-    diff: "Easy",
     pts: 200,
-    desc: "You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list and return its head.",
+    desc: "You are given the heads of two sorted linked lists `list1` and `list2`. Merge the two lists into one sorted list and return its head.",
     example: {
       input: "list1 = [1,2,4], list2 = [1,3,4]",
       output: "[1,1,2,3,4,4]",
@@ -76,9 +74,8 @@ const SHOWCASE_PROBLEMS = [
     num: 5,
     id: "E5",
     title: "Remove Duplicates from Sorted Array",
-    diff: "Easy",
     pts: 200,
-    desc: "Given an integer array nums sorted in non-decreasing order, remove the duplicates in-place such that each unique element appears only once. Return k after placing the final result in the first k slots.",
+    desc: "Given an integer array `nums` sorted in non-decreasing order, remove the duplicates in-place such that each unique element appears only once. Return `k` after placing the final result in the first `k` slots.",
     example: {
       input: "nums = [1,1,2]",
       output: "2, nums = [1,2,_]",
@@ -94,9 +91,8 @@ const SHOWCASE_PROBLEMS = [
     num: 6,
     id: "E6",
     title: "Remove Element",
-    diff: "Easy",
     pts: 200,
-    desc: "Given an integer array nums and an integer val, remove all occurrences of val in nums in-place. The relative order of the elements may be changed. Return k.",
+    desc: "Given an integer array `nums` and an integer `val`, remove all occurrences of `val` in `nums` in-place. The relative order of the elements may be changed. Return `k`.",
     example: {
       input: "nums = [3,2,2,3], val = 3",
       output: "2, nums = [2,2,_,_]",
@@ -112,9 +108,8 @@ const SHOWCASE_PROBLEMS = [
     num: 7,
     id: "E7",
     title: "Search Insert Position",
-    diff: "Easy",
     pts: 200,
-    desc: "Given a sorted array of distinct integers and a target value, return the index if the target is found. If not, return the index where it would be if it were inserted in order.",
+    desc: "Given a sorted array of distinct integers `nums` and a target value `target`, return the index if the target is found. If not, return the index where it would be if it were inserted in order.",
     example: {
       input: "nums = [1,3,5,6], target = 5",
       output: "2",
@@ -130,9 +125,8 @@ const SHOWCASE_PROBLEMS = [
     num: 8,
     id: "E8",
     title: "Plus One",
-    diff: "Easy",
     pts: 200,
-    desc: "You are given a large integer represented as an integer array digits, where each digits[i] is the ith digit of the integer. Increment the large integer by one and return the resulting array of digits.",
+    desc: "You are given a large integer represented as an integer array `digits`, where each `digits[i]` is the ith digit of the integer. Increment the large integer by one and return the resulting array of digits.",
     example: {
       input: "digits = [1,2,3]",
       output: "[1,2,4]",
@@ -148,9 +142,8 @@ const SHOWCASE_PROBLEMS = [
     num: 9,
     id: "E9",
     title: "Add Binary",
-    diff: "Easy",
     pts: 200,
-    desc: "Given two binary strings a and b, return their sum as a binary string.",
+    desc: "Given two binary strings `a` and `b`, return their sum as a binary string.",
     example: {
       input: "a = \"11\", b = \"1\"",
       output: "\"100\"",
@@ -166,9 +159,8 @@ const SHOWCASE_PROBLEMS = [
     num: 10,
     id: "E10",
     title: "Remove Duplicates from Sorted List",
-    diff: "Easy",
     pts: 200,
-    desc: "Given the head of a sorted linked list, delete all duplicates such that each element appears only once. Return the linked list sorted as well.",
+    desc: "Given the head of a sorted linked list `head`, delete all duplicates such that each element appears only once. Return the linked list sorted as well.",
     example: {
       input: "head = [1,1,2]",
       output: "[1,2]",
@@ -188,6 +180,9 @@ export function ProblemShowcase({ onNavigateHome }) {
 
   const problem = SHOWCASE_PROBLEMS[currentIndex] || SHOWCASE_PROBLEMS[0];
   const total = SHOWCASE_PROBLEMS.length;
+
+  // Repeating sequence: Easy -> Medium -> Hard -> Easy -> Medium -> Hard ...
+  const currentDifficulty = DIFFICULTY_SEQUENCE[currentIndex % 3];
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -210,25 +205,34 @@ export function ProblemShowcase({ onNavigateHome }) {
     }
   };
 
+  /**
+   * Safely formats inline code elements enclosed in backticks without
+   * splitting words into isolated letters or breaking natural sentence flow.
+   */
   const formatTextWithCodes = (text) => {
     if (!text) return '';
-    const parts = text.split(/(nums|target|val|digits|list1|list2|head|x|s|a|b)/g);
+    const parts = text.split(/(`[^`]+`)/g);
     return parts.map((part, idx) => {
-      if (['nums', 'target', 'val', 'digits', 'list1', 'list2', 'head', 'x', 's', 'a', 'b'].includes(part)) {
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        const codeText = part.slice(1, -1);
         return (
           <code
             key={idx}
             style={{
               padding: '2px 6px',
+              margin: '0 2px',
               borderRadius: '5px',
-              background: 'rgba(56, 139, 253, 0.15)',
-              border: '1px solid rgba(56, 139, 253, 0.3)',
+              background: 'rgba(56, 139, 253, 0.16)',
+              border: '1px solid rgba(56, 139, 253, 0.35)',
               color: '#79c0ff',
               fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
-              fontSize: '13px'
+              fontSize: '13px',
+              display: 'inline',
+              verticalAlign: 'baseline',
+              whiteSpace: 'nowrap'
             }}
           >
-            {part}
+            {codeText}
           </code>
         );
       }
@@ -290,13 +294,13 @@ export function ProblemShowcase({ onNavigateHome }) {
           <span>Exit to Home</span>
         </button>
 
-        {/* Quick Problem Selector Indicator */}
+        {/* Quick Problem Selector Dot Indicators */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {SHOWCASE_PROBLEMS.map((p, idx) => (
             <button
               key={p.id}
               onClick={() => setCurrentIndex(idx)}
-              title={`${p.id} — ${p.title}`}
+              title={`Problem ${idx + 1}: ${p.id} — ${p.title} (${DIFFICULTY_SEQUENCE[idx % 3]})`}
               style={{
                 width: idx === currentIndex ? '26px' : '8px',
                 height: '8px',
@@ -312,7 +316,7 @@ export function ProblemShowcase({ onNavigateHome }) {
         </div>
       </div>
 
-      {/* Main Problem Showcase Card (Matching Mockup / Screenshot) */}
+      {/* Main Problem Showcase Card (Matching Mockup & Screenshot) */}
       <div
         style={{
           width: '100%',
@@ -324,7 +328,8 @@ export function ProblemShowcase({ onNavigateHome }) {
           WebkitBackdropFilter: 'blur(20px)',
           padding: '36px 36px 28px',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(56, 139, 253, 0.08)',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          textAlign: 'left'
         }}
       >
         {/* Top Problem Counter */}
@@ -334,7 +339,8 @@ export function ProblemShowcase({ onNavigateHome }) {
             fontWeight: 600,
             color: '#58a6ff',
             marginBottom: '10px',
-            letterSpacing: '0.2px'
+            letterSpacing: '0.2px',
+            textAlign: 'left'
           }}
         >
           Problem {currentIndex + 1} of {total}
@@ -347,13 +353,14 @@ export function ProblemShowcase({ onNavigateHome }) {
             fontSize: '32px',
             fontWeight: 800,
             letterSpacing: '0.2px',
-            color: '#ffffff'
+            color: '#ffffff',
+            textAlign: 'left'
           }}
         >
           {problem.id} — {problem.title}
         </h1>
 
-        {/* Difficulty Tags Row */}
+        {/* Difficulty Tags Row — Repeating: Easy -> Medium -> Hard -> Easy -> Medium -> Hard */}
         <div
           style={{
             display: 'flex',
@@ -362,7 +369,7 @@ export function ProblemShowcase({ onNavigateHome }) {
             marginBottom: '18px'
           }}
         >
-          {/* Easy */}
+          {/* Easy Badge */}
           <div
             style={{
               display: 'inline-flex',
@@ -372,16 +379,25 @@ export function ProblemShowcase({ onNavigateHome }) {
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 700,
-              background: problem.diff === 'Easy' ? 'rgba(46, 160, 67, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${problem.diff === 'Easy' ? 'rgba(46, 160, 67, 0.5)' : 'rgba(255, 255, 255, 0.08)'}`,
-              color: problem.diff === 'Easy' ? '#3fb950' : 'var(--txt-dim)'
+              background: currentDifficulty === 'Easy' ? 'rgba(46, 160, 67, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${currentDifficulty === 'Easy' ? 'rgba(46, 160, 67, 0.55)' : 'rgba(255, 255, 255, 0.08)'}`,
+              color: currentDifficulty === 'Easy' ? '#3fb950' : 'var(--txt-dim)',
+              boxShadow: currentDifficulty === 'Easy' ? '0 0 12px rgba(46, 160, 67, 0.25)' : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3fb950' }} />
+            <span
+              style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: currentDifficulty === 'Easy' ? '#3fb950' : 'rgba(255, 255, 255, 0.25)'
+              }}
+            />
             <span>Easy</span>
           </div>
 
-          {/* Medium */}
+          {/* Medium Badge */}
           <div
             style={{
               display: 'inline-flex',
@@ -391,16 +407,25 @@ export function ProblemShowcase({ onNavigateHome }) {
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 700,
-              background: problem.diff === 'Medium' ? 'rgba(210, 153, 34, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${problem.diff === 'Medium' ? 'rgba(210, 153, 34, 0.5)' : 'rgba(255, 255, 255, 0.08)'}`,
-              color: problem.diff === 'Medium' ? '#d29922' : 'var(--txt-dim)'
+              background: currentDifficulty === 'Medium' ? 'rgba(210, 153, 34, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${currentDifficulty === 'Medium' ? 'rgba(210, 153, 34, 0.55)' : 'rgba(255, 255, 255, 0.08)'}`,
+              color: currentDifficulty === 'Medium' ? '#d29922' : 'var(--txt-dim)',
+              boxShadow: currentDifficulty === 'Medium' ? '0 0 12px rgba(210, 153, 34, 0.25)' : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#d29922' }} />
+            <span
+              style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: currentDifficulty === 'Medium' ? '#d29922' : 'rgba(255, 255, 255, 0.25)'
+              }}
+            />
             <span>Medium</span>
           </div>
 
-          {/* Hard */}
+          {/* Hard Badge */}
           <div
             style={{
               display: 'inline-flex',
@@ -410,12 +435,21 @@ export function ProblemShowcase({ onNavigateHome }) {
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 700,
-              background: problem.diff === 'Hard' ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${problem.diff === 'Hard' ? 'rgba(248, 81, 73, 0.5)' : 'rgba(255, 255, 255, 0.08)'}`,
-              color: problem.diff === 'Hard' ? '#f85149' : 'var(--txt-dim)'
+              background: currentDifficulty === 'Hard' ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${currentDifficulty === 'Hard' ? 'rgba(248, 81, 73, 0.55)' : 'rgba(255, 255, 255, 0.08)'}`,
+              color: currentDifficulty === 'Hard' ? '#f85149' : 'var(--txt-dim)',
+              boxShadow: currentDifficulty === 'Hard' ? '0 0 12px rgba(248, 81, 73, 0.25)' : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f85149' }} />
+            <span
+              style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: currentDifficulty === 'Hard' ? '#f85149' : 'rgba(255, 255, 255, 0.25)'
+              }}
+            />
             <span>Hard</span>
           </div>
         </div>
@@ -429,7 +463,8 @@ export function ProblemShowcase({ onNavigateHome }) {
             fontSize: '13px',
             fontWeight: 600,
             color: '#e3b341',
-            marginBottom: '26px'
+            marginBottom: '26px',
+            textAlign: 'left'
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -443,15 +478,16 @@ export function ProblemShowcase({ onNavigateHome }) {
           </span>
         </div>
 
-        {/* Problem Statement Section */}
-        <div style={{ marginBottom: '26px' }}>
+        {/* Problem Statement Section — Perfectly Aligned Left */}
+        <div style={{ marginBottom: '26px', textAlign: 'left' }}>
           <h3
             style={{
               margin: '0 0 10px',
               fontSize: '17px',
               fontWeight: 700,
               color: '#ffffff',
-              letterSpacing: '0.2px'
+              letterSpacing: '0.2px',
+              textAlign: 'left'
             }}
           >
             Problem Statement
@@ -461,22 +497,27 @@ export function ProblemShowcase({ onNavigateHome }) {
               margin: 0,
               fontSize: '15px',
               color: '#c9d1d9',
-              lineHeight: 1.6
+              lineHeight: 1.65,
+              textAlign: 'left',
+              wordBreak: 'normal',
+              overflowWrap: 'break-word',
+              whiteSpace: 'normal'
             }}
           >
             {formatTextWithCodes(problem.desc)}
           </p>
         </div>
 
-        {/* Example Section */}
-        <div style={{ marginBottom: '26px' }}>
+        {/* Example Section — Perfectly Aligned Left */}
+        <div style={{ marginBottom: '26px', textAlign: 'left' }}>
           <h3
             style={{
               margin: '0 0 10px',
               fontSize: '17px',
               fontWeight: 700,
               color: '#ffffff',
-              letterSpacing: '0.2px'
+              letterSpacing: '0.2px',
+              textAlign: 'left'
             }}
           >
             Example
@@ -491,7 +532,9 @@ export function ProblemShowcase({ onNavigateHome }) {
               padding: '18px 20px',
               fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
               fontSize: '13px',
-              lineHeight: 1.7
+              lineHeight: 1.7,
+              textAlign: 'left',
+              wordBreak: 'break-word'
             }}
           >
             {/* Copy Button */}
@@ -536,15 +579,16 @@ export function ProblemShowcase({ onNavigateHome }) {
           </div>
         </div>
 
-        {/* Constraints Section */}
-        <div style={{ marginBottom: '32px' }}>
+        {/* Constraints Section — Perfectly Aligned Left */}
+        <div style={{ marginBottom: '32px', textAlign: 'left' }}>
           <h3
             style={{
               margin: '0 0 10px',
               fontSize: '17px',
               fontWeight: 700,
               color: '#ffffff',
-              letterSpacing: '0.2px'
+              letterSpacing: '0.2px',
+              textAlign: 'left'
             }}
           >
             Constraints
@@ -558,11 +602,12 @@ export function ProblemShowcase({ onNavigateHome }) {
               padding: '16px 20px',
               fontSize: '14px',
               color: '#c9d1d9',
-              lineHeight: 1.8
+              lineHeight: 1.8,
+              textAlign: 'left'
             }}
           >
             {problem.constraints.map((c, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px' }}>
+              <div key={i} style={{ display: 'flex', gap: '8px', textAlign: 'left' }}>
                 <span style={{ color: '#8b949e', fontWeight: 600 }}>{i + 1}.</span>
                 <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace', fontSize: '13px' }}>
                   {c}
