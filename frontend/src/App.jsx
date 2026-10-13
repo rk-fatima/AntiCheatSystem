@@ -144,24 +144,35 @@ export function App() {
     };
   }, [team?.name, currentMember?.memberId, isExamStarted]);
 
-  // 3. Periodic fallback polling of team and prices
+  // 3. Periodic fallback polling of team and prices + instant cross-tab storage sync
   useEffect(() => {
     if (!team?.name || !isExamStarted) return;
-    const interval = setInterval(async () => {
+
+    const syncTeamAndPrices = async () => {
       try {
         const [teamData, probData] = await Promise.all([
           getTeamStatus(team.name),
           fetchProblems()
         ]);
-        if (teamData.team) {
+        if (teamData?.team) {
           setTeam(teamData.team);
         }
-        if (probData.prices) {
+        if (probData?.prices) {
           setProblemPrices(probData.prices);
         }
       } catch (e) {}
-    }, 4000);
-    return () => clearInterval(interval);
+    };
+
+    const interval = setInterval(syncTeamAndPrices, 2000);
+    const handleStorageChange = () => {
+      syncTeamAndPrices();
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [team?.name, isExamStarted]);
 
   // 4. Anti-Cheat Integration with Member-Level Attribution
@@ -567,11 +578,13 @@ export function App() {
         />
       )}
 
-      {/* Lock Overlay (Anti-cheat lockout screen with Organiser PIN) */}
+      {/* Lock Overlay (Administrator / Anti-cheat lockout screen) */}
       {isExamStarted && team?.isLocked && (
         <LockOverlay
           teamName={team.name}
           reason={team.lockReason}
+          unlockRequestedInitial={Boolean(team.unlockRequested)}
+          onRequestSubmitted={(updatedTeam) => setTeam(updatedTeam)}
           onUnlocked={(unlockedTeam) => setTeam(unlockedTeam)}
         />
       )}

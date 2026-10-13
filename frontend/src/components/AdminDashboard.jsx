@@ -46,6 +46,8 @@ import {
   adminGrantCardPass,
   adminRevealProblemHint,
   adminClearFreeze,
+  adminLockTeam,
+  adminUnlockTeam,
   adminLogout,
   fetchEventStatus,
   updateEventStatus,
@@ -91,6 +93,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [eventConfirmModal, setEventConfirmModal] = useState(null);
   const [eventActionLoading, setEventActionLoading] = useState(false);
+  const [teamLockLoading, setTeamLockLoading] = useState(null);
+  const [confirmUnlockTeamModal, setConfirmUnlockTeamModal] = useState(null);
 
   const [exportLoading, setExportLoading] = useState(false);
 
@@ -186,8 +190,13 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 3500);
-    return () => clearInterval(interval);
+    const interval = setInterval(loadData, 2500);
+    const handleStorage = () => loadData();
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, [loadData]);
 
   const showToast = (message, isSuccess = true) => {
@@ -195,6 +204,51 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     setTimeout(() => {
       setNotification(prev => (prev?.text === message ? null : prev));
     }, 4500);
+  };
+
+  // --- TEAM LOCK / UNLOCK HANDLERS ---
+  const handleLockTeam = async (team) => {
+    if (!team?.name) return;
+    setTeamLockLoading(team.name);
+    try {
+      await adminLockTeam(team.name, 'Your screen has been locked by the administrator.');
+      setTeams(prev =>
+        prev.map(t =>
+          t.name === team.name
+            ? { ...t, isLocked: true, lockReason: 'Your screen has been locked by the administrator.', unlockRequested: false }
+            : t
+        )
+      );
+      showToast(`🔒 Team "${team.name}" screen has been locked.`, true);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || `Failed to lock team "${team.name}".`, false);
+    } finally {
+      setTeamLockLoading(null);
+    }
+  };
+
+  const handleConfirmUnlockTeam = async () => {
+    if (!confirmUnlockTeamModal?.name) return;
+    const teamName = confirmUnlockTeamModal.name;
+    setTeamLockLoading(teamName);
+    try {
+      await adminUnlockTeam(teamName);
+      setTeams(prev =>
+        prev.map(t =>
+          t.name === teamName
+            ? { ...t, isLocked: false, lockReason: '', unlockRequested: false }
+            : t
+        )
+      );
+      setConfirmUnlockTeamModal(null);
+      showToast(`🔓 Team "${teamName}" screen has been unlocked.`, true);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || `Failed to unlock team "${teamName}".`, false);
+    } finally {
+      setTeamLockLoading(null);
+    }
   };
 
   // Target team object
@@ -1199,6 +1253,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     <th style={{ padding: '12px 16px' }}>Hints Used</th>
                     <th style={{ padding: '12px 16px' }}>Sabotages</th>
                     <th style={{ padding: '12px 16px' }}>Status</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1207,6 +1262,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     const solvedCount = (team.solved || []).length;
                     const hintsRevealedCount = Object.keys(team.revealedHints || {}).length;
                     const isFrozen = Boolean(team.frozenUntil && team.frozenUntil > Date.now());
+                    const isLockBusy = teamLockLoading === team.name;
 
                     return (
                       <tr
@@ -1282,17 +1338,105 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         {/* Status */}
                         <td style={{ padding: '12px 16px' }}>
                           {team.isLocked ? (
-                            <span style={{ color: '#ff7b72', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
-                              <Lock size={12} /> Locked
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                              <span style={{
+                                color: '#ff7b72',
+                                background: 'rgba(248, 81, 73, 0.12)',
+                                border: '1px solid rgba(248, 81, 73, 0.3)',
+                                padding: '2px 8px',
+                                borderRadius: '999px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11.5px',
+                                fontWeight: 700
+                              }}>
+                                <Lock size={11} /> Locked
+                              </span>
+                              {team.unlockRequested && (
+                                <span style={{
+                                  color: '#38bdf8',
+                                  background: 'rgba(56, 189, 248, 0.12)',
+                                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                                  padding: '1px 7px',
+                                  borderRadius: '999px',
+                                  fontSize: '10px',
+                                  fontWeight: 700
+                                }}>
+                                  Unlock Requested
+                                </span>
+                              )}
+                            </div>
                           ) : isFrozen ? (
                             <span style={{ color: '#58a6ff', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
                               <Snowflake size={12} /> Sabotaged
                             </span>
                           ) : (
-                            <span style={{ color: '#3fb950', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
-                              <CheckCircle2 size={12} /> Active
+                            <span style={{
+                              color: '#3fb950',
+                              background: 'rgba(63, 185, 80, 0.12)',
+                              border: '1px solid rgba(63, 185, 80, 0.3)',
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11.5px',
+                              fontWeight: 700
+                            }}>
+                              <CheckCircle2 size={11} /> Active
                             </span>
+                          )}
+                        </td>
+
+                        {/* Actions: Lock / Unlock Team */}
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          {team.isLocked ? (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmUnlockTeamModal(team)}
+                              disabled={isLockBusy}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                background: 'rgba(63, 185, 80, 0.15)',
+                                border: '1px solid rgba(63, 185, 80, 0.4)',
+                                color: '#3fb950',
+                                cursor: isLockBusy ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Unlock size={13} />
+                              {isLockBusy ? 'Unlocking...' : 'Unlock Team'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleLockTeam(team)}
+                              disabled={isLockBusy}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                background: 'rgba(248, 81, 73, 0.12)',
+                                border: '1px solid rgba(248, 81, 73, 0.35)',
+                                color: '#ff7b72',
+                                cursor: isLockBusy ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Lock size={13} />
+                              {isLockBusy ? 'Locking...' : 'Lock Team'}
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -1301,7 +1445,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
                   {filteredLeaderboard.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: 'var(--txt-dim)' }}>
+                      <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: 'var(--txt-dim)' }}>
                         {eventState.status === 'EVENT_ENDED'
                           ? 'Event has ended. No active competition in progress. Final results and leaderboard have been safely archived.'
                           : teams.length === 0
@@ -4059,6 +4203,113 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 }}
               >
                 {scoringSaving ? 'Saving...' : 'Save Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* CONFIRM UNLOCK TEAM MODAL                                    */}
+      {/* ============================================================ */}
+      {confirmUnlockTeamModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(4, 7, 16, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              background: '#0d111c',
+              border: '1px solid rgba(63, 185, 80, 0.35)',
+              borderRadius: '14px',
+              padding: '28px 24px',
+              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8)'
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'rgba(63, 185, 80, 0.14)',
+                border: '1px solid rgba(63, 185, 80, 0.35)',
+                color: '#3fb950',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}
+            >
+              <Unlock size={24} />
+            </div>
+
+            <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+              Confirm Unlock Team
+            </h3>
+
+            <p style={{ margin: '0 0 18px', fontSize: '13.5px', color: 'var(--txt-muted)', lineHeight: 1.55 }}>
+              Are you sure you want to unlock the screen for team{' '}
+              <strong style={{ color: '#ffffff' }}>{confirmUnlockTeamModal.name}</strong>? Their student portal will automatically return to normal.
+            </p>
+
+            {confirmUnlockTeamModal.unlockRequested && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  marginBottom: '18px'
+                }}
+              >
+                ✓ Student has verified their team password and requested unlocking.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setConfirmUnlockTeamModal(null)}
+                disabled={teamLockLoading === confirmUnlockTeamModal.name}
+                style={{ padding: '9px 16px', fontSize: '12.5px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUnlockTeam}
+                disabled={teamLockLoading === confirmUnlockTeamModal.name}
+                style={{
+                  padding: '9px 18px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #238636 0%, #2ea043 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  cursor: teamLockLoading === confirmUnlockTeamModal.name ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Unlock size={14} />
+                {teamLockLoading === confirmUnlockTeamModal.name ? 'Unlocking...' : 'Confirm & Unlock'}
               </button>
             </div>
           </div>

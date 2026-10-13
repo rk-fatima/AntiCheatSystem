@@ -250,7 +250,13 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) {
+    throw new Error('Team not found.');
+  }
+  if (team.isLocked) {
+    throw new Error('Your screen has been locked by the administrator.');
+  }
 
   // Client-side password validation
   if (password) {
@@ -637,10 +643,18 @@ export async function fetchLeaderboard() {
   }
   const list = Object.values(store.teams || {}).map(t => ({
     name: t.name,
+    captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
+    size: t.size || (t.members || []).length || 1,
     score: t.score || 0,
     solvedCount: (t.solved || []).length,
+    solved: [...(t.solved || [])],
+    balance: t.balance ?? 1000,
     wrongAttempts: Object.values(t.problemWrong || {}).reduce((a, b) => a + b, 0),
-    isLocked: t.isLocked || false
+    hintsUsed: Object.keys(t.revealedHints || {}).length,
+    sabotagesCount: t.sabotageCardsCount || 0,
+    isLocked: Boolean(t.isLocked),
+    lockReason: t.lockReason || '',
+    unlockRequested: Boolean(t.unlockRequested)
   })).sort((a, b) => b.score - a.score);
 
   return { leaderboard: list };
@@ -666,10 +680,22 @@ export async function proctorUnlockTeam(teamName, pin) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, pin })
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      const store = getFallbackStore();
+      const key = (teamName || '').trim().toUpperCase();
+      if (store.teams && store.teams[key]) {
+        store.teams[key].isLocked = false;
+        store.teams[key].lockReason = '';
+        store.teams[key].unlockRequested = false;
+        store.teams[key].violations = [];
+        saveFallbackStore(store);
+      }
+      return data;
+    }
   } catch (e) {}
 
-  if (pin !== 'qubit') {
+  if (pin && pin !== 'qubit' && pin !== 'Abcd.01@#') {
     throw new Error('Invalid Organiser PIN');
   }
   const store = getFallbackStore();
@@ -678,11 +704,140 @@ export async function proctorUnlockTeam(teamName, pin) {
   if (team) {
     team.isLocked = false;
     team.lockReason = '';
+    team.unlockRequested = false;
     team.violations = [];
     saveFallbackStore(store);
     return { success: true, team };
   }
   return { success: true };
+}
+
+export async function adminLockTeam(teamName, reason = 'Your screen has been locked by the administrator.') {
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  if (store.teams && store.teams[key]) {
+    store.teams[key].isLocked = true;
+    store.teams[key].lockReason = reason || 'Your screen has been locked by the administrator.';
+    store.teams[key].lockedByAdmin = true;
+    store.teams[key].unlockRequested = false;
+    saveFallbackStore(store);
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/team/lock`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ teamName, reason })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (store.teams && store.teams[key] && data.team) {
+        store.teams[key] = { ...store.teams[key], ...data.team, isLocked: true };
+        saveFallbackStore(store);
+      }
+      return data;
+    }
+  } catch (e) {}
+
+  const team = store.teams?.[key];
+  if (!team) {
+    throw new Error(`Team "${teamName}" not found.`);
+  }
+  return { success: true, team };
+}
+
+export async function adminUnlockTeam(teamName) {
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  if (store.teams && store.teams[key]) {
+    store.teams[key].isLocked = false;
+    store.teams[key].lockReason = '';
+    store.teams[key].lockedByAdmin = false;
+    store.teams[key].unlockRequested = false;
+    store.teams[key].violations = [];
+    saveFallbackStore(store);
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/team/unlock`, {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ teamName })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (store.teams && store.teams[key] && data.team) {
+        store.teams[key] = { ...store.teams[key], ...data.team, isLocked: false, lockReason: '', unlockRequested: false };
+        saveFallbackStore(store);
+      }
+      return data;
+    }
+  } catch (e) {}
+
+  const team = store.teams?.[key];
+  if (!team) {
+    throw new Error(`Team "${teamName}" not found.`);
+  }
+  return { success: true, team };
+}
+
+export async function requestTeamUnlock(teamName, password) {
+  const cleanPassword = String(password || '').trim();
+  if (!cleanPassword) {
+    throw new Error('Please enter your password to request unlocking.');
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/team/request-unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName, password: cleanPassword })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const store = getFallbackStore();
+      const key = (teamName || '').trim().toUpperCase();
+      if (store.teams && store.teams[key]) {
+        store.teams[key].unlockRequested = true;
+        saveFallbackStore(store);
+      }
+      return data;
+    }
+    const errData = await res.json().catch(() => null);
+    if (errData?.error) {
+      throw new Error(errData.error);
+    }
+  } catch (e) {
+    if (e.message && e.message.includes('Incorrect password')) {
+      throw e;
+    }
+  }
+
+  const store = getFallbackStore();
+  const key = (teamName || '').trim().toUpperCase();
+  const team = store.teams?.[key];
+  if (!team) {
+    throw new Error('Team not found.');
+  }
+
+  const reg = Object.values(store.registrations || {}).find(
+    r => (r.teamName || '').trim().toUpperCase() === key
+  );
+  const isAdminPin =
+    cleanPassword.toLowerCase() === 'qubit' ||
+    cleanPassword === 'Abcd.01@#';
+  const isTeamPass =
+    (team.password && team.password === cleanPassword) ||
+    (reg?.password && reg.password === cleanPassword);
+
+  if (!isAdminPin && !isTeamPass) {
+    throw new Error('Incorrect password. Screen remains locked.');
+  }
+
+  team.unlockRequested = true;
+  team.unlockRequestedAt = new Date().toISOString();
+  saveFallbackStore(store);
+  return { success: true, unlockRequested: true, team };
 }
 
 export async function proctorResetTeam(teamName) {

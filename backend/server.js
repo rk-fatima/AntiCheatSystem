@@ -734,9 +734,56 @@ app.post('/api/proctor/unlock', (req, res) => {
   if (result.success) {
     broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
     broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
     return res.json({ success: true, team: result.team });
   }
   res.status(400).json({ error: result.message });
+});
+
+app.post('/api/admin/team/lock', requireAdminAuth, (req, res) => {
+  const { teamName, reason } = req.body;
+  if (!teamName) {
+    return res.status(400).json({ error: 'teamName is required.' });
+  }
+  const result = db.lockTeam(teamName, reason || 'Your screen has been locked by the administrator.');
+  if (result.success) {
+    broadcastToTeam(teamName, { type: 'TEAM_LOCKED', team: result.team });
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
+    return res.json({ success: true, team: result.team });
+  }
+  res.status(400).json({ error: result.message });
+});
+
+app.post('/api/admin/team/unlock', requireAdminAuth, (req, res) => {
+  const { teamName } = req.body;
+  if (!teamName) {
+    return res.status(400).json({ error: 'teamName is required.' });
+  }
+  const result = db.unlockTeam(teamName, db.state.config.adminPin);
+  if (result.success) {
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
+    return res.json({ success: true, team: result.team });
+  }
+  res.status(400).json({ error: result.message });
+});
+
+app.post('/api/team/request-unlock', (req, res) => {
+  const { teamName, password } = req.body;
+  if (!teamName) {
+    return res.status(400).json({ error: 'teamName is required.' });
+  }
+  const result = db.requestTeamUnlock(teamName, password);
+  if (result.success) {
+    broadcastToTeam(teamName, { type: 'TEAM_WORKSPACE_UPDATED', team: result.team });
+    broadcastToProctors({ type: 'TEAM_UPDATED', team: result.team });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
+    return res.json({ success: true, unlockRequested: true, team: result.team });
+  }
+  res.status(403).json({ error: result.message || 'Incorrect password. Screen remains locked.' });
 });
 
 app.post('/api/proctor/reset', (req, res) => {

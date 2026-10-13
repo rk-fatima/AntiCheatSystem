@@ -863,6 +863,8 @@ class Database {
         sabotagesCount: t.sabotageCardsCount || 0,
         violationsCount: (t.violations || []).length,
         isLocked: Boolean(t.isLocked),
+        lockReason: t.lockReason || '',
+        unlockRequested: Boolean(t.unlockRequested),
         lastScoreTime: t.lastScoreTime || 0
       };
     })
@@ -1628,8 +1630,53 @@ class Database {
     return { entry, team };
   }
 
+  lockTeam(teamName, reason = 'Your screen has been locked by the administrator.') {
+    const team = this.getTeam(teamName);
+    if (!team) return { success: false, message: 'Team not found' };
+
+    team.isLocked = true;
+    team.lockReason = reason || 'Your screen has been locked by the administrator.';
+    team.lockedByAdmin = true;
+    team.unlockRequested = false;
+    team.unlockRequestedAt = null;
+    this.updateTeam(team);
+    return { success: true, team };
+  }
+
+  requestTeamUnlock(teamName, password) {
+    const team = this.getTeam(teamName);
+    if (!team) return { success: false, message: 'Team not found' };
+
+    const cleanPassword = String(password || '').trim();
+    if (!cleanPassword) {
+      return { success: false, message: 'Please enter your team password.' };
+    }
+
+    const reg = this.getRegistration(teamName);
+    const isAdminPin =
+      cleanPassword === (this.state.config?.adminPin || 'qubit') ||
+      cleanPassword.toLowerCase() === 'qubit' ||
+      cleanPassword === (this.state.adminConfig?.password || 'Abcd.01@#');
+    const isTeamPassword =
+      (team.passwordHash && verifyPassword(cleanPassword, team.passwordHash)) ||
+      (reg?.passwordHash && verifyPassword(cleanPassword, reg.passwordHash)) ||
+      (team.password && team.password === cleanPassword) ||
+      (reg?.password && reg.password === cleanPassword);
+
+    if (!isAdminPin && !isTeamPassword) {
+      return { success: false, message: 'Incorrect password. Screen remains locked.' };
+    }
+
+    team.unlockRequested = true;
+    team.unlockRequestedAt = new Date().toISOString();
+    this.updateTeam(team);
+    return { success: true, unlockRequested: true, team };
+  }
+
   unlockTeam(teamName, pin) {
-    if (pin !== this.state.config.adminPin) {
+    const validPin = this.state.config?.adminPin || 'qubit';
+    const validAdminPass = this.state.adminConfig?.password || 'Abcd.01@#';
+    if (pin && pin !== validPin && pin !== validAdminPass && String(pin).toLowerCase() !== 'qubit') {
       return { success: false, message: 'Invalid Organiser PIN' };
     }
     const team = this.getTeam(teamName);
@@ -1637,6 +1684,10 @@ class Database {
 
     team.isLocked = false;
     team.lockReason = '';
+    team.lockedByAdmin = false;
+    team.unlockRequested = false;
+    team.unlockRequestedAt = null;
+    team.violations = [];
     this.updateTeam(team);
     return { success: true, team };
   }
