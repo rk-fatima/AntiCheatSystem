@@ -21,6 +21,28 @@ import {
 } from 'lucide-react';
 import { submitTeamRegistration, fetchEventStatus } from '../services/api';
 
+const INPUT_STYLE_BASE = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '9px 12px',
+  background: 'rgba(255, 255, 255, 0.05)',
+  border: '1px solid rgba(255, 255, 255, 0.15)',
+  borderRadius: '6px',
+  color: '#ffffff',
+  fontSize: '13px'
+};
+
+const INPUT_STYLE_SM = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '8px 10px',
+  background: 'rgba(255, 255, 255, 0.05)',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  borderRadius: '6px',
+  color: '#ffffff',
+  fontSize: '12px'
+};
+
 export function TeamRegistration({ onNavigateLogin }) {
   const [teamName, setTeamName] = useState('');
   const [password, setPassword] = useState('');
@@ -574,14 +596,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                     value={teamName}
                     onChange={(e) => setTeamName(e.target.value.toUpperCase())}
                     style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '9px 12px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '6px',
-                      color: '#ffffff',
-                      fontSize: '13px',
+                      ...INPUT_STYLE_BASE,
                       fontWeight: 600,
                       textTransform: 'uppercase'
                     }}
@@ -605,14 +620,8 @@ export function TeamRegistration({ onNavigateLogin }) {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '9px 34px 9px 12px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          borderRadius: '6px',
-                          color: '#ffffff',
-                          fontSize: '13px'
+                          ...INPUT_STYLE_BASE,
+                          padding: '9px 34px 9px 12px'
                         }}
                       />
                       <button
@@ -646,16 +655,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                       placeholder="Re-enter password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '9px 12px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderRadius: '6px',
-                        color: '#ffffff',
-                        fontSize: '13px'
-                      }}
+                      style={INPUT_STYLE_BASE}
                     />
                   </div>
                 </div>
@@ -684,16 +684,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                     placeholder="e.g. Salman Khan"
                     value={leaderName}
                     onChange={(e) => handleLeaderNameChange(e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '9px 12px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '6px',
-                      color: '#ffffff',
-                      fontSize: '13px'
-                    }}
+                    style={INPUT_STYLE_BASE}
                   />
                 </div>
 
@@ -709,16 +700,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                       placeholder="+91 98765 43210"
                       value={leaderContact}
                       onChange={(e) => setLeaderContact(e.target.value)}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '9px 12px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderRadius: '6px',
-                        color: '#ffffff',
-                        fontSize: '13px'
-                      }}
+                      style={INPUT_STYLE_BASE}
                     />
                   </div>
 
@@ -732,16 +714,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                       placeholder="leader@college.edu"
                       value={leaderEmail}
                       onChange={(e) => setLeaderEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '9px 12px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderRadius: '6px',
-                        color: '#ffffff',
-                        fontSize: '13px'
-                      }}
+                      style={INPUT_STYLE_BASE}
                     />
                   </div>
                 </div>
@@ -831,16 +804,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                             placeholder={isLeader ? 'Leader Full Name' : `Member ${idx + 1} Full Name`}
                             value={members[idx]?.name || ''}
                             onChange={(e) => handleMemberChange(idx, 'name', e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '8px 10px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              borderRadius: '6px',
-                              color: '#ffffff',
-                              fontSize: '12px'
-                            }}
+                            style={INPUT_STYLE_SM}
                           />
 
                           <input
@@ -849,16 +813,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                             placeholder="College / Dept (Optional)"
                             value={members[idx]?.college || ''}
                             onChange={(e) => handleMemberChange(idx, 'college', e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '8px 10px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              borderRadius: '6px',
-                              color: '#ffffff',
-                              fontSize: '12px'
-                            }}
+                            style={INPUT_STYLE_SM}
                           />
                         </div>
 
@@ -869,16 +824,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                             placeholder="Roll No / ID (Optional)"
                             value={members[idx]?.rollNo || ''}
                             onChange={(e) => handleMemberChange(idx, 'rollNo', e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '8px 10px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              borderRadius: '6px',
-                              color: '#ffffff',
-                              fontSize: '12px'
-                            }}
+                            style={INPUT_STYLE_SM}
                           />
 
                           <input
@@ -887,16 +833,7 @@ export function TeamRegistration({ onNavigateLogin }) {
                             placeholder="Phone / Email (Optional)"
                             value={members[idx]?.phone || ''}
                             onChange={(e) => handleMemberChange(idx, 'phone', e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '8px 10px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              borderRadius: '6px',
-                              color: '#ffffff',
-                              fontSize: '12px'
-                            }}
+                            style={INPUT_STYLE_SM}
                           />
                         </div>
                       </div>

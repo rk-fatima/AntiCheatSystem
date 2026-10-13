@@ -1595,6 +1595,32 @@ export function adminLogout() {
   } catch (e) {}
 }
 
+function createAndRecordUnlockTxn(store, team, { id, problemId, problemTitle, cardType, bid, previousBalance, remainingBalance }) {
+  const now = new Date();
+  const record = {
+    id: id || `TXN-ADM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    type: 'ADMIN_UNLOCK',
+    teamName: team.name,
+    problemId,
+    problemTitle,
+    cardType,
+    bidPrice: bid,
+    bidAmount: bid,
+    price: bid,
+    previousBalance,
+    remainingBalance,
+    status: 'UNLOCKED',
+    timestamp: now.toISOString(),
+    displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+  };
+
+  if (!team.transactions) team.transactions = [];
+  team.transactions.unshift(record);
+  if (!store.unlockHistory) store.unlockHistory = [];
+  store.unlockHistory.unshift(record);
+  return record;
+}
+
 export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
   try {
     const res = await backendFetch('/admin/problems/unlock', {
@@ -1649,28 +1675,14 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
 
   const prob = (fallbackProblemsData.problems || []).find(p => p.id === problemId);
   const problemTitle = prob ? prob.title : problemId;
-  const now = new Date();
 
-  const record = {
-    id: `TXN-ADM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    type: 'ADMIN_UNLOCK',
-    teamName: team.name,
-    problemId: problemId,
-    problemTitle: problemTitle,
-    bidPrice: bid,
-    bidAmount: bid,
-    price: bid,
-    previousBalance: previousBalance,
-    remainingBalance: remainingBalance,
-    status: 'UNLOCKED',
-    timestamp: now.toISOString(),
-    displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-  };
-
-  if (!team.transactions) team.transactions = [];
-  team.transactions.unshift(record);
-  if (!store.unlockHistory) store.unlockHistory = [];
-  store.unlockHistory.unshift(record);
+  const record = createAndRecordUnlockTxn(store, team, {
+    problemId,
+    problemTitle,
+    bid,
+    previousBalance,
+    remainingBalance
+  });
 
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
@@ -1737,28 +1749,15 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
     if (!team.sabotageCardsCount || team.sabotageCardsCount < 1) team.sabotageCardsCount = 1;
   }
 
-  const now = new Date();
-  const record = {
+  const record = createAndRecordUnlockTxn(store, team, {
     id: `TXN-ADM-CARD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    type: 'ADMIN_UNLOCK',
-    teamName: team.name,
     problemId: type,
     problemTitle: cardTitle,
     cardType: type,
-    bidPrice: bid,
-    bidAmount: bid,
-    price: bid,
-    previousBalance: previousBalance,
-    remainingBalance: remainingBalance,
-    status: 'UNLOCKED',
-    timestamp: now.toISOString(),
-    displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-  };
-
-  if (!team.transactions) team.transactions = [];
-  team.transactions.unshift(record);
-  if (!store.unlockHistory) store.unlockHistory = [];
-  store.unlockHistory.unshift(record);
+    bid,
+    previousBalance,
+    remainingBalance
+  });
 
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);

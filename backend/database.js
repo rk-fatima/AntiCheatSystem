@@ -1238,6 +1238,48 @@ class Database {
     return this.state.teams[k] || Object.values(this.state.teams).find(t => t.name.toLowerCase() === k.toLowerCase()) || null;
   }
 
+  getTeamMember(team, memberId) {
+    return (team?.members || []).find(m => m.memberId === memberId) || {
+      memberId: memberId || `${team?.name || 'team'}-01`,
+      name: memberId || 'Team Member'
+    };
+  }
+
+  recordTransaction(team, txn) {
+    if (!team.transactions) team.transactions = [];
+    team.transactions.unshift(txn);
+    if (!this.state.transactions) this.state.transactions = [];
+    this.state.transactions.unshift(txn);
+  }
+
+  recordUnlockTransaction(team, { id, problemId, problemTitle, cardType, bid, previousBalance, remainingBalance }) {
+    const now = new Date();
+    const txn = {
+      id: id || `TXN-ADM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      type: 'ADMIN_UNLOCK',
+      teamName: team.name,
+      problemId,
+      problemTitle,
+      cardType,
+      bidPrice: bid,
+      bidAmount: bid,
+      price: bid,
+      previousBalance,
+      remainingBalance,
+      status: 'UNLOCKED',
+      timestamp: now.toISOString(),
+      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+
+    this.recordTransaction(team, txn);
+    if (!this.state.unlockHistory) this.state.unlockHistory = [];
+    this.state.unlockHistory.unshift(txn);
+
+    this.updateTeam(team);
+    this.save();
+    return txn;
+  }
+
   verifyTeamLogin(teamName, password, memberId) {
     const normalized = (teamName || '').trim();
     if (!normalized) {
@@ -1446,10 +1488,7 @@ class Database {
       throw new Error(`Insufficient budget! Your winning bid is ₹${finalBidAmount}, but team only has ₹${team.balance} remaining.`);
     }
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId || `${team.name}-01`,
-      name: memberId || 'Team Member'
-    };
+    const member = this.getTeamMember(team, memberId);
 
     // Deduct bid amount at the TEAM level
     team.balance -= finalBidAmount;
@@ -1482,9 +1521,7 @@ class Database {
       displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     };
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    this.state.transactions.unshift(txn);
+    this.recordTransaction(team, txn);
 
     this.updateTeam(team);
     this.save();
@@ -1498,10 +1535,7 @@ class Database {
     if (!team) return null;
     if (!team.problemStatuses) team.problemStatuses = {};
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId,
-      name: memberId
-    };
+    const member = this.getTeamMember(team, memberId);
 
     // Don't overwrite if problem is already solved
     if (team.problemStatuses[problemId]?.status === 'SOLVED') {
@@ -1543,10 +1577,7 @@ class Database {
     if (!team.problemStatuses) team.problemStatuses = {};
     if (!team.attempts) team.attempts = [];
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId || `${team.name}-01`,
-      name: memberId || 'Team Member'
-    };
+    const member = this.getTeamMember(team, memberId);
 
     const now = Date.now();
     const isAlreadySolved = (team.solved || []).includes(problem.id);
@@ -1840,10 +1871,7 @@ class Database {
       throw new Error(`Insufficient ByteCoins! Hint Pass costs ${cost} ByteCoins, but team only has ${team.balance} ByteCoins remaining.`);
     }
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId || `${team.name}-01`,
-      name: memberId || 'Team Member'
-    };
+    const member = this.getTeamMember(team, memberId);
 
     let hintData = null;
     if (problemId) {
@@ -1886,9 +1914,7 @@ class Database {
       isoTime: new Date().toISOString()
     };
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    this.state.transactions.unshift(txn);
+    this.recordTransaction(team, txn);
 
     this.save();
     return { team, txn, hint: hintData };
@@ -1914,10 +1940,7 @@ class Database {
       return { team, hint: team.revealedHints[problem.id], alreadyRevealed: true };
     }
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId || `${team.name}-01`,
-      name: memberId || 'Team Member'
-    };
+    const member = this.getTeamMember(team, memberId);
 
     const cost = 40;
     if ((team.hintPassesCount || 0) > 0) {
@@ -1955,9 +1978,7 @@ class Database {
       isoTime: new Date().toISOString()
     };
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    this.state.transactions.unshift(txn);
+    this.recordTransaction(team, txn);
 
     this.save();
     return { team, txn, hint: hintData };
@@ -1989,10 +2010,7 @@ class Database {
       throw new Error(`Insufficient ByteCoins! Sabotage Card costs ${cost} ByteCoins, but team only has ${team.balance} ByteCoins remaining.`);
     }
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId || `${team.name}-01`,
-      name: memberId || 'Team Member'
-    };
+    const member = this.getTeamMember(team, memberId);
 
     team.balance -= cost;
     team.sabotageCardsCount = (team.sabotageCardsCount || 0) + 1;
@@ -2012,9 +2030,7 @@ class Database {
       isoTime: new Date().toISOString()
     };
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    this.state.transactions.unshift(txn);
+    this.recordTransaction(team, txn);
 
     this.save();
     return { team, txn };
@@ -2044,10 +2060,7 @@ class Database {
       throw new Error(`Team "${target.name}" is already frozen! Remaining freeze time: ${remainingSec}s.`);
     }
 
-    const member = (team.members || []).find(m => m.memberId === memberId) || {
-      memberId: memberId || `${team.name}-01`,
-      name: memberId || 'Team Member'
-    };
+    const member = this.getTeamMember(team, memberId);
 
     const cost = 40;
     if ((team.sabotageCardsCount || 0) > 0) {
@@ -2080,9 +2093,7 @@ class Database {
       isoTime: new Date().toISOString()
     };
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    this.state.transactions.unshift(txn);
+    this.recordTransaction(team, txn);
 
     this.save();
     return {
@@ -2250,32 +2261,14 @@ class Database {
       };
     }
 
-    const now = new Date();
-    const txn = {
-      id: `TXN-ADM-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      type: 'ADMIN_UNLOCK',
-      teamName: team.name,
-      problemId: problemId,
-      problemTitle: problemTitle,
-      bidPrice: bid,
-      bidAmount: bid,
-      price: bid,
-      previousBalance: previousBalance,
-      remainingBalance: remainingBalance,
-      status: 'UNLOCKED',
-      timestamp: now.toISOString(),
-      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-    };
+    const txn = this.recordUnlockTransaction(team, {
+      problemId,
+      problemTitle,
+      bid,
+      previousBalance,
+      remainingBalance
+    });
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    if (!this.state.transactions) this.state.transactions = [];
-    this.state.transactions.unshift(txn);
-    if (!this.state.unlockHistory) this.state.unlockHistory = [];
-    this.state.unlockHistory.unshift(txn);
-
-    this.updateTeam(team);
-    this.save();
     return {
       success: true,
       team,
@@ -2349,33 +2342,16 @@ class Database {
       }
     }
 
-    const now = new Date();
-    const txn = {
+    const txn = this.recordUnlockTransaction(team, {
       id: `TXN-ADM-CARD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      type: 'ADMIN_UNLOCK',
-      teamName: team.name,
       problemId: type,
       problemTitle: cardTitle,
       cardType: type,
-      bidPrice: bid,
-      bidAmount: bid,
-      price: bid,
-      previousBalance: previousBalance,
-      remainingBalance: remainingBalance,
-      status: 'UNLOCKED',
-      timestamp: now.toISOString(),
-      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-    };
+      bid,
+      previousBalance,
+      remainingBalance
+    });
 
-    if (!team.transactions) team.transactions = [];
-    team.transactions.unshift(txn);
-    if (!this.state.transactions) this.state.transactions = [];
-    this.state.transactions.unshift(txn);
-    if (!this.state.unlockHistory) this.state.unlockHistory = [];
-    this.state.unlockHistory.unshift(txn);
-
-    this.updateTeam(team);
-    this.save();
     return {
       success: true,
       team,

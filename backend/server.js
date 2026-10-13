@@ -137,6 +137,26 @@ function broadcastToAll(payload) {
   }
 }
 
+function broadcastTeamsAndLeaderboard(result, res) {
+  if (result?.teams) {
+    result.teams.forEach(t => {
+      broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
+    });
+  }
+  broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
+  if (res) res.json(result);
+}
+
+function broadcastEventStateChange(result, res, extraEvent = null) {
+  if (extraEvent) broadcastToAll(extraEvent);
+  broadcastToAll({
+    type: 'EVENT_STATUS_CHANGED',
+    eventState: result.eventState
+  });
+  broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
+  if (res) res.json({ success: true, ...result });
+}
+
 // --- HEALTH CHECK ---
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Qubit AntiCheat Server', serverTime: Date.now() });
@@ -867,12 +887,7 @@ app.post('/api/admin/event/start', requireAdminAuth, (req, res) => {
   const { participatingTeams = [], eventName = '' } = req.body || {};
   try {
     const result = db.startEventSession({ participatingTeams, eventName });
-    broadcastToAll({
-      type: 'EVENT_STATUS_CHANGED',
-      eventState: result.eventState
-    });
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
-    res.json({ success: true, ...result });
+    broadcastEventStateChange(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -882,12 +897,7 @@ app.post('/api/admin/event/start', requireAdminAuth, (req, res) => {
 app.post('/api/admin/event/end', requireAdminAuth, (req, res) => {
   try {
     const result = db.endEventSession();
-    broadcastToAll({
-      type: 'EVENT_STATUS_CHANGED',
-      eventState: result.eventState
-    });
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
-    res.json({ success: true, ...result });
+    broadcastEventStateChange(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -897,16 +907,10 @@ app.post('/api/admin/event/end', requireAdminAuth, (req, res) => {
 app.post('/api/admin/auction/end', requireAdminAuth, (req, res) => {
   try {
     const result = db.endAuction();
-    broadcastToAll({
+    broadcastEventStateChange(result, res, {
       type: 'AUCTION_ENDED',
       eventState: result.eventState
     });
-    broadcastToAll({
-      type: 'EVENT_STATUS_CHANGED',
-      eventState: result.eventState
-    });
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
-    res.json({ success: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -975,13 +979,7 @@ app.post('/api/admin/problems/unlock', (req, res) => {
   const { teamName, problemId, bidPrice } = req.body;
   try {
     const result = db.adminUnlockProblem(teamName, problemId, bidPrice);
-    if (result.teams) {
-      result.teams.forEach(t => {
-        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
-      });
-    }
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
-    res.json(result);
+    broadcastTeamsAndLeaderboard(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -992,13 +990,7 @@ app.post('/api/admin/problems/lock', (req, res) => {
   const { teamName, problemId } = req.body;
   try {
     const result = db.adminLockProblem(teamName, problemId);
-    if (result.teams) {
-      result.teams.forEach(t => {
-        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
-      });
-    }
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
-    res.json(result);
+    broadcastTeamsAndLeaderboard(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -1009,13 +1001,7 @@ app.post('/api/admin/cards/unlock', (req, res) => {
   const { teamName, cardType, bidPrice } = req.body;
   try {
     const result = db.adminUnlockCard(teamName, cardType, bidPrice);
-    if (result.teams) {
-      result.teams.forEach(t => {
-        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
-      });
-    }
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
-    res.json(result);
+    broadcastTeamsAndLeaderboard(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -1026,13 +1012,7 @@ app.post('/api/admin/cards/lock', (req, res) => {
   const { teamName, cardType } = req.body;
   try {
     const result = db.adminLockCard(teamName, cardType);
-    if (result.teams) {
-      result.teams.forEach(t => {
-        broadcastToTeam(t.name, { type: 'TEAM_WORKSPACE_UPDATED', team: t });
-      });
-    }
-    broadcastToAll({ type: 'LEADERBOARD_UPDATED' });
-    res.json(result);
+    broadcastTeamsAndLeaderboard(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

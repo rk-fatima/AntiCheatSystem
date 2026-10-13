@@ -149,6 +149,51 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     ? `${window.location.origin}${window.location.pathname}#register`
     : '';
 
+  const renderDeductionRows = (items, configField) => items.map(item => (
+    <div key={item.key} style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '8px 12px',
+      background: 'rgba(255, 255, 255, 0.02)',
+      border: '1px solid rgba(255, 255, 255, 0.05)',
+      borderRadius: '6px'
+    }}>
+      <div>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>{item.label}</div>
+        <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>{item.desc}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ fontSize: '13px', color: '#ff7b72', fontWeight: 700 }}>−</span>
+        <input
+          type="number"
+          min="0"
+          value={scoringConfig?.[configField]?.[item.key] ?? item.defaultVal}
+          onChange={(e) => setScoringConfig(prev => ({
+            ...prev,
+            [configField]: {
+              ...prev[configField],
+              [item.key]: parseInt(e.target.value) || 0
+            }
+          }))}
+          style={{
+            width: '75px',
+            padding: '6px 8px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '4px',
+            color: '#ffffff',
+            fontSize: '13px',
+            fontWeight: 700,
+            fontFamily: 'var(--font-mono)',
+            textAlign: 'right'
+          }}
+        />
+        <span style={{ fontSize: '12px', color: 'var(--txt-dim)' }}>pts</span>
+      </div>
+    </div>
+  ));
+
   useEffect(() => {
     if (regUrl && showQrModal) {
       QRCode.toDataURL(regUrl, {
@@ -2886,7 +2931,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[
+                  {renderDeductionRows([
                     { key: 'O(1)', label: 'O(1) — Constant', defaultVal: 0, desc: 'Direct lookup, mathematical formulas' },
                     { key: 'O(log n)', label: 'O(log n) — Logarithmic', defaultVal: 5, desc: 'Binary search, divide & conquer halving' },
                     { key: 'O(n)', label: 'O(n) — Linear', defaultVal: 10, desc: 'Single loop pass, linear scan, frequency map' },
@@ -2895,50 +2940,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     { key: 'O(n^3)', label: 'O(n³) — Cubic', defaultVal: 40, desc: 'Triple nested loops, cubic matrix ops' },
                     { key: 'O(2^n)', label: 'O(2ⁿ) — Exponential', defaultVal: 60, desc: 'Unmemoized branching recursion, subsets' },
                     { key: 'O(n!)', label: 'O(n!) — Factorial', defaultVal: 80, desc: 'Permutations generator, brute-force TSP' }
-                  ].map(item => (
-                    <div key={item.key} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.05)',
-                      borderRadius: '6px'
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>{item.label}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>{item.desc}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '13px', color: '#ff7b72', fontWeight: 700 }}>−</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={scoringConfig?.timeComplexityDeductions?.[item.key] ?? item.defaultVal}
-                          onChange={(e) => setScoringConfig(prev => ({
-                            ...prev,
-                            timeComplexityDeductions: {
-                              ...prev.timeComplexityDeductions,
-                              [item.key]: parseInt(e.target.value) || 0
-                            }
-                          }))}
-                          style={{
-                            width: '75px',
-                            padding: '6px 8px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.12)',
-                            borderRadius: '4px',
-                            color: '#ffffff',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            fontFamily: 'var(--font-mono)',
-                            textAlign: 'right'
-                          }}
-                        />
-                        <span style={{ fontSize: '12px', color: 'var(--txt-dim)' }}>pts</span>
-                      </div>
-                    </div>
-                  ))}
+                  ], 'timeComplexityDeductions')}
                 </div>
               </div>
 
@@ -2960,56 +2962,13 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[
+                  {renderDeductionRows([
                     { key: 'O(1)', label: 'O(1) — Constant Auxiliary Space', defaultVal: 0, desc: 'Scalars, pointers, in-place variable tracking' },
                     { key: 'O(log n)', label: 'O(log n) — Logarithmic Auxiliary Space', defaultVal: 5, desc: 'Call stack for divide & conquer / binary recursion' },
                     { key: 'O(n)', label: 'O(n) — Linear Auxiliary Space', defaultVal: 10, desc: '1D arrays, lists, hash maps, hash sets, queues' },
                     { key: 'O(n^2)', label: 'O(n²) — Quadratic Auxiliary Space', defaultVal: 20, desc: '2D matrix, adjacency matrix, memoization grid' },
                     { key: 'O(n^3+)', label: 'O(n³+) — Cubic or Higher Auxiliary Space', defaultVal: 30, desc: '3D+ arrays, tensor allocations' }
-                  ].map(item => (
-                    <div key={item.key} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.05)',
-                      borderRadius: '6px'
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>{item.label}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>{item.desc}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '13px', color: '#ff7b72', fontWeight: 700 }}>−</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={scoringConfig?.spaceComplexityDeductions?.[item.key] ?? item.defaultVal}
-                          onChange={(e) => setScoringConfig(prev => ({
-                            ...prev,
-                            spaceComplexityDeductions: {
-                              ...prev.spaceComplexityDeductions,
-                              [item.key]: parseInt(e.target.value) || 0
-                            }
-                          }))}
-                          style={{
-                            width: '75px',
-                            padding: '6px 8px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.12)',
-                            borderRadius: '4px',
-                            color: '#ffffff',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            fontFamily: 'var(--font-mono)',
-                            textAlign: 'right'
-                          }}
-                        />
-                        <span style={{ fontSize: '12px', color: 'var(--txt-dim)' }}>pts</span>
-                      </div>
-                    </div>
-                  ))}
+                  ], 'spaceComplexityDeductions')}
                 </div>
               </div>
             </div>
