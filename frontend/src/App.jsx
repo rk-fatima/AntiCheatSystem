@@ -53,21 +53,42 @@ export function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.toLowerCase();
-      if (hash === '#ps' || hash.startsWith('#ps')) {
+      const isPsRoute = hash === '#ps' || hash.startsWith('#ps');
+
+      if (isPsRoute) {
         setViewMode('ps');
-      } else if (hash.includes('register')) {
-        setViewMode('register');
-      } else if (hash.includes('admin')) {
-        setViewMode('admin');
-        setIsAdminLoggedIn(isAdminAuthenticated());
-      } else if (hash.includes('team') || hash.includes('workspace') || hash.includes('login')) {
-        setViewMode('workspace');
       } else {
-        setViewMode('landing');
+        // Navigating away from #ps immediately clears the in-memory unlock state
+        setIsPsUnlocked(false);
+
+        if (hash.includes('register')) {
+          setViewMode('register');
+        } else if (hash.includes('admin')) {
+          setViewMode('admin');
+          setIsAdminLoggedIn(isAdminAuthenticated());
+        } else if (hash.includes('team') || hash.includes('workspace') || hash.includes('login')) {
+          setViewMode('workspace');
+        } else {
+          setViewMode('landing');
+        }
       }
     };
+
+    const handlePageShow = (e) => {
+      // Invalidate on bfcache restoration
+      if (e.persisted) {
+        setIsPsUnlocked(false);
+      }
+    };
+
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, []);
 
   const socketRef = useRef(null);
@@ -312,6 +333,7 @@ export function App() {
         <ProtectedPageGate
           onUnlock={() => setIsPsUnlocked(true)}
           onNavigateHome={() => {
+            setIsPsUnlocked(false);
             window.location.hash = '';
             setViewMode('landing');
           }}
@@ -320,7 +342,14 @@ export function App() {
     }
     return (
       <ProblemShowcase
+        onLogout={() => {
+          setIsPsUnlocked(false);
+          if (window.location.hash.toLowerCase() !== '#ps') {
+            window.location.hash = '#ps';
+          }
+        }}
         onNavigateHome={() => {
+          setIsPsUnlocked(false);
           window.location.hash = '';
           setViewMode('landing');
         }}

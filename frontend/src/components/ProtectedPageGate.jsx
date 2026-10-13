@@ -175,6 +175,11 @@ export function ProtectedPageGate({ onUnlock, onNavigateHome }) {
                   setPassword(e.target.value);
                   if (error) setError('');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSubmit(e);
+                  }
+                }}
                 placeholder="Enter password"
                 autoFocus
                 autoComplete="current-password"

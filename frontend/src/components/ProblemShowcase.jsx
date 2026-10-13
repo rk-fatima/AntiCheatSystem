@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Copy, Check, ChevronLeft, ChevronRight, Home, LogOut } from 'lucide-react';
 
 const DIFFICULTY_SEQUENCE = ['Easy', 'Medium', 'Hard'];
 
@@ -174,7 +174,7 @@ const SHOWCASE_PROBLEMS = [
   }
 ];
 
-export function ProblemShowcase({ onNavigateHome }) {
+export function ProblemShowcase({ onNavigateHome, onLogout }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [copied, setCopied] = useState(false);
 
@@ -262,7 +262,9 @@ export function ProblemShowcase({ onNavigateHome }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '20px'
+          marginBottom: '20px',
+          gap: '12px',
+          flexWrap: 'wrap'
         }}
       >
         <button
@@ -294,25 +296,86 @@ export function ProblemShowcase({ onNavigateHome }) {
           <span>Exit to Home</span>
         </button>
 
-        {/* Quick Problem Selector Dot Indicators */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {SHOWCASE_PROBLEMS.map((p, idx) => (
+        {/* Right Header Controls: Problem Progress Indicators & Clearly Visible Logout Button */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Quick Problem Selector Dot Indicators */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 10px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.06)'
+            }}
+          >
+            {SHOWCASE_PROBLEMS.map((p, idx) => (
+              <button
+                key={p.id}
+                onClick={() => setCurrentIndex(idx)}
+                title={`Problem ${idx + 1}: ${p.id} — ${p.title} (${DIFFICULTY_SEQUENCE[idx % 3]})`}
+                style={{
+                  width: idx === currentIndex ? '24px' : '8px',
+                  height: '8px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  background: idx === currentIndex ? '#58a6ff' : 'rgba(255, 255, 255, 0.2)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  padding: 0
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Clearly Visible Logout Button (top-right corner) */}
+          {onLogout && (
             <button
-              key={p.id}
-              onClick={() => setCurrentIndex(idx)}
-              title={`Problem ${idx + 1}: ${p.id} — ${p.title} (${DIFFICULTY_SEQUENCE[idx % 3]})`}
+              type="button"
+              onClick={onLogout}
+              aria-label="Logout and lock problem statements"
               style={{
-                width: idx === currentIndex ? '26px' : '8px',
-                height: '8px',
-                borderRadius: '4px',
-                border: 'none',
-                background: idx === currentIndex ? '#58a6ff' : 'rgba(255, 255, 255, 0.2)',
+                background: 'linear-gradient(135deg, rgba(88, 166, 255, 0.12) 0%, rgba(137, 87, 229, 0.18) 100%)',
+                border: '1px solid rgba(137, 87, 229, 0.38)',
+                borderRadius: '8px',
+                color: '#d2a8ff',
+                fontSize: '13px',
+                fontWeight: 600,
+                padding: '7px 14px',
                 cursor: 'pointer',
-                transition: 'all 0.2s',
-                padding: 0
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 10px rgba(137, 87, 229, 0.18)',
+                transition: 'all 0.15s ease'
               }}
-            />
-          ))}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(88, 166, 255, 0.22) 0%, rgba(137, 87, 229, 0.3) 100%)';
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.borderColor = 'rgba(137, 87, 229, 0.7)';
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(137, 87, 229, 0.35)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(88, 166, 255, 0.12) 0%, rgba(137, 87, 229, 0.18) 100%)';
+                e.currentTarget.style.color = '#d2a8ff';
+                e.currentTarget.style.borderColor = 'rgba(137, 87, 229, 0.38)';
+                e.currentTarget.style.boxShadow = '0 2px 10px rgba(137, 87, 229, 0.18)';
+                e.currentTarget.style.transform = 'none';
+              }}
+            >
+              <LogOut size={14} color="#d2a8ff" />
+              <span>Logout</span>
+            </button>
+          )}
         </div>
       </div>
 
