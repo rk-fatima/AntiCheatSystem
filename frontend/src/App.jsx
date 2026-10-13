@@ -11,6 +11,8 @@ import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
 import { TeamRegistration } from './components/TeamRegistration';
 import { LandingPage } from './components/LandingPage';
+import { ProtectedPageGate } from './components/ProtectedPageGate';
+import { ProblemShowcase } from './components/ProblemShowcase';
 import { useAntiCheat } from './hooks/useAntiCheat';
 import {
   fetchProblems,
@@ -39,17 +41,21 @@ export function App() {
 
   const [viewMode, setViewMode] = useState(() => {
     const hash = window.location.hash.toLowerCase();
+    if (hash === '#ps' || hash.startsWith('#ps')) return 'ps';
     if (hash.includes('register')) return 'register';
     if (hash.includes('admin')) return 'admin';
     if (hash.includes('team') || hash.includes('workspace') || hash.includes('login')) return 'workspace';
     return 'landing';
   });
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => isAdminAuthenticated());
+  const [isPsUnlocked, setIsPsUnlocked] = useState(false);
 
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.toLowerCase();
-      if (hash.includes('register')) {
+      if (hash === '#ps' || hash.startsWith('#ps')) {
+        setViewMode('ps');
+      } else if (hash.includes('register')) {
         setViewMode('register');
       } else if (hash.includes('admin')) {
         setViewMode('admin');
@@ -294,6 +300,29 @@ export function App() {
         onNavigateRegister={() => {
           window.location.hash = '#register';
           setViewMode('register');
+        }}
+      />
+    );
+  }
+
+  // Dedicated Protected Problem Statements Route (#ps)
+  if (viewMode === 'ps') {
+    if (!isPsUnlocked) {
+      return (
+        <ProtectedPageGate
+          onUnlock={() => setIsPsUnlocked(true)}
+          onNavigateHome={() => {
+            window.location.hash = '';
+            setViewMode('landing');
+          }}
+        />
+      );
+    }
+    return (
+      <ProblemShowcase
+        onNavigateHome={() => {
+          window.location.hash = '';
+          setViewMode('landing');
         }}
       />
     );
