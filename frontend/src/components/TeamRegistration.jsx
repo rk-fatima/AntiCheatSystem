@@ -36,7 +36,7 @@ export function TeamRegistration({ onNavigateLogin }) {
     { name: '', rollNo: '', email: '', phone: '', college: '' }
   ]);
 
-  const [eventStatus, setEventStatus] = useState('REGISTRATION_OPEN');
+  const [eventStatus, setEventStatus] = useState('REGISTRATION_CLOSED');
   const [statusLoading, setStatusLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -53,18 +53,24 @@ export function TeamRegistration({ onNavigateLogin }) {
     : '';
 
   useEffect(() => {
-    async function checkStatus() {
-      setStatusLoading(true);
+    let active = true;
+    async function checkStatus(isInitial = false) {
+      if (isInitial) setStatusLoading(true);
       try {
         const state = await fetchEventStatus();
-        setEventStatus(state?.status || 'REGISTRATION_OPEN');
+        if (active) setEventStatus(state?.status || 'REGISTRATION_CLOSED');
       } catch (e) {
-        setEventStatus('REGISTRATION_OPEN');
+        if (active) setEventStatus('REGISTRATION_CLOSED');
       } finally {
-        setStatusLoading(false);
+        if (active && isInitial) setStatusLoading(false);
       }
     }
-    checkStatus();
+    checkStatus(true);
+    const interval = setInterval(() => checkStatus(false), 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Generate QR Code
@@ -189,7 +195,7 @@ export function TeamRegistration({ onNavigateLogin }) {
     }
   };
 
-  const isRegistrationClosed = eventStatus === 'REGISTRATION_CLOSED' || eventStatus === 'EVENT_LIVE' || eventStatus === 'EVENT_ENDED';
+  const isRegistrationClosed = eventStatus !== 'EVENT_LIVE' && eventStatus !== 'REGISTRATION_OPEN';
 
   return (
     <div style={{
@@ -239,21 +245,15 @@ export function TeamRegistration({ onNavigateLogin }) {
             fontWeight: 700,
             padding: '3px 10px',
             borderRadius: '12px',
-            background: eventStatus === 'EVENT_ENDED'
-              ? 'rgba(148, 163, 184, 0.15)'
-              : (eventStatus === 'EVENT_LIVE'
-                ? 'rgba(188, 140, 255, 0.15)'
-                : (isRegistrationClosed ? 'rgba(248, 81, 73, 0.12)' : 'rgba(56, 189, 248, 0.12)')),
-            border: eventStatus === 'EVENT_ENDED'
-              ? '1px solid rgba(148, 163, 184, 0.35)'
-              : (eventStatus === 'EVENT_LIVE'
-                ? '1px solid rgba(188, 140, 255, 0.35)'
-                : (isRegistrationClosed ? '1px solid rgba(248, 81, 73, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)')),
-            color: eventStatus === 'EVENT_ENDED'
-              ? '#94a3b8'
-              : (eventStatus === 'EVENT_LIVE'
-                ? '#d2a8ff'
-                : (isRegistrationClosed ? '#ff7b72' : '#38bdf8')),
+            background: isRegistrationClosed
+              ? 'rgba(248, 81, 73, 0.12)'
+              : 'rgba(46, 160, 67, 0.15)',
+            border: isRegistrationClosed
+              ? '1px solid rgba(248, 81, 73, 0.3)'
+              : '1px solid rgba(46, 160, 67, 0.4)',
+            color: isRegistrationClosed
+              ? '#ff7b72'
+              : '#3fb950',
             letterSpacing: '0.4px',
             display: 'flex',
             alignItems: 'center',
@@ -263,17 +263,9 @@ export function TeamRegistration({ onNavigateLogin }) {
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              background: eventStatus === 'EVENT_ENDED'
-                ? '#94a3b8'
-                : (eventStatus === 'EVENT_LIVE'
-                  ? '#bc8cff'
-                  : (isRegistrationClosed ? '#f85149' : '#38bdf8'))
+              background: isRegistrationClosed ? '#f85149' : '#3fb950'
             }} />
-            {eventStatus === 'EVENT_ENDED'
-              ? 'EVENT ENDED'
-              : (eventStatus === 'EVENT_LIVE'
-                ? 'EVENT LIVE'
-                : (isRegistrationClosed ? 'REGISTRATION CLOSED' : 'REGISTRATION OPEN'))}
+            {isRegistrationClosed ? 'REGISTRATION CLOSED' : 'REGISTRATION OPEN'}
           </span>
         </div>
 
@@ -531,7 +523,7 @@ export function TeamRegistration({ onNavigateLogin }) {
               }}>
                 <AlertCircle size={18} style={{ flexShrink: 0 }} />
                 <div>
-                  <strong>Registration is closed.</strong> Competition is active or registration has been paused by the admin.
+                  <strong>Registration is closed.</strong> {eventStatus === 'EVENT_ENDED' ? 'The competition has concluded.' : 'Please wait for the administrator to start the event.'}
                 </div>
               </div>
             )}

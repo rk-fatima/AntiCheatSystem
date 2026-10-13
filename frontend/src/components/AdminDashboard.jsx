@@ -80,7 +80,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const [notification, setNotification] = useState(null);
 
   // Event controls & registrations
-  const [eventState, setEventState] = useState({ status: 'REGISTRATION_OPEN', startedAt: null });
+  const [eventState, setEventState] = useState({ status: 'REGISTRATION_CLOSED', startedAt: null });
   const [registrations, setRegistrations] = useState([]);
   const [regFilter, setRegFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
   const [regSearch, setRegSearch] = useState('');
@@ -171,13 +171,11 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       if (data.scoringConfig) setScoringConfig(data.scoringConfig);
       if (data.complexityReviews) setComplexityReviews(data.complexityReviews);
 
-      // Default to first active team or first permanent team
+      // Select only from active participating teams in current live event
       setSelectedTeamName(prev => {
+        if (loadedTeams.length === 0) return '';
         if (prev && loadedTeams.some(t => t.name === prev)) return prev;
-        if (loadedTeams.length > 0) return loadedTeams[0]?.name || '';
-        const all = data.allTeams || [];
-        if (prev && all.some(t => t.name === prev)) return prev;
-        return all[0]?.name || '';
+        return loadedTeams[0]?.name || '';
       });
     } catch (err) {
       console.error('Failed to load admin data:', err);
@@ -343,7 +341,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       actionType: 'START_EVENT',
       targetStatus: 'EVENT_LIVE',
       title: 'Are you sure you want to start the event?',
-      description: 'Public registration will close automatically. The competition will become live, bidding will be enabled, and registered teams can log in to participate.',
+      description: 'Starting the event will open public team registration, create a fresh competition session with an empty leaderboard, and enable bidding.',
       confirmText: 'Start Event',
       confirmColor: '#2ea043'
     });
@@ -354,7 +352,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       actionType: 'END_EVENT',
       targetStatus: 'EVENT_ENDED',
       title: 'End Event & Conclude Competition?',
-      description: 'Are you sure you want to end the current event? Active bidding and problem unlocking will be halted. The final leaderboard, team scores, ByteCoins balances, and auction history will be safely archived. All registered team accounts and credentials will be preserved for the next event, and public registration will remain closed until a new event is started.',
+      description: 'Are you sure you want to end the current event? Public registration and active bidding will close automatically. The final leaderboard and results will be archived into past event records, and the current dashboard will be cleared for the next event.',
       confirmText: 'End Event',
       confirmColor: '#da3633'
     });
@@ -367,14 +365,22 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       if (eventConfirmModal.targetStatus === 'EVENT_ENDED' || eventConfirmModal.actionType === 'END_EVENT') {
         const result = await endEventSession();
         setEventState(result.eventState || { status: 'EVENT_ENDED' });
-        showToast('🏁 Event concluded! Final leaderboard and results archived safely.', true);
+        setTeams([]);
+        setRegistrations([]);
+        setUnlockHistory([]);
+        setSelectedTeamName('');
+        showToast('🏁 Event concluded! Registration closed, active leaderboard cleared, and final results archived safely.', true);
       } else if (eventConfirmModal.targetStatus === 'EVENT_LIVE' || eventConfirmModal.actionType === 'START_EVENT') {
         const result = await startEventSession({
           participatingTeams: [],
           eventName: 'QUBIT Code Auctioneer'
         });
         setEventState(result.eventState || { status: 'EVENT_LIVE' });
-        showToast('🚀 Event is now live! Competition activated and bidding enabled.', true);
+        setTeams([]);
+        setRegistrations([]);
+        setUnlockHistory([]);
+        setSelectedTeamName('');
+        showToast('🚀 Event is now live! Team registration is open and bidding is enabled.', true);
       } else {
         const updated = await updateEventStatus(eventConfirmModal.targetStatus);
         setEventState(updated);
@@ -840,15 +846,15 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     ? 'EVENT ENDED'
                     : eventState.status === 'EVENT_LIVE'
                     ? 'EVENT LIVE'
-                    : 'REGISTRATION OPEN'}
+                    : 'REGISTRATION CLOSED'}
                 </span>
               </div>
               <div style={{ fontSize: '13px', color: '#c9d1d9' }}>
                 {eventState.status === 'EVENT_ENDED'
-                  ? 'The competition has ended. Results and leaderboard are available.'
+                  ? 'The competition has ended. Registration is closed and current dashboard is cleared.'
                   : eventState.status === 'EVENT_LIVE'
-                  ? 'The competition is live. Teams can participate in the auction.'
-                  : 'Public registration is open. Teams can register.'}
+                  ? 'The competition is live. Public registration and bidding are open.'
+                  : 'Registration is closed. Click Start Event to open registration and start the competition.'}
               </div>
             </div>
           </div>

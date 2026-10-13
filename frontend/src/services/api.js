@@ -5,86 +5,40 @@ const API_BASE = import.meta.env.VITE_API_URL
   : '/api';
 
 // --- Client-side Fallback Store for Static Hosting (e.g. GitHub Pages) ---
-const LOCAL_STORAGE_KEY = 'qubit_client_store_v3';
+const LOCAL_STORAGE_KEY = 'qubit_client_store_v5';
 
 function getFallbackStore() {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.eventState) {
+        parsed.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null, participatingTeams: [] };
+      }
+      if (!parsed.teams || Array.isArray(parsed.teams)) parsed.teams = {};
+      if (!parsed.registrations || Array.isArray(parsed.registrations)) parsed.registrations = {};
+      if (!Array.isArray(parsed.archivedEvents)) parsed.archivedEvents = [];
+      if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
+      if (!Array.isArray(parsed.unlockHistory)) parsed.unlockHistory = [];
+      return parsed;
+    }
   } catch (e) {}
 
   const initialStore = {
-    teams: {
-      "SYNORA": {
-        name: "Synora",
-        size: 2,
-        members: [
-          { memberId: "SYNORA-001-M01", name: "Mohammed Salman", isCaptain: true },
-          { memberId: "SYNORA-001-M02", name: "Sreethan", isCaptain: false }
-        ],
-        balance: 730,
-        unlocked: ["E1", "E2"],
-        unlockedCards: [],
-        solved: ["E1", "E2"],
-        problemStatuses: {
-          "E1": { status: "SOLVED", solvedBy: "SYNORA-001-M01", solvedByName: "Salman" },
-          "E2": { status: "SOLVED", solvedBy: "SYNORA-001-M01", solvedByName: "Salman" }
-        },
-        hintPassesCount: 2,
-        sabotageCardsCount: 0,
-        revealedHints: {
-          "E1": { hint: "Use a Hash Map to store seen elements and their indices in O(N) time.", revealedByName: "Salman" }
-        },
-        violations: [],
-        isLocked: false,
-        lockReason: "",
-        score: 370,
-        problemWrong: { "E1": 2, "E2": 1 },
-        transactions: [
-          {
-            id: "TXN-1",
-            problemId: "E1",
-            problemTitle: "Two Sum",
-            bidAmount: 150,
-            purchasedBy: "SYNORA-001-M01",
-            purchasedByName: "Salman",
-            remainingBalance: 850,
-            displayTime: "Just now"
-          },
-          {
-            id: "TXN-2",
-            problemId: "E2",
-            problemTitle: "Palindrome Number",
-            bidAmount: 120,
-            purchasedBy: "SYNORA-001-M01",
-            purchasedByName: "Salman",
-            remainingBalance: 730,
-            displayTime: "Just now"
-          }
-        ]
-      },
-      "VISIONX": {
-        name: "VisionX",
-        size: 1,
-        members: [
-          { memberId: "VISIONX-001-M01", name: "Rukhsaar", isCaptain: true }
-        ],
-        balance: 1000,
-        unlocked: [],
-        unlockedCards: [],
-        solved: [],
-        problemStatuses: {},
-        hintPassesCount: 0,
-        sabotageCardsCount: 0,
-        revealedHints: {},
-        violations: [],
-        isLocked: false,
-        lockReason: "",
-        score: 0,
-        problemWrong: {},
-        transactions: []
-      }
-    }
+    eventState: {
+      status: 'REGISTRATION_CLOSED',
+      startedAt: null,
+      endedAt: null,
+      currentEventId: null,
+      currentEventName: 'QUBIT Code Auctioneer',
+      participatingTeams: []
+    },
+    currentEvent: null,
+    archivedEvents: [],
+    registrations: {},
+    transactions: [],
+    unlockHistory: [],
+    teams: {}
   };
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialStore));
@@ -126,7 +80,10 @@ export async function fetchTeamsList() {
   } catch (e) {}
 
   const store = getFallbackStore();
-  return { teams: Object.values(store.teams) };
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    return { teams: [] };
+  }
+  return { teams: Object.values(store.teams || {}) };
 }
 
 export async function registerTeam({ name, size, captainIdx, members }) {
@@ -675,7 +632,10 @@ export async function fetchLeaderboard() {
   } catch (e) {}
 
   const store = getFallbackStore();
-  const list = Object.values(store.teams).map(t => ({
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    return { leaderboard: [] };
+  }
+  const list = Object.values(store.teams || {}).map(t => ({
     name: t.name,
     score: t.score || 0,
     solvedCount: (t.solved || []).length,
@@ -693,7 +653,10 @@ export async function fetchProctorTeams() {
   } catch (e) {}
 
   const store = getFallbackStore();
-  return { teams: Object.values(store.teams) };
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    return { teams: [] };
+  }
+  return { teams: Object.values(store.teams || {}) };
 }
 
 export async function proctorUnlockTeam(teamName, pin) {
@@ -1268,12 +1231,12 @@ export async function fetchEventStatus() {
     const res = await fetch(`${API_BASE}/event/status`);
     if (res.ok) {
       const data = await res.json();
-      return data.eventState || { status: 'REGISTRATION_OPEN', startedAt: null };
+      return data.eventState || { status: 'REGISTRATION_CLOSED', startedAt: null };
     }
   } catch (e) {}
 
   const store = getFallbackStore();
-  return store.eventState || { status: 'REGISTRATION_OPEN', startedAt: null };
+  return store.eventState || { status: 'REGISTRATION_CLOSED', startedAt: null };
 }
 
 export async function updateEventStatus(status) {
@@ -1293,23 +1256,23 @@ export async function updateEventStatus(status) {
     if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
-  const store = getFallbackStore();
-  if (!store.eventState) store.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
-  store.eventState.status = status;
-  if (status === 'EVENT_LIVE') {
-    if (!store.eventState.startedAt) {
-      store.eventState.startedAt = new Date().toISOString();
-    }
-    store.eventState.endedAt = null;
-  }
   if (status === 'EVENT_ENDED') {
-    store.eventState.endedAt = new Date().toISOString();
+    const res = await endEventSession();
+    return res.eventState;
   }
+  if (status === 'EVENT_LIVE') {
+    const res = await startEventSession({});
+    return res.eventState;
+  }
+
+  const store = getFallbackStore();
+  if (!store.eventState) store.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
+  store.eventState.status = status;
   saveFallbackStore(store);
   return store.eventState;
 }
 
-export async function startEventSession({ participatingTeams, eventName }) {
+export async function startEventSession({ participatingTeams = [], eventName = '' } = {}) {
   try {
     const res = await fetch(`${API_BASE}/admin/event/start`, {
       method: 'POST',
@@ -1325,24 +1288,46 @@ export async function startEventSession({ participatingTeams, eventName }) {
     if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
-  // Fallback
+  // Fallback: Start a clean new event session
   const store = getFallbackStore();
-  if (!store.eventState) store.eventState = {};
-  store.eventState.status = 'EVENT_LIVE';
-  store.eventState.startedAt = new Date().toISOString();
-  store.eventState.endedAt = null;
-  store.eventState.participatingTeams = participatingTeams;
-  Object.values(store.teams || {}).forEach(t => {
-    if ((participatingTeams || []).includes(t.name)) {
-      t.balance = 1000;
-      t.score = 0;
-      t.solved = [];
-      t.wrong = 0;
-      t.unlocked = [];
-    }
-  });
+  if (!Array.isArray(store.archivedEvents)) store.archivedEvents = [];
+  const sessionNum = store.archivedEvents.length + 1;
+  const sessionId = `EVT-${Date.now().toString(36).toUpperCase()}`;
+  const sessionTitle = (eventName || '').trim() || `QUBIT Code Auctioneer #${sessionNum}`;
+  const startedAt = new Date().toISOString();
+
+  // Clear previous event's active team list, registrations, and session logs
+  store.transactions = [];
+  store.unlockHistory = [];
+  store.registrations = {};
+  store.teams = {};
+
+  store.currentEvent = {
+    id: sessionId,
+    name: sessionTitle,
+    status: 'EVENT_LIVE',
+    startedAt,
+    endedAt: null,
+    participatingTeams: [],
+    teamParticipationRecords: {}
+  };
+
+  store.eventState = {
+    status: 'EVENT_LIVE',
+    startedAt,
+    endedAt: null,
+    currentEventId: sessionId,
+    currentEventName: sessionTitle,
+    participatingTeams: []
+  };
+
   saveFallbackStore(store);
-  return { success: true, eventState: store.eventState };
+  return {
+    success: true,
+    eventState: store.eventState,
+    currentEvent: store.currentEvent,
+    participatingTeams: []
+  };
 }
 
 export async function endEventSession() {
@@ -1360,13 +1345,93 @@ export async function endEventSession() {
     if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
-  // Fallback
+  // Fallback: Archive current event data and completely clear active dashboard state
   const store = getFallbackStore();
-  if (!store.eventState) store.eventState = {};
-  store.eventState.status = 'EVENT_ENDED';
-  store.eventState.endedAt = new Date().toISOString();
+  if (!Array.isArray(store.archivedEvents)) store.archivedEvents = [];
+  const endedAt = new Date().toISOString();
+  const current = store.currentEvent || {
+    id: `EVT-${Date.now().toString(36).toUpperCase()}`,
+    name: `QUBIT Code Auctioneer #${store.archivedEvents.length + 1}`,
+    startedAt: store.eventState?.startedAt || endedAt,
+    participatingTeams: Object.keys(store.teams || {})
+  };
+
+  const activeTeamsList = Object.values(store.teams || {});
+  const finalLeaderboard = activeTeamsList
+    .map(t => ({
+      name: t.name,
+      captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
+      size: t.size || (t.members || []).length || 1,
+      score: t.score || 0,
+      solvedCount: (t.solved || []).length,
+      solved: [...(t.solved || [])],
+      balance: t.balance ?? 1000,
+      wrongAttempts: t.wrong || 0,
+      hintsUsed: Object.keys(t.revealedHints || {}).length,
+      sabotagesCount: t.sabotageCardsCount || 0,
+      violationsCount: (t.violations || []).length
+    }))
+    .sort((a, b) => b.score - a.score || b.balance - a.balance)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+  const teamSnapshots = {};
+  activeTeamsList.forEach(t => {
+    teamSnapshots[t.name] = {
+      score: t.score || 0,
+      balance: t.balance ?? 1000,
+      solved: [...(t.solved || [])],
+      unlocked: [...(t.unlocked || [])],
+      wrong: t.wrong || 0,
+      problemStatuses: { ...(t.problemStatuses || {}) }
+    };
+  });
+
+  const archiveRecord = {
+    id: current.id || `EVT-${Date.now().toString(36).toUpperCase()}`,
+    name: current.name || `QUBIT Code Auctioneer #${store.archivedEvents.length + 1}`,
+    startedAt: current.startedAt || store.eventState?.startedAt || endedAt,
+    endedAt,
+    participatingTeams: activeTeamsList.map(t => t.name),
+    finalLeaderboard,
+    teamSnapshots,
+    registrationsArchive: Object.values(store.registrations || {}),
+    transactions: [...(store.transactions || [])],
+    unlockHistory: [...(store.unlockHistory || [])]
+  };
+
+  store.archivedEvents.push(archiveRecord);
+
+  // Clear previous event's teams, registrations, transactions, and unlock history for fresh next event
+  store.teams = {};
+  store.registrations = {};
+  store.transactions = [];
+  store.unlockHistory = [];
+
+  store.currentEvent = {
+    id: null,
+    name: null,
+    status: 'EVENT_ENDED',
+    startedAt: null,
+    endedAt,
+    participatingTeams: [],
+    teamParticipationRecords: {}
+  };
+
+  store.eventState = {
+    status: 'EVENT_ENDED',
+    startedAt: null,
+    endedAt,
+    currentEventId: null,
+    currentEventName: null,
+    participatingTeams: []
+  };
+
   saveFallbackStore(store);
-  return { success: true, eventState: store.eventState };
+  return {
+    success: true,
+    eventState: store.eventState,
+    archiveRecord
+  };
 }
 
 export async function fetchArchivedEvents() {
@@ -1378,10 +1443,9 @@ export async function fetchArchivedEvents() {
       const data = await res.json();
       return data.archives || [];
     }
-  } catch (e) {
-    console.error('Failed to fetch archived events:', e);
-  }
-  return [];
+  } catch (e) {}
+  const store = getFallbackStore();
+  return store.archivedEvents || [];
 }
 
 export async function batchAcceptRegistrations(registrationIds) {
@@ -1417,8 +1481,17 @@ export async function submitTeamRegistration(formData) {
   }
 
   const store = getFallbackStore();
+  const status = store.eventState?.status || 'REGISTRATION_CLOSED';
+  if (status !== 'EVENT_LIVE' && status !== 'REGISTRATION_OPEN') {
+    if (status === 'EVENT_ENDED') {
+      throw new Error('Registration is closed. The competition has concluded.');
+    }
+    throw new Error('Registration is currently closed. Please wait for the administrator to start the event.');
+  }
+
   const normalized = (formData.teamName || '').trim().toUpperCase();
   if (!store.registrations) store.registrations = {};
+  if (!store.teams) store.teams = {};
   if (store.teams[normalized]) {
     throw new Error(`Team "${formData.teamName}" is already registered and approved.`);
   }
@@ -1439,6 +1512,7 @@ export async function submitTeamRegistration(formData) {
   const regId = `REG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   const reg = {
     id: regId,
+    eventId: store.currentEvent?.id || store.eventState?.currentEventId || null,
     teamName: formData.teamName,
     leaderName: formData.leaderName,
     leaderContact: formData.leaderContact || '',
@@ -1466,6 +1540,9 @@ export async function fetchAdminRegistrations() {
   } catch (e) {}
 
   const store = getFallbackStore();
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    return [];
+  }
   return Object.values(store.registrations || {}).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
@@ -1498,6 +1575,8 @@ export async function approveTeamRegistration(regId) {
     college: m.college || ''
   }));
 
+  const currentEventId = store.currentEvent?.id || store.eventState?.currentEventId || `EVT-${Date.now().toString(36).toUpperCase()}`;
+
   const newTeam = {
     id: reg.teamName,
     name: reg.teamName,
@@ -1506,6 +1585,7 @@ export async function approveTeamRegistration(regId) {
     captainName: members[0].name,
     members,
     password: reg.password,
+    currentEventId,
     balance: 1000,
     unlocked: [],
     unlockedCards: [],
@@ -1523,10 +1603,29 @@ export async function approveTeamRegistration(regId) {
     createdAt: new Date().toISOString()
   };
 
+  if (!store.teams) store.teams = {};
   store.teams[norm] = newTeam;
   reg.status = 'APPROVED';
   reg.approvedAt = new Date().toISOString();
   reg.assignedMembers = members;
+
+  if (store.currentEvent) {
+    if (!Array.isArray(store.currentEvent.participatingTeams)) {
+      store.currentEvent.participatingTeams = [];
+    }
+    if (!store.currentEvent.participatingTeams.includes(newTeam.name)) {
+      store.currentEvent.participatingTeams.push(newTeam.name);
+    }
+  }
+  if (store.eventState) {
+    if (!Array.isArray(store.eventState.participatingTeams)) {
+      store.eventState.participatingTeams = [];
+    }
+    if (!store.eventState.participatingTeams.includes(newTeam.name)) {
+      store.eventState.participatingTeams.push(newTeam.name);
+    }
+  }
+
   saveFallbackStore(store);
   return { success: true, team: newTeam, registration: reg };
 }
@@ -1563,14 +1662,21 @@ export async function fetchAdminOverview() {
   } catch (e) {}
 
   const store = getFallbackStore();
+  const isLive = store.eventState?.status === 'EVENT_LIVE';
+  const activeTeams = isLive ? Object.values(store.teams || {}) : [];
+  const activeRegistrations = isLive ? Object.values(store.registrations || {}) : [];
+
   return {
-    teams: Object.values(store.teams),
+    teams: activeTeams,
+    allTeams: activeTeams,
+    archivedEvents: store.archivedEvents || [],
     problems: fallbackProblemsData.problems || [],
-    transactions: store.transactions || [],
-    unlockHistory: store.unlockHistory || [],
+    transactions: isLive ? (store.transactions || []) : [],
+    unlockHistory: isLive ? (store.unlockHistory || []) : [],
     submissions: [],
-    eventState: store.eventState || { status: 'REGISTRATION_OPEN', startedAt: null },
-    registrations: Object.values(store.registrations || {}),
+    eventState: store.eventState || { status: 'REGISTRATION_CLOSED', startedAt: null, participatingTeams: [] },
+    currentEvent: store.currentEvent || null,
+    registrations: activeRegistrations,
     scoringConfig: store.scoringConfig || null,
     complexityReviews: []
   };

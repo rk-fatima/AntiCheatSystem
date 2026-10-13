@@ -17,21 +17,27 @@ import {
 import { fetchEventStatus } from '../services/api';
 
 export function LandingPage({ onNavigateAdmin, onNavigateTeam, onNavigateRegister }) {
-  const [eventStatus, setEventStatus] = useState('REGISTRATION_OPEN');
+  const [eventStatus, setEventStatus] = useState('REGISTRATION_CLOSED');
 
   useEffect(() => {
+    let active = true;
     async function loadStatus() {
       try {
         const state = await fetchEventStatus();
-        setEventStatus(state?.status || 'REGISTRATION_OPEN');
+        if (active) setEventStatus(state?.status || 'REGISTRATION_CLOSED');
       } catch (e) {
-        setEventStatus('REGISTRATION_OPEN');
+        if (active) setEventStatus('REGISTRATION_CLOSED');
       }
     }
     loadStatus();
+    const interval = setInterval(loadStatus, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  const isRegistrationClosed = eventStatus === 'REGISTRATION_CLOSED' || eventStatus === 'EVENT_LIVE' || eventStatus === 'EVENT_ENDED';
+  const isRegistrationClosed = eventStatus !== 'EVENT_LIVE' && eventStatus !== 'REGISTRATION_OPEN';
 
   return (
     <div style={{

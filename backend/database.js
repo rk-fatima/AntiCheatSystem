@@ -52,7 +52,7 @@ class Database {
       teams: {},         // Clean start: populated ONLY via actual registration & admin approval
       registrations: {}, // Self-registrations submitted by teams
       eventState: {
-        status: 'REGISTRATION_OPEN', // 'REGISTRATION_OPEN' | 'REGISTRATION_CLOSED' | 'EVENT_LIVE' | 'EVENT_ENDED'
+        status: 'REGISTRATION_CLOSED', // 'REGISTRATION_CLOSED' | 'EVENT_LIVE' | 'EVENT_ENDED'
         startedAt: null,
         endedAt: null
       },
@@ -101,7 +101,7 @@ class Database {
           teams: parsed.teams || {},
           registrations: parsed.registrations || {},
           eventState: parsed.eventState || {
-            status: 'REGISTRATION_OPEN',
+            status: 'REGISTRATION_CLOSED',
             startedAt: null
           },
           archivedEvents: parsed.archivedEvents || [],
@@ -516,7 +516,7 @@ class Database {
   // --- EVENT STATUS & SESSION CONTROLS ---
   getEventState() {
     if (!this.state.eventState) {
-      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
+      this.state.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
     }
     const current = this.state.currentEvent;
     return {
@@ -542,7 +542,7 @@ class Database {
     }
 
     if (!this.state.eventState) {
-      this.state.eventState = { status: 'REGISTRATION_OPEN', startedAt: null, endedAt: null };
+      this.state.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
     }
     this.state.eventState.status = status;
     this.save();
@@ -638,10 +638,11 @@ class Database {
     const sessionTitle = (eventName || '').trim() || `QUBIT Code Auctioneer #${sessionNum}`;
     const sessionId = `EVT-${Date.now().toString(36).toUpperCase()}`;
 
-    // Clear active session logs for this fresh competition
+    // Clear active session logs and registrations for this fresh competition
     this.state.transactions = [];
     this.state.unlockHistory = [];
     this.state.submissions = [];
+    this.state.registrations = {};
 
     // Reset event-specific participation, scores, and bidding data for pre-specified teams (if any)
     const teamParticipationRecords = {};
@@ -763,6 +764,10 @@ class Database {
       participatingTeams: [...participatingNames],
       finalLeaderboard,
       teamSnapshots,
+      registrationsArchive: Object.values(this.state.registrations || {}).map(r => {
+        const { passwordHash: _, ...safe } = r;
+        return safe;
+      }),
       transactions: [...(this.state.transactions || [])],
       unlockHistory: [...(this.state.unlockHistory || [])]
     };
@@ -772,11 +777,12 @@ class Database {
     }
     this.state.archivedEvents.push(archiveRecord);
 
-    // Clear active session transactions, unlock history, and submissions
+    // Clear active session transactions, unlock history, submissions, and previous event registrations
     // (all are safely preserved in archiveRecord!)
     this.state.transactions = [];
     this.state.unlockHistory = [];
     this.state.submissions = [];
+    this.state.registrations = {};
 
     // Reset each team's session data while preserving their permanent account
     for (const team of Object.values(this.state.teams)) {
@@ -900,16 +906,14 @@ class Database {
     return results;
   }
 
-  // --- SELF-REGISTRATION (STATUS: PENDING) ---
+  // --- SELF-REGISTRATION ---
   submitRegistration({ teamName, leaderName, leaderContact, leaderEmail, password, memberCount, members }) {
     const eventState = this.getEventState();
-    if (eventState.status !== 'REGISTRATION_OPEN') {
-      if (eventState.status === 'EVENT_LIVE') {
-        throw new Error('Public registration is closed. The competition is currently live.');
-      } else if (eventState.status === 'EVENT_ENDED') {
-        throw new Error('Public registration is closed. The competition has concluded.');
+    if (eventState.status !== 'EVENT_LIVE' && eventState.status !== 'REGISTRATION_OPEN') {
+      if (eventState.status === 'EVENT_ENDED') {
+        throw new Error('Registration is closed. The competition has concluded.');
       }
-      throw new Error('Public registration is currently closed. Contact event organizers for late approval.');
+      throw new Error('Registration is currently closed. Please wait for the administrator to start the event.');
     }
 
     const normalizedName = (teamName || '').trim();
@@ -1100,6 +1104,12 @@ class Database {
     reg.status = 'APPROVED';
     reg.approvedAt = new Date().toISOString();
     reg.assignedMembers = formattedMembers;
+
+    // If competition is currently live, automatically enroll the approved team into the active session
+    if (this.getEventState().status === 'EVENT_LIVE') {
+      this.ensureTeamJoinedCurrentEvent(newTeam.name);
+    }
+
     this.save();
 
     const { passwordHash: _, ...safeReg } = reg;

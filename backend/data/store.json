@@ -1614,162 +1614,13 @@
       "totalWrongPenalty": 0
     }
   },
-  "registrations": {
-    "REG-MV5FZMLV-CAPZ": {
-      "id": "REG-MV5FZMLV-CAPZ",
-      "teamName": "SYNORA",
-      "leaderName": "Mohd Salman",
-      "leaderContact": "+916302530236",
-      "leaderEmail": "mohammedsalman080405@gmail.com",
-      "passwordHash": "600fc0b7d3f7c0a4ba2b68aec0d45ff8:3ef04f94259ed162c6da02bad7117ed1de7e9ef91d0a92783a8cc0a7f024bc58f98d7493bee6b0bbc30acc855b684389dba9229fda1337d2849299e2874e19e4",
-      "memberCount": 1,
-      "members": [
-        {
-          "name": "Mohd Salman",
-          "rollNo": "24261A0537",
-          "email": "mohammedsalman080405@gmail.com",
-          "phone": "6302530236",
-          "college": "MGIT"
-        }
-      ],
-      "status": "APPROVED",
-      "rejectionReason": "",
-      "createdAt": "2026-10-12T16:04:09.947Z",
-      "approvedAt": "2026-10-12T16:05:31.969Z",
-      "assignedMembers": [
-        {
-          "memberId": "SYNORA-001-M01",
-          "name": "Mohd Salman",
-          "isCaptain": true,
-          "rollNo": "24261A0537",
-          "phone": "6302530236",
-          "email": "mohammedsalman080405@gmail.com",
-          "college": "MGIT"
-        }
-      ]
-    },
-    "REG-MV5JJSCP-TVF7": {
-      "id": "REG-MV5JJSCP-TVF7",
-      "teamName": "CyberKnights",
-      "leaderName": "Arjun Rao",
-      "leaderContact": "+91 9876543210",
-      "leaderEmail": "arjun@example.com",
-      "passwordHash": "a99e0455e44c21641b42f3d1394c13bc:b8602297e91a038c446826e10f13ebd4b3f831f17cd6d5e7cd313735a7c2883c01dc3eba9524164902a6e0794a408560262f528fd9b20be34abb9b424fccec03",
-      "memberCount": 2,
-      "members": [
-        {
-          "name": "Arjun Rao",
-          "rollNo": "",
-          "email": "arjun@example.com",
-          "phone": "+91 9876543210",
-          "college": ""
-        },
-        {
-          "name": "Dev Sharma",
-          "rollNo": "",
-          "email": "dev@example.com",
-          "phone": "+91 9876543211",
-          "college": ""
-        }
-      ],
-      "status": "APPROVED",
-      "rejectionReason": "",
-      "createdAt": "2026-10-12T17:43:49.348Z",
-      "approvedAt": "2026-10-12T17:43:58.790Z",
-      "assignedMembers": [
-        {
-          "memberId": "CYBERKNI-001-M01",
-          "name": "Arjun Rao",
-          "isCaptain": true,
-          "rollNo": "",
-          "phone": "+91 9876543210",
-          "email": "arjun@example.com",
-          "college": ""
-        },
-        {
-          "memberId": "CYBERKNI-001-M02",
-          "name": "Dev Sharma",
-          "isCaptain": false,
-          "rollNo": "",
-          "phone": "+91 9876543211",
-          "email": "dev@example.com",
-          "college": ""
-        }
-      ]
-    },
-    "REG-MV5KWZD8-QUKE": {
-      "id": "REG-MV5KWZD8-QUKE",
-      "teamName": "AlphaTeam",
-      "leaderName": "Alpha Leader",
-      "leaderContact": "+91 9876543210",
-      "leaderEmail": "alpha@test.com",
-      "passwordHash": "dc2f489c78f82f1091cb8d0fc274f305:08683ae5465f7b70fcabc74930852c5c7272597541f01495b3dd5aea76f1106e799366c858e75a7e746c2e8a305718b7a8bc79a4238f772641f36890614b794c",
-      "memberCount": 1,
-      "members": [
-        {
-          "name": "Alpha Leader",
-          "rollNo": "",
-          "email": "alpha@test.com",
-          "phone": "+91 9876543210",
-          "college": ""
-        }
-      ],
-      "status": "APPROVED",
-      "rejectionReason": "",
-      "createdAt": "2026-10-12T18:22:04.582Z",
-      "approvedAt": "2026-10-12T18:22:04.583Z",
-      "assignedMembers": [
-        {
-          "memberId": "ALPHATEA-001-M01",
-          "name": "Alpha Leader",
-          "isCaptain": true,
-          "rollNo": "",
-          "phone": "+91 9876543210",
-          "email": "alpha@test.com",
-          "college": ""
-        }
-      ]
-    },
-    "REG-MV5KWZDZ-4B83": {
-      "id": "REG-MV5KWZDZ-4B83",
-      "teamName": "BetaTeam",
-      "leaderName": "Beta Leader",
-      "leaderContact": "+91 9876543211",
-      "leaderEmail": "beta@test.com",
-      "passwordHash": "370be319e691acb3aec74b7e7ebbca02:8a8b66fa4018b0f0d974de795b6769c12544f81227f660dad68ac87c4983476063f62fa85236ee321618662b8d5664c62b2769be4e9a59740ee85f0a956c8578",
-      "memberCount": 1,
-      "members": [
-        {
-          "name": "Beta Leader",
-          "rollNo": "",
-          "email": "beta@test.com",
-          "phone": "+91 9876543211",
-          "college": ""
-        }
-      ],
-      "status": "APPROVED",
-      "rejectionReason": "",
-      "createdAt": "2026-10-12T18:22:04.605Z",
-      "approvedAt": "2026-10-12T18:22:04.606Z",
-      "assignedMembers": [
-        {
-          "memberId": "BETATEAM-001-M01",
-          "name": "Beta Leader",
-          "isCaptain": true,
-          "rollNo": "",
-          "phone": "+91 9876543211",
-          "email": "beta@test.com",
-          "college": ""
-        }
-      ]
-    }
-  },
+  "registrations": {},
   "eventState": {
-    "status": "EVENT_ENDED",
-    "startedAt": "2026-10-12T19:11:24.088Z",
-    "endedAt": "2026-10-12T19:11:29.003Z",
+    "status": "REGISTRATION_CLOSED",
+    "startedAt": null,
+    "endedAt": null,
     "currentEventId": null,
-    "currentEventName": null,
+    "currentEventName": "QUBIT Code Auctioneer",
     "participatingTeams": []
   },
   "archivedEvents": [
@@ -3366,15 +3217,7 @@
       "unlockHistory": []
     }
   ],
-  "currentEvent": {
-    "id": null,
-    "name": null,
-    "status": "EVENT_ENDED",
-    "startedAt": null,
-    "endedAt": "2026-10-12T19:11:29.003Z",
-    "participatingTeams": [],
-    "teamParticipationRecords": {}
-  },
+  "currentEvent": null,
   "transactions": [],
   "unlockHistory": [],
   "submissions": [],
