@@ -181,7 +181,12 @@ export function LeaderboardModal({ onClose }) {
                       {team.balance ?? 1000} BC
                     </td>
                     <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
-                      {team.score} pts
+                      <div>{team.score} pts</div>
+                      {Boolean(team.auctionBonusAwarded && team.bytecoinBonus > 0) && (
+                        <div style={{ fontSize: '10px', color: '#e3b341', fontWeight: 600 }}>
+                          (+{team.bytecoinBonus} BC bonus)
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

@@ -235,6 +235,29 @@ function applyCloudEvent(store, evt) {
     return true;
   }
 
+  if (evt.type === 'AUCTION_END') {
+    if (!store.eventState) store.eventState = {};
+    store.eventState.auctionStatus = 'AUCTION_ENDED';
+    store.eventState.auctionEnded = true;
+    store.eventState.isBiddingActive = false;
+    store.eventState.auctionEndedAt = evt.auctionEndedAt || new Date().toISOString();
+    if (store.currentEvent) {
+      store.currentEvent.auctionEnded = true;
+      store.currentEvent.auctionStatus = 'AUCTION_ENDED';
+    }
+    if (!store.teams) store.teams = {};
+    for (const team of Object.values(store.teams)) {
+      if (!team.auctionBonusAwarded) {
+        const bonus = Math.floor((team.balance ?? 1000) / 10);
+        team.score = (team.score || 0) + bonus;
+        team.bytecoinBonus = bonus;
+        team.auctionBonusAwarded = true;
+        team.auctionBonusAwardedAt = store.eventState.auctionEndedAt;
+      }
+    }
+    return true;
+  }
+
   if (evt.type === 'EVENT_STATUS') {
     if (!store.eventState) store.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
     store.eventState.status = evt.status;
@@ -617,6 +640,12 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
   }
 
   const store = getFallbackStore();
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    throw new Error('The event is not live. Problem bidding will activate once the competition starts.');
+  }
+  if (store.eventState?.auctionEnded || store.eventState?.isBiddingActive === false) {
+    throw new Error('The auction has ended. Problem bidding and purchasing are closed.');
+  }
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) {
@@ -1030,6 +1059,8 @@ export async function fetchLeaderboard() {
     captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
     size: t.size || (t.members || []).length || 1,
     score: t.score || 0,
+    bytecoinBonus: t.bytecoinBonus || 0,
+    auctionBonusAwarded: Boolean(t.auctionBonusAwarded),
     solvedCount: (t.solved || []).length,
     solved: [...(t.solved || [])],
     balance: t.balance ?? 1000,
@@ -1039,7 +1070,7 @@ export async function fetchLeaderboard() {
     isLocked: Boolean(t.isLocked),
     lockReason: t.lockReason || '',
     unlockRequested: Boolean(t.unlockRequested)
-  })).sort((a, b) => b.score - a.score);
+  })).sort((a, b) => b.score - a.score || b.balance - a.balance);
 
   return { leaderboard: list };
 }
@@ -1315,6 +1346,12 @@ export async function purchaseHintPass({ teamName, memberId, problemId }) {
   } catch (e) {}
 
   const store = getFallbackStore();
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    throw new Error('The event is not live. Hint Pass purchase will activate once the competition starts.');
+  }
+  if (store.eventState?.auctionEnded || store.eventState?.isBiddingActive === false) {
+    throw new Error('The auction has ended. Hint Pass purchasing is closed.');
+  }
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) throw new Error('Team not found.');
@@ -1375,6 +1412,12 @@ export async function purchaseSabotageCard({ teamName, memberId }) {
   } catch (e) {}
 
   const store = getFallbackStore();
+  if (store.eventState?.status !== 'EVENT_LIVE') {
+    throw new Error('The event is not live. Sabotage Card purchase will activate once the competition starts.');
+  }
+  if (store.eventState?.auctionEnded || store.eventState?.isBiddingActive === false) {
+    throw new Error('The auction has ended. Sabotage Card purchasing is closed.');
+  }
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) throw new Error('Team not found.');
@@ -1905,7 +1948,11 @@ export async function startEventSession({ participatingTeams = [], eventName = '
     startedAt,
     endedAt: null,
     participatingTeams: [],
-    teamParticipationRecords: {}
+    teamParticipationRecords: {},
+    auctionStatus: 'AUCTION_ACTIVE',
+    auctionEnded: false,
+    isBiddingActive: true,
+    auctionEndedAt: null
   };
 
   store.eventState = {
@@ -1914,7 +1961,11 @@ export async function startEventSession({ participatingTeams = [], eventName = '
     endedAt: null,
     currentEventId: sessionId,
     currentEventName: sessionTitle,
-    participatingTeams: []
+    participatingTeams: [],
+    auctionStatus: 'AUCTION_ACTIVE',
+    auctionEnded: false,
+    isBiddingActive: true,
+    auctionEndedAt: null
   };
 
   const evtId = recordLocalEvtId(store);
@@ -2023,7 +2074,11 @@ export async function endEventSession() {
     startedAt: null,
     endedAt,
     participatingTeams: [],
-    teamParticipationRecords: {}
+    teamParticipationRecords: {},
+    auctionStatus: 'AUCTION_ENDED',
+    auctionEnded: true,
+    isBiddingActive: false,
+    auctionEndedAt: store.eventState?.auctionEndedAt || endedAt
   };
 
   store.eventState = {
@@ -2032,7 +2087,11 @@ export async function endEventSession() {
     endedAt,
     currentEventId: null,
     currentEventName: null,
-    participatingTeams: []
+    participatingTeams: [],
+    auctionStatus: 'AUCTION_ENDED',
+    auctionEnded: true,
+    isBiddingActive: false,
+    auctionEndedAt: store.eventState?.auctionEndedAt || endedAt
   };
 
   const evtId = recordLocalEvtId(store);
@@ -2051,6 +2110,91 @@ export async function endEventSession() {
     success: true,
     eventState: store.eventState,
     archiveRecord
+  };
+}
+
+export async function endAuctionSession() {
+  let backendResult = null;
+  try {
+    const res = await backendFetch('/admin/auction/end', {
+      method: 'POST',
+      headers: getAdminHeaders()
+    });
+    if (res.ok) {
+      backendResult = await res.json();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to end auction session.');
+    }
+  } catch (e) {
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+  }
+
+  // Finalize auction status and award remaining ByteCoins / 10 bonus points in local & cloud store
+  await pullCloudEvents(true);
+  const store = getFallbackStore();
+  if (!store.eventState) store.eventState = {};
+
+  const endedAt = backendResult?.eventState?.auctionEndedAt || new Date().toISOString();
+  store.eventState.auctionStatus = 'AUCTION_ENDED';
+  store.eventState.auctionEnded = true;
+  store.eventState.isBiddingActive = false;
+  store.eventState.auctionEndedAt = endedAt;
+
+  if (store.currentEvent) {
+    store.currentEvent.auctionEnded = true;
+    store.currentEvent.auctionStatus = 'AUCTION_ENDED';
+    store.currentEvent.auctionEndedAt = endedAt;
+  }
+
+  const awardedBonuses = [];
+  if (!store.teams) store.teams = {};
+  for (const team of Object.values(store.teams)) {
+    if (!team.auctionBonusAwarded) {
+      const remBC = Number(team.balance ?? 1000);
+      const bonus = Math.floor(remBC / 10);
+      team.score = (Number(team.score) || 0) + bonus;
+      team.bytecoinBonus = bonus;
+      team.auctionBonusAwarded = true;
+      team.auctionBonusAwardedAt = endedAt;
+      awardedBonuses.push({
+        teamName: team.name,
+        remainingByteCoins: remBC,
+        bonus,
+        newScore: team.score
+      });
+    }
+  }
+
+  const evtId = recordLocalEvtId(store);
+  saveFallbackStore(store);
+  await publishCloudEvent({
+    evtId,
+    type: 'AUCTION_END',
+    eventState: store.eventState,
+    currentEvent: store.currentEvent,
+    auctionEndedAt: endedAt,
+    awardedBonuses
+  });
+
+  if (backendResult) return backendResult;
+
+  return {
+    success: true,
+    eventState: store.eventState,
+    awardedBonuses,
+    leaderboard: Object.values(store.teams)
+      .map(t => ({
+        name: t.name,
+        captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
+        score: t.score || 0,
+        bytecoinBonus: t.bytecoinBonus || 0,
+        auctionBonusAwarded: Boolean(t.auctionBonusAwarded),
+        balance: t.balance ?? 1000,
+        solvedCount: (t.solved || []).length
+      }))
+      .sort((a, b) => b.score - a.score || b.balance - a.balance)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }))
   };
 }
 

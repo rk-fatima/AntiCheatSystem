@@ -56,6 +56,7 @@ import {
   rejectTeamRegistration,
   startEventSession,
   endEventSession,
+  endAuctionSession,
   fetchArchivedEvents,
   fetchScoringConfig,
   updateScoringConfig,
@@ -412,11 +413,26 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     });
   };
 
+  const promptEndAuction = () => {
+    setEventConfirmModal({
+      actionType: 'END_AUCTION',
+      targetStatus: 'AUCTION_ENDED',
+      title: 'End Auction & Finalize ByteCoins?',
+      description: 'Are you sure you want to end the auction? All problem bidding and card purchases will be stopped immediately. Each team\'s remaining ByteCoins will be converted to bonus points (Bonus = Remaining ByteCoins ÷ 10) and added directly to their active leaderboard score. This action can only be performed once.',
+      confirmText: 'End Auction',
+      confirmColor: '#d29922'
+    });
+  };
+
   const handleConfirmEventAction = async () => {
     if (!eventConfirmModal) return;
     setEventActionLoading(true);
     try {
-      if (eventConfirmModal.targetStatus === 'EVENT_ENDED' || eventConfirmModal.actionType === 'END_EVENT') {
+      if (eventConfirmModal.actionType === 'END_AUCTION' || eventConfirmModal.targetStatus === 'AUCTION_ENDED') {
+        const result = await endAuctionSession();
+        setEventState(result.eventState || { ...eventState, auctionEnded: true, auctionStatus: 'AUCTION_ENDED' });
+        showToast('🏆 Auction finalized! Bidding stopped and ByteCoin bonus points (BC ÷ 10) awarded to all teams.', true);
+      } else if (eventConfirmModal.targetStatus === 'EVENT_ENDED' || eventConfirmModal.actionType === 'END_EVENT') {
         const result = await endEventSession();
         setEventState(result.eventState || { status: 'EVENT_ENDED' });
         setTeams([]);
@@ -913,32 +929,78 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             </div>
           </div>
 
-          {/* Action button: Start/End Event */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Action button: Start/End Event & End Auction */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {eventState.status === 'EVENT_LIVE' ? (
-              /* Event Live -> Red ■ End Event button */
-              <button
-                type="button"
-                onClick={promptEndEvent}
-                disabled={eventActionLoading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 18px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #cf222e 0%, #da3633 100%)',
-                  border: '1px solid rgba(218, 54, 51, 0.5)',
-                  borderRadius: '6px',
-                  color: '#ffffff',
-                  cursor: eventActionLoading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(207, 34, 46, 0.35)'
-                }}
-              >
-                <Square size={12} fill="#ffffff" />
-                <span>End Event</span>
-              </button>
+              <>
+                {/* End Auction Button */}
+                {eventState.auctionEnded ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      background: 'rgba(210, 153, 34, 0.15)',
+                      border: '1px solid rgba(210, 153, 34, 0.35)',
+                      borderRadius: '6px',
+                      color: '#e3b341'
+                    }}
+                  >
+                    <CheckCircle2 size={13} color="#e3b341" />
+                    <span>Auction Finalized</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={promptEndAuction}
+                    disabled={eventActionLoading}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 18px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      background: 'linear-gradient(135deg, #bb8009 0%, #d29922 100%)',
+                      border: '1px solid rgba(210, 153, 34, 0.5)',
+                      borderRadius: '6px',
+                      color: '#0d1117',
+                      cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 14px rgba(210, 153, 34, 0.35)'
+                    }}
+                  >
+                    <Coins size={13} color="#0d1117" />
+                    <span>End Auction</span>
+                  </button>
+                )}
+
+                {/* Event Live -> Red ■ End Event button */}
+                <button
+                  type="button"
+                  onClick={promptEndEvent}
+                  disabled={eventActionLoading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 18px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #cf222e 0%, #da3633 100%)',
+                    border: '1px solid rgba(218, 54, 51, 0.5)',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    cursor: eventActionLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(207, 34, 46, 0.35)'
+                  }}
+                >
+                  <Square size={12} fill="#ffffff" />
+                  <span>End Event</span>
+                </button>
+              </>
             ) : (
               /* Event Not Live (REGISTRATION_OPEN, EVENT_ENDED) -> Green ▶ Start Event button */
               <button
@@ -1302,7 +1364,12 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
                         {/* Score */}
                         <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#bc8cff', fontSize: '14px' }}>
-                          {team.score || 0} pts
+                          <div>{team.score || 0} pts</div>
+                          {Boolean(team.auctionBonusAwarded && team.bytecoinBonus > 0) && (
+                            <div style={{ fontSize: '11px', color: '#e3b341', fontWeight: 600 }}>
+                              (+{team.bytecoinBonus} BC bonus)
+                            </div>
+                          )}
                         </td>
 
                         {/* Solved */}

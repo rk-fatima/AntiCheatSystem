@@ -231,7 +231,10 @@ export async function exportLeaderboardToPNG({
               <td style="padding: 14px 16px; color: #c9d1d9;">${team.captainName || team.leaderName || 'Leader'}</td>
               <td style="padding: 14px 16px; text-align: center; color: #58a6ff; font-weight: 700;">${team.solvedCount ?? (team.solved || []).length ?? 0}</td>
               <td style="padding: 14px 16px; text-align: center; font-weight: 700; color: #3fb950; font-family: monospace;">${team.balance ?? 1000} BC</td>
-              <td style="padding: 14px 16px; text-align: right; font-weight: 800; color: #bc8cff; font-size: 16px; font-family: monospace;">${team.score || 0} pts</td>
+              <td style="padding: 14px 16px; text-align: right; font-weight: 800; color: #bc8cff; font-size: 16px; font-family: monospace;">
+                ${team.score || 0} pts
+                ${team.auctionBonusAwarded && team.bytecoinBonus > 0 ? `<div style="font-size: 11px; color: #e3b341; font-weight: 600;">(+${team.bytecoinBonus} BC)</div>` : ''}
+              </td>
             </tr>
           `;
         }).join('')}

@@ -892,6 +892,25 @@ app.post('/api/admin/event/end', requireAdminAuth, (req, res) => {
   }
 });
 
+// Dedicated End Auction Session: stops bidding & awards remaining ByteCoins bonus (BC / 10)
+app.post('/api/admin/auction/end', requireAdminAuth, (req, res) => {
+  try {
+    const result = db.endAuction();
+    broadcastToAll({
+      type: 'AUCTION_ENDED',
+      eventState: result.eventState
+    });
+    broadcastToAll({
+      type: 'EVENT_STATUS_CHANGED',
+      eventState: result.eventState
+    });
+    broadcastToAll({ type: 'LEADERBOARD_UPDATED', leaderboard: db.getActiveLeaderboard() });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Get Archived Event Sessions
 app.get('/api/admin/event/archives', requireAdminAuth, (req, res) => {
   res.json({ archives: db.getArchivedEvents() });
@@ -1190,6 +1209,116 @@ app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
   });
 });
 
+// --- CLOUD STATE SYNCHRONIZATION & CROSS-DEVICE BRIDGE ---
+const KV_APP_KEY = 'rkfatima2026';
+const KV_PTR_KEY = 'qubit_live_state_v7';
+const KV_STATUS_KEY = 'qubit_reg_status_v7';
+const CLOUD_SYNC_TOPIC_V6 = 'qubit_cloud_sync_rkfatima_v6';
+const CLOUD_SYNC_TOPIC_V7 = 'qubit_cloud_sync_rkfatima_v7';
+
+let lastCloudSyncBytebinKey = null;
+
+export async function syncServerStateToCloud() {
+  try {
+    const eventState = db.getEventState();
+    const status = eventState?.status || 'REGISTRATION_CLOSED';
+    const snapshot = {
+      updatedAt: Date.now(),
+      eventState,
+      currentEvent: db.state.currentEvent || null,
+      archivedEvents: db.getArchivedEvents(),
+      teams: db.state.teams || {},
+      registrations: db.state.registrations || {},
+      transactions: db.getAllTransactions(),
+      unlockHistory: db.getUnlockHistory()
+    };
+
+    let bbKey = lastCloudSyncBytebinKey || 'NONE';
+    try {
+      const bbRes = await fetch('https://bytebin.lucko.me/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshot)
+      });
+      if (bbRes.ok) {
+        const data = await bbRes.json();
+        if (data && data.key) {
+          bbKey = data.key;
+          lastCloudSyncBytebinKey = bbKey;
+        }
+      }
+    } catch (e) {}
+
+    const ptrValue = `${status}__${bbKey}__${snapshot.updatedAt}`;
+    await Promise.allSettled([
+      fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${KV_APP_KEY}/${KV_PTR_KEY}/${encodeURIComponent(ptrValue)}`, { method: 'POST', body: '' }),
+      fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${KV_APP_KEY}/${KV_STATUS_KEY}/${encodeURIComponent(status)}`, { method: 'POST', body: '' }),
+      fetch(`https://ntfy.sh/${CLOUD_SYNC_TOPIC_V7}`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'EVENT_STATUS', status, eventState, bbKey, updatedAt: snapshot.updatedAt })
+      })
+    ]);
+  } catch (err) {
+    console.error('Cloud sync error in backend:', err.message);
+  }
+}
+
+// Hook broadcastToAll to also trigger cloud state sync on major events
+const originalBroadcastToAll = broadcastToAll;
+broadcastToAll = function(payload) {
+  originalBroadcastToAll(payload);
+  if (['EVENT_STATUS_CHANGED', 'LEADERBOARD_UPDATED', 'TEAM_REGISTERED', 'RESET_ALL', 'AUCTION_ENDED'].includes(payload?.type)) {
+    syncServerStateToCloud().catch(() => {});
+  }
+};
+
+// Poll v6 topic for actions from unrefreshed client tabs and bridge them into the database
+const processedBridgeEvtIds = new Set();
+setInterval(async () => {
+  try {
+    const res = await fetch(`https://ntfy.sh/${CLOUD_SYNC_TOPIC_V6}/json?poll=1&since=1h`);
+    if (!res.ok) return;
+    const text = await res.text();
+    if (!text || !text.trim()) return;
+    for (const line of text.trim().split('\n')) {
+      if (!line.trim()) continue;
+      let wrapper;
+      try { wrapper = JSON.parse(line); } catch (e) { continue; }
+      if (!wrapper || wrapper.event !== 'message' || !wrapper.message) continue;
+      let evt;
+      try { evt = JSON.parse(wrapper.message); } catch (e) { continue; }
+      if (!evt || !evt.type || !evt.evtId || processedBridgeEvtIds.has(evt.evtId)) continue;
+      processedBridgeEvtIds.add(evt.evtId);
+
+      if (evt.type === 'EVENT_START') {
+        const currentStatus = db.getEventState().status;
+        if (currentStatus !== 'EVENT_LIVE') {
+          console.log('[Bridge] Applied EVENT_START from legacy v6 client:', evt.evtId);
+          db.startEventSession({
+            participatingTeams: evt.eventState?.participatingTeams || [],
+            eventName: evt.currentEvent?.name || 'QUBIT Code Auctioneer'
+          });
+          syncServerStateToCloud().catch(() => {});
+        }
+      } else if (evt.type === 'EVENT_END') {
+        const currentStatus = db.getEventState().status;
+        if (currentStatus !== 'EVENT_ENDED') {
+          console.log('[Bridge] Applied EVENT_END from legacy v6 client:', evt.evtId);
+          db.endEventSession();
+          syncServerStateToCloud().catch(() => {});
+        }
+      } else if (evt.type === 'AUCTION_END') {
+        const currentEventState = db.getEventState();
+        if (currentEventState.status === 'EVENT_LIVE' && !currentEventState.auctionEnded) {
+          console.log('[Bridge] Applied AUCTION_END from client:', evt.evtId);
+          db.endAuction();
+          syncServerStateToCloud().catch(() => {});
+        }
+      }
+    }
+  } catch (e) {}
+}, 3000);
+
 // SPA Fallback
 if (fs.existsSync(FRONTEND_DIST)) {
   app.get('*', (req, res) => {
@@ -1199,5 +1328,6 @@ if (fs.existsSync(FRONTEND_DIST)) {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Qubit AntiCheat Server running on http://0.0.0.0:${PORT}`);
+  syncServerStateToCloud().catch(() => {});
 });
 

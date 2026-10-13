@@ -1612,16 +1612,65 @@
       "rawScore": 200,
       "totalProblemScores": 200,
       "totalWrongPenalty": 0
+    },
+    "OmegaTesters": {
+      "name": "OmegaTesters",
+      "captainName": "Alpha",
+      "size": 2,
+      "score": 410,
+      "balance": 400,
+      "solved": [
+        "LC1"
+      ],
+      "unlocked": [
+        "LC1"
+      ],
+      "violations": [],
+      "transactions": [
+        {
+          "id": "TXN-AUC-BONUS-1791891625516-CW6P",
+          "type": "AUCTION_BONUS",
+          "teamName": "OmegaTesters",
+          "problemId": "AUCTION_FINALIZE",
+          "problemTitle": "Auction ByteCoin Conversion Bonus",
+          "cardType": "BONUS",
+          "bidPrice": 0,
+          "bidAmount": 0,
+          "price": 0,
+          "previousBalance": 400,
+          "remainingBalance": 400,
+          "bonusPoints": 40,
+          "previousScore": 370,
+          "newScore": 410,
+          "status": "AWARDED",
+          "timestamp": "2026-10-13T11:40:25.516Z",
+          "displayTime": "05:10 PM"
+        }
+      ],
+      "members": [
+        {
+          "name": "Alpha",
+          "memberId": "T01-M01"
+        }
+      ],
+      "bytecoinBonus": 40,
+      "auctionBonusAwarded": true,
+      "auctionBonusAwardedAt": "2026-10-13T11:40:25.516Z",
+      "lastScoreTime": 1791891625516
     }
   },
   "registrations": {},
   "eventState": {
-    "status": "REGISTRATION_CLOSED",
-    "startedAt": null,
+    "status": "EVENT_LIVE",
+    "startedAt": "2026-10-13T07:32:24.525Z",
     "endedAt": null,
-    "currentEventId": null,
+    "currentEventId": "EVT-MV6D5CUK",
     "currentEventName": "QUBIT Code Auctioneer",
-    "participatingTeams": []
+    "participatingTeams": [],
+    "auctionStatus": "AUCTION_ACTIVE",
+    "auctionEnded": false,
+    "isBiddingActive": true,
+    "auctionEndedAt": null
   },
   "archivedEvents": [
     {
@@ -3217,8 +3266,40 @@
       "unlockHistory": []
     }
   ],
-  "currentEvent": null,
-  "transactions": [],
+  "currentEvent": {
+    "id": "EVT-MV6D5CUK",
+    "name": "QUBIT Code Auctioneer",
+    "status": "EVENT_LIVE",
+    "startedAt": "2026-10-13T07:32:24.525Z",
+    "endedAt": null,
+    "participatingTeams": [],
+    "teamParticipationRecords": {},
+    "auctionEnded": false,
+    "auctionStatus": "AUCTION_ACTIVE",
+    "auctionEndedAt": null,
+    "isBiddingActive": true
+  },
+  "transactions": [
+    {
+      "id": "TXN-AUC-BONUS-1791891625516-CW6P",
+      "type": "AUCTION_BONUS",
+      "teamName": "OmegaTesters",
+      "problemId": "AUCTION_FINALIZE",
+      "problemTitle": "Auction ByteCoin Conversion Bonus",
+      "cardType": "BONUS",
+      "bidPrice": 0,
+      "bidAmount": 0,
+      "price": 0,
+      "previousBalance": 400,
+      "remainingBalance": 400,
+      "bonusPoints": 40,
+      "previousScore": 370,
+      "newScore": 410,
+      "status": "AWARDED",
+      "timestamp": "2026-10-13T11:40:25.516Z",
+      "displayTime": "05:10 PM"
+    }
+  ],
   "unlockHistory": [],
   "submissions": [],
   "telemetry": [

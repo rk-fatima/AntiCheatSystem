@@ -519,8 +519,13 @@ class Database {
       this.state.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
     }
     const current = this.state.currentEvent;
+    const isLive = this.state.eventState.status === 'EVENT_LIVE';
     return {
       ...this.state.eventState,
+      auctionStatus: this.state.eventState.auctionStatus || (isLive ? (this.state.eventState.auctionEnded ? 'AUCTION_ENDED' : 'AUCTION_ACTIVE') : 'AUCTION_ENDED'),
+      auctionEnded: Boolean(this.state.eventState.auctionEnded),
+      isBiddingActive: this.state.eventState.isBiddingActive !== undefined ? Boolean(this.state.eventState.isBiddingActive) : (isLive && !this.state.eventState.auctionEnded),
+      auctionEndedAt: this.state.eventState.auctionEndedAt || null,
       currentEventId: current?.id || null,
       currentEventName: current?.name || 'QUBIT Code Auctioneer',
       participatingTeams: current?.participatingTeams || []
@@ -696,6 +701,10 @@ class Database {
     this.state.eventState.currentEventId = sessionId;
     this.state.eventState.currentEventName = sessionTitle;
     this.state.eventState.participatingTeams = validatedTeamNames;
+    this.state.eventState.auctionStatus = 'AUCTION_ACTIVE';
+    this.state.eventState.auctionEnded = false;
+    this.state.eventState.isBiddingActive = true;
+    this.state.eventState.auctionEndedAt = null;
 
     this.save();
     return {
@@ -811,6 +820,9 @@ class Database {
     this.state.eventState.currentEventId = null;
     this.state.eventState.currentEventName = null;
     this.state.eventState.participatingTeams = [];
+    this.state.eventState.auctionStatus = 'AUCTION_ENDED';
+    this.state.eventState.auctionEnded = true;
+    this.state.eventState.isBiddingActive = false;
 
     this.state.currentEvent = {
       id: null,
@@ -826,6 +838,91 @@ class Database {
     return {
       eventState: this.getEventState(),
       archiveRecord
+    };
+  }
+
+  endAuction() {
+    const eventState = this.getEventState();
+    if (eventState.status !== 'EVENT_LIVE') {
+      throw new Error('Auction can only be ended while an event is live.');
+    }
+
+    if (this.state.eventState?.auctionEnded) {
+      throw new Error('Auction has already been finalized. Remaining ByteCoin bonus points cannot be awarded again.');
+    }
+
+    if (!this.state.eventState) this.state.eventState = {};
+    this.state.eventState.auctionStatus = 'AUCTION_ENDED';
+    this.state.eventState.auctionEnded = true;
+    this.state.eventState.isBiddingActive = false;
+    this.state.eventState.auctionEndedAt = new Date().toISOString();
+
+    if (this.state.currentEvent) {
+      this.state.currentEvent.auctionEnded = true;
+      this.state.currentEvent.auctionStatus = 'AUCTION_ENDED';
+      this.state.currentEvent.auctionEndedAt = this.state.eventState.auctionEndedAt;
+    }
+
+    const participatingNames = (this.state.currentEvent?.participatingTeams && this.state.currentEvent.participatingTeams.length > 0)
+      ? this.state.currentEvent.participatingTeams
+      : Object.keys(this.state.teams || {});
+
+    const awardedBonuses = [];
+
+    for (const name of participatingNames) {
+      const team = this.getTeam(name);
+      if (!team) continue;
+
+      if (team.auctionBonusAwarded) {
+        continue;
+      }
+
+      const remainingBC = team.balance ?? (this.state.config.initialTeamBalance || 1000);
+      const bonusPoints = Math.floor(remainingBC / 10);
+      const prevScore = team.score || 0;
+      const newScore = prevScore + bonusPoints;
+
+      team.score = newScore;
+      team.bytecoinBonus = bonusPoints;
+      team.auctionBonusAwarded = true;
+      team.auctionBonusAwardedAt = new Date().toISOString();
+      team.lastScoreTime = Date.now();
+
+      const txn = {
+        id: `TXN-AUC-BONUS-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        type: 'AUCTION_BONUS',
+        teamName: team.name,
+        problemId: 'AUCTION_FINALIZE',
+        problemTitle: 'Auction ByteCoin Conversion Bonus',
+        cardType: 'BONUS',
+        bidPrice: 0,
+        bidAmount: 0,
+        price: 0,
+        previousBalance: remainingBC,
+        remainingBalance: remainingBC,
+        bonusPoints,
+        previousScore: prevScore,
+        newScore,
+        status: 'AWARDED',
+        timestamp: new Date().toISOString(),
+        displayTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+      };
+
+      if (!team.transactions) team.transactions = [];
+      team.transactions.unshift(txn);
+      if (!this.state.transactions) this.state.transactions = [];
+      this.state.transactions.unshift(txn);
+
+      this.updateTeam(team);
+      awardedBonuses.push({ teamName: team.name, remainingBC, bonusPoints, prevScore, newScore });
+    }
+
+    this.save();
+    return {
+      success: true,
+      eventState: this.getEventState(),
+      awardedBonuses,
+      leaderboard: this.getActiveLeaderboard()
     };
   }
 
@@ -853,6 +950,8 @@ class Database {
         captainName: t.captainName || (t.members && t.members[0]?.name) || 'Leader',
         size: t.size || (t.members || []).length || 1,
         score: t.score || 0,
+        bytecoinBonus: t.bytecoinBonus || 0,
+        auctionBonusAwarded: Boolean(t.auctionBonusAwarded),
         solvedCount: (t.solved || []).length,
         solved: [...(t.solved || [])],
         balance: t.balance ?? (this.state.config.initialTeamBalance || 1000),
@@ -1290,6 +1389,9 @@ class Database {
       }
       throw new Error('The event is not live. Problem bidding will activate once the competition starts.');
     }
+    if (eventState.auctionEnded || eventState.isBiddingActive === false) {
+      throw new Error('The auction has ended. Problem bidding and purchasing are closed.');
+    }
 
     const team = this.getTeam(teamName);
     if (!team) {
@@ -1721,6 +1823,9 @@ class Database {
       }
       throw new Error('The event is not live. Hint Pass purchase will activate once the competition starts.');
     }
+    if (eventState.auctionEnded || eventState.isBiddingActive === false) {
+      throw new Error('The auction has ended. Hint Pass purchasing is closed.');
+    }
 
     const team = this.getTeam(teamName);
     if (!team) throw new Error('Team not found.');
@@ -1866,6 +1971,9 @@ class Database {
         throw new Error('The competition has concluded. Sabotage Card purchase is no longer active.');
       }
       throw new Error('The event is not live. Sabotage Card purchase will activate once the competition starts.');
+    }
+    if (eventState.auctionEnded || eventState.isBiddingActive === false) {
+      throw new Error('The auction has ended. Sabotage Card purchasing is closed.');
     }
 
     const team = this.getTeam(teamName);
