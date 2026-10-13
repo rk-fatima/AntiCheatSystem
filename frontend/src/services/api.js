@@ -4,8 +4,43 @@ const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api';
 
-// --- Client-side Fallback Store for Static Hosting (e.g. GitHub Pages) ---
-const LOCAL_STORAGE_KEY = 'qubit_client_store_v5';
+const IS_STATIC_HOST =
+  typeof window !== 'undefined' &&
+  !import.meta.env.VITE_API_URL &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1';
+
+async function backendFetch(path, options = {}) {
+  if (IS_STATIC_HOST) {
+    const err = new Error('Failed to fetch: static host');
+    err.isStaticFallback = true;
+    throw err;
+  }
+  const res = await fetch(`${API_BASE}${path}`, options);
+  const contentType = res.headers.get('content-type') || '';
+  if (res.status === 404 || res.status === 405 || res.status >= 502 || !contentType.includes('application/json')) {
+    const err = new Error('Failed to fetch: backend endpoint unavailable');
+    err.isStaticFallback = true;
+    throw err;
+  }
+  return res;
+}
+
+// --- Client-side & Cloud-Synced Store for Static Hosting (e.g. GitHub Pages) ---
+const LOCAL_STORAGE_KEY = 'qubit_client_store_v6';
+const CLOUD_SYNC_TOPIC = 'qubit_cloud_sync_rkfatima_v6';
+
+let syncBroadcastChannel = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    syncBroadcastChannel = new BroadcastChannel('qubit_live_sync_channel_v6');
+    syncBroadcastChannel.onmessage = () => {
+      try {
+        window.dispatchEvent(new Event('storage'));
+      } catch (e) {}
+    };
+  }
+} catch (e) {}
 
 function getFallbackStore() {
   try {
@@ -20,6 +55,7 @@ function getFallbackStore() {
       if (!Array.isArray(parsed.archivedEvents)) parsed.archivedEvents = [];
       if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
       if (!Array.isArray(parsed.unlockHistory)) parsed.unlockHistory = [];
+      if (!Array.isArray(parsed.appliedEventIds)) parsed.appliedEventIds = [];
       return parsed;
     }
   } catch (e) {}
@@ -38,6 +74,7 @@ function getFallbackStore() {
     registrations: {},
     transactions: [],
     unlockHistory: [],
+    appliedEventIds: [],
     teams: {}
   };
   try {
@@ -48,8 +85,214 @@ function getFallbackStore() {
 
 function saveFallbackStore(store) {
   try {
+    if (Array.isArray(store.appliedEventIds) && store.appliedEventIds.length > 500) {
+      store.appliedEventIds = store.appliedEventIds.slice(-500);
+    }
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(store));
+    if (syncBroadcastChannel) {
+      syncBroadcastChannel.postMessage({ updatedAt: Date.now() });
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
   } catch (e) {}
+}
+
+function recordLocalEvtId(store) {
+  const evtId = `EVT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  if (!Array.isArray(store.appliedEventIds)) store.appliedEventIds = [];
+  store.appliedEventIds.push(evtId);
+  return evtId;
+}
+
+async function publishCloudEvent(payload) {
+  if (!IS_STATIC_HOST) return;
+  try {
+    await fetch(`https://ntfy.sh/${CLOUD_SYNC_TOPIC}`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {}
+}
+
+function applyCloudEvent(store, evt) {
+  if (!evt || !evt.type || !evt.evtId) return false;
+  if (!Array.isArray(store.appliedEventIds)) store.appliedEventIds = [];
+  if (store.appliedEventIds.includes(evt.evtId)) return false;
+
+  store.appliedEventIds.push(evt.evtId);
+
+  if (evt.type === 'EVENT_START') {
+    store.transactions = [];
+    store.unlockHistory = [];
+    store.registrations = {};
+    store.teams = {};
+    store.currentEvent = evt.currentEvent || {
+      id: evt.eventState?.currentEventId || `EVT-${Date.now()}`,
+      name: evt.eventState?.currentEventName || 'QUBIT Code Auctioneer',
+      status: 'EVENT_LIVE',
+      startedAt: evt.eventState?.startedAt || new Date().toISOString(),
+      endedAt: null,
+      participatingTeams: [],
+      teamParticipationRecords: {}
+    };
+    store.eventState = evt.eventState || {
+      status: 'EVENT_LIVE',
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+      participatingTeams: []
+    };
+    return true;
+  }
+
+  if (evt.type === 'EVENT_END') {
+    if (!Array.isArray(store.archivedEvents)) store.archivedEvents = [];
+    if (evt.archiveRecord && !store.archivedEvents.some(a => a.id === evt.archiveRecord.id)) {
+      store.archivedEvents.push(evt.archiveRecord);
+    }
+    store.teams = {};
+    store.registrations = {};
+    store.transactions = [];
+    store.unlockHistory = [];
+    store.currentEvent = evt.currentEvent || {
+      id: null,
+      name: null,
+      status: 'EVENT_ENDED',
+      startedAt: null,
+      endedAt: evt.eventState?.endedAt || new Date().toISOString(),
+      participatingTeams: [],
+      teamParticipationRecords: {}
+    };
+    store.eventState = evt.eventState || {
+      status: 'EVENT_ENDED',
+      startedAt: null,
+      endedAt: new Date().toISOString(),
+      currentEventId: null,
+      currentEventName: null,
+      participatingTeams: []
+    };
+    return true;
+  }
+
+  if (evt.type === 'EVENT_STATUS') {
+    if (!store.eventState) store.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
+    store.eventState.status = evt.status;
+    return true;
+  }
+
+  if (evt.type === 'REG_SUBMIT' && evt.registration) {
+    if (!store.registrations) store.registrations = {};
+    store.registrations[evt.registration.id] = evt.registration;
+    return true;
+  }
+
+  if (evt.type === 'REG_APPROVE' && evt.team) {
+    if (!store.registrations) store.registrations = {};
+    if (evt.regId && store.registrations[evt.regId]) {
+      store.registrations[evt.regId].status = 'APPROVED';
+      store.registrations[evt.regId].approvedAt = evt.registration?.approvedAt || new Date().toISOString();
+      store.registrations[evt.regId].assignedMembers = evt.team.members;
+    } else if (evt.registration) {
+      store.registrations[evt.registration.id] = evt.registration;
+    }
+    if (!store.teams) store.teams = {};
+    const norm = (evt.team.name || '').trim().toUpperCase();
+    store.teams[norm] = evt.team;
+    if (store.currentEvent) {
+      if (!Array.isArray(store.currentEvent.participatingTeams)) store.currentEvent.participatingTeams = [];
+      if (!store.currentEvent.participatingTeams.includes(evt.team.name)) {
+        store.currentEvent.participatingTeams.push(evt.team.name);
+      }
+    }
+    if (store.eventState) {
+      if (!Array.isArray(store.eventState.participatingTeams)) store.eventState.participatingTeams = [];
+      if (!store.eventState.participatingTeams.includes(evt.team.name)) {
+        store.eventState.participatingTeams.push(evt.team.name);
+      }
+    }
+    return true;
+  }
+
+  if (evt.type === 'REG_REJECT' && evt.regId) {
+    if (store.registrations && store.registrations[evt.regId]) {
+      store.registrations[evt.regId].status = 'REJECTED';
+      store.registrations[evt.regId].rejectionReason = evt.reason || 'Declined by event administrator.';
+    }
+    return true;
+  }
+
+  if (evt.type === 'TEAM_UPDATE' && evt.team) {
+    if (!store.teams) store.teams = {};
+    const norm = (evt.team.name || evt.teamName || '').trim().toUpperCase();
+    if (norm) {
+      store.teams[norm] = { ...(store.teams[norm] || {}), ...evt.team };
+    }
+    if (evt.unlockRecord) {
+      if (!Array.isArray(store.unlockHistory)) store.unlockHistory = [];
+      if (!store.unlockHistory.some(u => u.id === evt.unlockRecord.id)) {
+        store.unlockHistory.unshift(evt.unlockRecord);
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+let lastCloudPullAt = 0;
+let activeCloudPull = null;
+
+async function pullCloudEvents(force = false) {
+  if (!IS_STATIC_HOST) return;
+  const now = Date.now();
+  if (!force && now - lastCloudPullAt < 1800) {
+    if (activeCloudPull) return activeCloudPull;
+    return;
+  }
+  if (activeCloudPull) return activeCloudPull;
+  lastCloudPullAt = now;
+
+  activeCloudPull = (async () => {
+    try {
+      const res = await fetch(`https://ntfy.sh/${CLOUD_SYNC_TOPIC}/json?poll=1&since=12h`);
+      if (!res.ok) return;
+      const text = await res.text();
+      if (!text || !text.trim()) return;
+      const lines = text.trim().split('\n');
+      const store = getFallbackStore();
+      let changed = false;
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let wrapper;
+        try {
+          wrapper = JSON.parse(line);
+        } catch (e) {
+          continue;
+        }
+        if (!wrapper || wrapper.event !== 'message' || !wrapper.message) continue;
+        let evt;
+        try {
+          evt = JSON.parse(wrapper.message);
+        } catch (e) {
+          continue;
+        }
+        if (applyCloudEvent(store, evt)) {
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        saveFallbackStore(store);
+      }
+    } catch (e) {
+      // Ignore transient network errors
+    } finally {
+      activeCloudPull = null;
+    }
+  })();
+
+  return activeCloudPull;
 }
 
 const PREDEFINED_HINTS = {
@@ -62,7 +305,7 @@ const PREDEFINED_HINTS = {
 
 export async function fetchProblems() {
   try {
-    const res = await fetch(`${API_BASE}/problems`);
+    const res = await backendFetch('/problems');
     if (res.ok) return await res.json();
   } catch (e) {}
 
@@ -75,10 +318,11 @@ export async function fetchProblems() {
 
 export async function fetchTeamsList() {
   try {
-    const res = await fetch(`${API_BASE}/teams`);
+    const res = await backendFetch('/teams');
     if (res.ok) return await res.json();
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   if (store.eventState?.status !== 'EVENT_LIVE') {
     return { teams: [] };
@@ -88,7 +332,7 @@ export async function fetchTeamsList() {
 
 export async function registerTeam({ name, size, captainIdx, members }) {
   try {
-    const res = await fetch(`${API_BASE}/team/register`, {
+    const res = await backendFetch('/team/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, size, captainIdx, members })
@@ -121,13 +365,15 @@ export async function registerTeam({ name, size, captainIdx, members }) {
     transactions: []
   };
   store.teams[normalized] = teamObj;
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: teamObj.name, team: teamObj });
   return { success: true, team: teamObj };
 }
 
 export async function verifyTeamCredentials({ teamName, password }) {
   try {
-    const res = await fetch(`${API_BASE}/auth/team-login`, {
+    const res = await backendFetch('/auth/team-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, password })
@@ -136,9 +382,10 @@ export async function verifyTeamCredentials({ teamName, password }) {
     if (res.ok) return data;
     throw new Error(data.error || 'Team verification failed.');
   } catch (err) {
-    if (err.message && !err.message.toLowerCase().includes('fetch')) throw err;
+    if (!err.isStaticFallback && err.message && !err.message.toLowerCase().includes('fetch')) throw err;
   }
 
+  await pullCloudEvents(true);
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
@@ -163,7 +410,7 @@ export async function verifyTeamCredentials({ teamName, password }) {
 
 export async function loginTeam({ teamName, memberId, password }) {
   try {
-    const res = await fetch(`${API_BASE}/auth/team-login`, {
+    const res = await backendFetch('/auth/team-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, password })
@@ -172,19 +419,23 @@ export async function loginTeam({ teamName, memberId, password }) {
     if (res.ok) return data;
     throw new Error(data.error || 'Login failed.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
+  await pullCloudEvents(true);
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) {
+    throw new Error(`Team "${teamName}" not found.`);
+  }
   const member = team.members.find(m => m.memberId === memberId) || team.members[0];
   return { success: true, team, member };
 }
 
 export async function getTeamStatus(teamName) {
   try {
-    const res = await fetch(`${API_BASE}/team/${encodeURIComponent(teamName)}`);
+    const res = await backendFetch(`/team/${encodeURIComponent(teamName)}`);
     if (res.ok) return await res.json();
     const errData = await res.json().catch(() => null);
     if (errData?.error) {
@@ -194,11 +445,12 @@ export async function getTeamStatus(teamName) {
       throw err;
     }
   } catch (e) {
-    if (e.isPending || e.isRejected || (e.message && !e.message.toLowerCase().includes('fetch'))) {
+    if (!e.isStaticFallback && (e.isPending || e.isRejected || (e.message && !e.message.toLowerCase().includes('fetch')))) {
       throw e;
     }
   }
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
@@ -224,7 +476,7 @@ export async function getTeamStatus(teamName) {
 
 export async function syncTeamsFromSheet(payload) {
   try {
-    const res = await fetch(`${API_BASE}/teams/sync`, {
+    const res = await backendFetch('/teams/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -236,7 +488,7 @@ export async function syncTeamsFromSheet(payload) {
 
 export async function purchaseProblem({ teamName, memberId, problemId, bidAmount, password }) {
   try {
-    const res = await fetch(`${API_BASE}/problems/purchase`, {
+    const res = await backendFetch('/problems/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, problemId, bidAmount, password })
@@ -245,7 +497,7 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
     const errData = await res.json().catch(() => ({}));
     if (errData.error) throw new Error(errData.error);
   } catch (e) {
-    if (e.message && e.message.includes('Incorrect password')) throw e;
+    if (!e.isStaticFallback && e.message && e.message.includes('Incorrect password')) throw e;
   }
 
   const store = getFallbackStore();
@@ -302,13 +554,15 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
     displayTime: new Date().toLocaleTimeString()
   });
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team, problem: { id: problemId } };
 }
 
 export async function notifyMemberWorking({ teamName, memberId, problemId }) {
   try {
-    const res = await fetch(`${API_BASE}/problems/working`, {
+    const res = await backendFetch('/problems/working', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, problemId })
@@ -324,7 +578,7 @@ export async function unlockProblemKey(teamName, key, memberId, bidAmount) {
 
 export async function sendTelemetry(teamName, memberId, event, details) {
   try {
-    const res = await fetch(`${API_BASE}/telemetry`, {
+    const res = await backendFetch('/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, event, details })
@@ -342,7 +596,9 @@ export async function sendTelemetry(teamName, memberId, event, details) {
       team.isLocked = true;
       team.lockReason = `Flag threshold reached (${team.violations.length} violations detected).`;
     }
+    const evtId = recordLocalEvtId(store);
     saveFallbackStore(store);
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
     return { ok: true, isLocked: team.isLocked, flagsCount: team.violations.length };
   }
   return null;
@@ -352,7 +608,7 @@ export async function pollJobStatus(jobId, timeoutMs = 25000) {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
     try {
-      const res = await fetch(`${API_BASE}/submissions/status/${jobId}`);
+      const res = await backendFetch(`/submissions/status/${jobId}`);
       if (res.ok) {
         const job = await res.json();
         if (job.status === 'COMPLETED' || job.status === 'FAILED') {
@@ -497,7 +753,7 @@ export function simulateCodeExecution(lang, code, stdin = '', problem = null) {
 
 export async function runCodeAsync({ teamName, memberId, lang, code, stdin, problemId }) {
   try {
-    const res = await fetch(`${API_BASE}/submissions/run`, {
+    const res = await backendFetch('/submissions/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, lang, code, stdin, problemId })
@@ -539,7 +795,7 @@ export async function runCodeAsync({ teamName, memberId, lang, code, stdin, prob
 
 export async function submitCodeAsync({ teamName, memberId, problemId, lang, code }) {
   try {
-    const res = await fetch(`${API_BASE}/submissions/submit`, {
+    const res = await backendFetch('/submissions/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, problemId, lang, code })
@@ -563,7 +819,9 @@ export async function submitCodeAsync({ teamName, memberId, problemId, lang, cod
   await new Promise(r => setTimeout(r, 500));
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
+  if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
 
   const problem = (fallbackProblemsData.problems || []).find(p => p.id === problemId) || { id: problemId, diff: 'Easy', si: '', eo: '' };
   const diffPoints = (problemId && problemId.startsWith('H')) || problem.diff === 'Hard' ? 400 : ((problemId && problemId.startsWith('M')) || problem.diff === 'Medium' ? 300 : 200);
@@ -576,19 +834,25 @@ export async function submitCodeAsync({ teamName, memberId, problemId, lang, cod
   // Also check if code has passed criteria
   const isPassed = isMatch || (!code.includes('TODO') && code.length > 50 && !code.includes('printf("Hello")'));
 
+  if (!team.problemWrong) team.problemWrong = {};
+  if (!team.problemStatuses) team.problemStatuses = {};
+  if (!team.solved) team.solved = [];
+
   if (isPassed) {
     if (!team.solved.includes(problemId)) {
       team.solved.push(problemId);
     }
     const wrongOnProb = team.problemWrong[problemId] || 0;
-    const finalScore = diffPoints - (wrongOnProb * 10);
-    team.score += Math.max(0, finalScore);
+    const finalScore = diffPoints - (wrongOnProb * 5);
+    team.score = (team.score || 0) + Math.max(0, finalScore);
     team.problemStatuses[problemId] = {
       status: 'SOLVED',
       solvedBy: memberId,
       finalProblemScore: finalScore
     };
+    const evtId = recordLocalEvtId(store);
     saveFallbackStore(store);
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
 
     const gradeResult = {
       passed: true,
@@ -609,8 +873,11 @@ export async function submitCodeAsync({ teamName, memberId, problemId, lang, cod
     };
   } else {
     team.problemWrong[problemId] = (team.problemWrong[problemId] || 0) + 1;
-    team.score = Math.max(0, team.score - 10);
+    team.wrong = (team.wrong || 0) + 1;
+    team.score = Math.max(0, (team.score || 0) - 5);
+    const evtId = recordLocalEvtId(store);
     saveFallbackStore(store);
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
 
     const gradeResult = {
       passed: false,
@@ -633,10 +900,11 @@ export async function submitCodeAsync({ teamName, memberId, problemId, lang, cod
 
 export async function fetchLeaderboard() {
   try {
-    const res = await fetch(`${API_BASE}/leaderboard`);
+    const res = await backendFetch('/leaderboard');
     if (res.ok) return await res.json();
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   if (store.eventState?.status !== 'EVENT_LIVE') {
     return { leaderboard: [] };
@@ -662,10 +930,11 @@ export async function fetchLeaderboard() {
 
 export async function fetchProctorTeams() {
   try {
-    const res = await fetch(`${API_BASE}/proctor/teams`);
+    const res = await backendFetch('/proctor/teams');
     if (res.ok) return await res.json();
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   if (store.eventState?.status !== 'EVENT_LIVE') {
     return { teams: [] };
@@ -675,7 +944,7 @@ export async function fetchProctorTeams() {
 
 export async function proctorUnlockTeam(teamName, pin) {
   try {
-    const res = await fetch(`${API_BASE}/proctor/unlock`, {
+    const res = await backendFetch('/proctor/unlock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, pin })
@@ -706,7 +975,9 @@ export async function proctorUnlockTeam(teamName, pin) {
     team.lockReason = '';
     team.unlockRequested = false;
     team.violations = [];
+    const evtId = recordLocalEvtId(store);
     saveFallbackStore(store);
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
     return { success: true, team };
   }
   return { success: true };
@@ -720,11 +991,13 @@ export async function adminLockTeam(teamName, reason = 'Your screen has been loc
     store.teams[key].lockReason = reason || 'Your screen has been locked by the administrator.';
     store.teams[key].lockedByAdmin = true;
     store.teams[key].unlockRequested = false;
+    const evtId = recordLocalEvtId(store);
     saveFallbackStore(store);
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: store.teams[key].name, team: store.teams[key] });
   }
 
   try {
-    const res = await fetch(`${API_BASE}/admin/team/lock`, {
+    const res = await backendFetch('/admin/team/lock', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, reason })
@@ -755,11 +1028,13 @@ export async function adminUnlockTeam(teamName) {
     store.teams[key].lockedByAdmin = false;
     store.teams[key].unlockRequested = false;
     store.teams[key].violations = [];
+    const evtId = recordLocalEvtId(store);
     saveFallbackStore(store);
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: store.teams[key].name, team: store.teams[key] });
   }
 
   try {
-    const res = await fetch(`${API_BASE}/admin/team/unlock`, {
+    const res = await backendFetch('/admin/team/unlock', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName })
@@ -788,7 +1063,7 @@ export async function requestTeamUnlock(teamName, password) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/team/request-unlock`, {
+    const res = await backendFetch('/team/request-unlock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, password: cleanPassword })
@@ -808,11 +1083,12 @@ export async function requestTeamUnlock(teamName, password) {
       throw new Error(errData.error);
     }
   } catch (e) {
-    if (e.message && e.message.includes('Incorrect password')) {
+    if (!e.isStaticFallback && e.message && e.message.includes('Incorrect password')) {
       throw e;
     }
   }
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams?.[key];
@@ -836,13 +1112,15 @@ export async function requestTeamUnlock(teamName, password) {
 
   team.unlockRequested = true;
   team.unlockRequestedAt = new Date().toISOString();
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, unlockRequested: true, team };
 }
 
 export async function proctorResetTeam(teamName) {
   try {
-    const res = await fetch(`${API_BASE}/proctor/reset`, {
+    const res = await backendFetch('/proctor/reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName })
@@ -854,7 +1132,7 @@ export async function proctorResetTeam(teamName) {
 
 export async function proctorResetAll(pin) {
   try {
-    const res = await fetch(`${API_BASE}/proctor/reset-all`, {
+    const res = await backendFetch('/proctor/reset-all', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin })
@@ -866,7 +1144,7 @@ export async function proctorResetAll(pin) {
 
 export async function updateProblemPrice({ problemId, price, pin }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/problems/price`, {
+    const res = await backendFetch('/admin/problems/price', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ problemId, price, pin })
@@ -878,7 +1156,7 @@ export async function updateProblemPrice({ problemId, price, pin }) {
 
 export async function batchSetProblemPrices({ easyPrice, mediumPrice, hardPrice, pin }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/problems/batch-prices`, {
+    const res = await backendFetch('/admin/problems/batch-prices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ easyPrice, mediumPrice, hardPrice, pin })
@@ -890,7 +1168,7 @@ export async function batchSetProblemPrices({ easyPrice, mediumPrice, hardPrice,
 
 export async function fetchProblemPrices() {
   try {
-    const res = await fetch(`${API_BASE}/admin/problems/prices`);
+    const res = await backendFetch('/admin/problems/prices');
     if (res.ok) return await res.json();
   } catch (e) {}
   return { prices: {} };
@@ -898,9 +1176,10 @@ export async function fetchProblemPrices() {
 
 export async function fetchTransactions() {
   try {
-    const res = await fetch(`${API_BASE}/admin/transactions`);
+    const res = await backendFetch('/admin/transactions');
     if (res.ok) return await res.json();
   } catch (e) {}
+  await pullCloudEvents();
   const store = getFallbackStore();
   const txns = [];
   Object.values(store.teams || {}).forEach(t => {
@@ -911,7 +1190,7 @@ export async function fetchTransactions() {
 
 export async function purchaseHintPass({ teamName, memberId, problemId }) {
   try {
-    const res = await fetch(`${API_BASE}/cards/hint/purchase`, {
+    const res = await backendFetch('/cards/hint/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, problemId })
@@ -921,17 +1200,21 @@ export async function purchaseHintPass({ teamName, memberId, problemId }) {
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
+  if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
   if (team.balance < 40) throw new Error('Insufficient ByteCoins for Hint Pass.');
   team.balance -= 40;
   team.hintPassesCount = (team.hintPassesCount || 0) + 1;
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team };
 }
 
 export async function useHintPass({ teamName, memberId, problemId }) {
   try {
-    const res = await fetch(`${API_BASE}/cards/hint/use`, {
+    const res = await backendFetch('/cards/hint/use', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, problemId })
@@ -941,7 +1224,9 @@ export async function useHintPass({ teamName, memberId, problemId }) {
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
+  if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
   if ((team.hintPassesCount || 0) <= 0) {
     if (team.balance < 40) throw new Error('Insufficient ByteCoins.');
     team.balance -= 40;
@@ -954,16 +1239,18 @@ export async function useHintPass({ teamName, memberId, problemId }) {
   team.revealedHints[problemId] = {
     hint: hintText,
     revealedBy: memberId,
-    revealedByName: memberId.includes('M01') ? 'Salman' : 'Team Member',
+    revealedByName: memberId.includes('M01') ? 'Leader' : 'Team Member',
     revealedAt: Date.now()
   };
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team };
 }
 
 export async function purchaseSabotageCard({ teamName, memberId }) {
   try {
-    const res = await fetch(`${API_BASE}/cards/sabotage/purchase`, {
+    const res = await backendFetch('/cards/sabotage/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId })
@@ -973,17 +1260,21 @@ export async function purchaseSabotageCard({ teamName, memberId }) {
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
+  if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
   if (team.balance < 40) throw new Error('Insufficient ByteCoins for Sabotage Card.');
   team.balance -= 40;
   team.sabotageCardsCount = (team.sabotageCardsCount || 0) + 1;
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team };
 }
 
 export async function useSabotageCard({ teamName, memberId, targetTeamName }) {
   try {
-    const res = await fetch(`${API_BASE}/cards/sabotage/use`, {
+    const res = await backendFetch('/cards/sabotage/use', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, targetTeamName })
@@ -994,8 +1285,10 @@ export async function useSabotageCard({ teamName, memberId, targetTeamName }) {
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const targetKey = (targetTeamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
   const target = store.teams[targetKey];
+  if (!team) throw new Error('Team not found.');
+  if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
 
   if ((team.sabotageCardsCount || 0) <= 0) {
     if (team.balance < 40) throw new Error('Insufficient ByteCoins.');
@@ -1008,13 +1301,17 @@ export async function useSabotageCard({ teamName, memberId, targetTeamName }) {
     target.frozenUntil = Date.now() + 5 * 60 * 1000;
     target.frozenBy = team.name;
   }
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  if (target) {
+    await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: target.name, team: target });
+  }
   return { success: true, attackingTeam: team, targetTeam: target };
 }
 
 export async function unlockCard({ teamName, memberId, cardType, password }) {
   try {
-    const res = await fetch(`${API_BASE}/cards/unlock`, {
+    const res = await backendFetch('/cards/unlock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamName, memberId, cardType, password })
@@ -1023,12 +1320,13 @@ export async function unlockCard({ teamName, memberId, cardType, password }) {
     const errData = await res.json().catch(() => ({}));
     if (errData.error) throw new Error(errData.error);
   } catch (e) {
-    if (e.message && e.message.includes('Incorrect password')) throw e;
+    if (!e.isStaticFallback && e.message && e.message.includes('Incorrect password')) throw e;
   }
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
   const p = String(password || '').trim().toLowerCase();
   const type = String(cardType || '').trim().toUpperCase();
 
@@ -1047,16 +1345,19 @@ export async function unlockCard({ teamName, memberId, cardType, password }) {
   if (!team.unlockedCards.includes(type)) {
     team.unlockedCards.push(type);
   }
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team, cardType: type };
 }
 
 export async function fetchSabotageTargets(excludeTeam = '') {
   try {
-    const res = await fetch(`${API_BASE}/cards/targets?excludeTeam=${encodeURIComponent(excludeTeam)}`);
+    const res = await backendFetch(`/cards/targets?excludeTeam=${encodeURIComponent(excludeTeam)}`);
     if (res.ok) return await res.json();
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   const excludeNorm = (excludeTeam || '').trim().toUpperCase();
   const targets = Object.values(store.teams)
@@ -1075,8 +1376,8 @@ export async function fetchSabotageTargets(excludeTeam = '') {
 
 export async function fetchSubmissions(teamName = null) {
   try {
-    const url = teamName ? `${API_BASE}/submissions?teamName=${encodeURIComponent(teamName)}` : `${API_BASE}/submissions`;
-    const res = await fetch(url);
+    const url = teamName ? `/submissions?teamName=${encodeURIComponent(teamName)}` : `/submissions`;
+    const res = await backendFetch(url);
     if (res.ok) return await res.json();
   } catch (e) {}
   return { submissions: [] };
@@ -1087,7 +1388,7 @@ const ADMIN_SESSION_KEY = 'qubit_admin_session_auth';
 
 export async function adminLogin(adminId, password) {
   try {
-    const res = await fetch(`${API_BASE}/admin/login`, {
+    const res = await backendFetch('/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adminId, password })
@@ -1100,7 +1401,7 @@ export async function adminLogin(adminId, password) {
     const err = await res.json().catch(() => ({}));
     if (err.error) throw new Error(err.error);
   } catch (e) {
-    if (e.message && e.message.includes('Invalid Admin ID')) throw e;
+    if (!e.isStaticFallback && e.message && e.message.includes('Invalid Admin ID')) throw e;
   }
 
   // Fallback local auth for static hosting
@@ -1136,7 +1437,7 @@ export function adminLogout() {
 
 export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/problems/unlock`, {
+    const res = await backendFetch('/admin/problems/unlock', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, problemId, bidPrice })
@@ -1147,7 +1448,7 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
     const errData = await res.json().catch(() => null);
     if (errData?.error) throw new Error(errData.error);
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
   const store = getFallbackStore();
@@ -1211,7 +1512,9 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
   if (!store.unlockHistory) store.unlockHistory = [];
   store.unlockHistory.unshift(record);
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team, unlockRecord: record });
   return { success: true, team, teams: [team], txn: record, unlockRecord: record };
 }
 
@@ -1221,7 +1524,7 @@ export async function adminLockProblem({ teamName, problemId }) {
 
 export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/cards/unlock`, {
+    const res = await backendFetch('/admin/cards/unlock', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, cardType, bidPrice })
@@ -1230,7 +1533,7 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
     const errData = await res.json().catch(() => null);
     if (errData?.error) throw new Error(errData.error);
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
   const type = String(cardType || '').trim().toUpperCase();
@@ -1297,7 +1600,9 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
   if (!store.unlockHistory) store.unlockHistory = [];
   store.unlockHistory.unshift(record);
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team, unlockRecord: record });
   return { success: true, team, teams: [team], cardType: type, txn: record, unlockRecord: record };
 }
 
@@ -1307,7 +1612,7 @@ export async function adminLockCard({ teamName, cardType }) {
 
 export async function adminGrantCardPass({ teamName, cardType, amount = 1 }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/cards/grant`, {
+    const res = await backendFetch('/admin/cards/grant', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, cardType, amount })
@@ -1318,7 +1623,8 @@ export async function adminGrantCardPass({ teamName, cardType, amount = 1 }) {
   const type = String(cardType || '').trim().toUpperCase();
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
 
   if (!team.unlockedCards) team.unlockedCards = [];
   if (!team.unlockedCards.includes(type)) team.unlockedCards.push(type);
@@ -1331,13 +1637,15 @@ export async function adminGrantCardPass({ teamName, cardType, amount = 1 }) {
     team.sabotageCardsCount = (team.sabotageCardsCount || 0) + amount;
   }
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team };
 }
 
 export async function adminRevealProblemHint({ teamName, problemId }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/hints/reveal`, {
+    const res = await backendFetch('/admin/hints/reveal', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName, problemId })
@@ -1347,7 +1655,8 @@ export async function adminRevealProblemHint({ teamName, problemId }) {
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
 
   const hint = PREDEFINED_HINTS[problemId] || 'Algorithmic strategy unlocked by Administrator.';
   if (!team.revealedHints) team.revealedHints = {};
@@ -1358,13 +1667,15 @@ export async function adminRevealProblemHint({ teamName, problemId }) {
     revealedAt: new Date().toISOString()
   };
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team, hint };
 }
 
 export async function adminClearFreeze({ teamName }) {
   try {
-    const res = await fetch(`${API_BASE}/admin/sabotage/unfreeze`, {
+    const res = await backendFetch('/admin/sabotage/unfreeze', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ teamName })
@@ -1374,29 +1685,33 @@ export async function adminClearFreeze({ teamName }) {
 
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key] || store.teams['SYNORA'];
+  const team = store.teams[key];
+  if (!team) throw new Error('Team not found.');
   team.frozenUntil = null;
   team.frozenBy = null;
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
   return { success: true, team };
 }
 
 export async function fetchEventStatus() {
   try {
-    const res = await fetch(`${API_BASE}/event/status`);
+    const res = await backendFetch('/event/status');
     if (res.ok) {
       const data = await res.json();
       return data.eventState || { status: 'REGISTRATION_CLOSED', startedAt: null };
     }
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   return store.eventState || { status: 'REGISTRATION_CLOSED', startedAt: null };
 }
 
 export async function updateEventStatus(status) {
   try {
-    const res = await fetch(`${API_BASE}/admin/event/status`, {
+    const res = await backendFetch('/admin/event/status', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ status })
@@ -1408,7 +1723,7 @@ export async function updateEventStatus(status) {
     const err = await res.json().catch(() => ({}));
     if (err.error) throw new Error(err.error);
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
   if (status === 'EVENT_ENDED') {
@@ -1423,13 +1738,15 @@ export async function updateEventStatus(status) {
   const store = getFallbackStore();
   if (!store.eventState) store.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
   store.eventState.status = status;
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({ evtId, type: 'EVENT_STATUS', status, eventState: store.eventState });
   return store.eventState;
 }
 
 export async function startEventSession({ participatingTeams = [], eventName = '' } = {}) {
   try {
-    const res = await fetch(`${API_BASE}/admin/event/start`, {
+    const res = await backendFetch('/admin/event/start', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ participatingTeams, eventName })
@@ -1440,10 +1757,11 @@ export async function startEventSession({ participatingTeams = [], eventName = '
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to start event session.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
   // Fallback: Start a clean new event session
+  await pullCloudEvents();
   const store = getFallbackStore();
   if (!Array.isArray(store.archivedEvents)) store.archivedEvents = [];
   const sessionNum = store.archivedEvents.length + 1;
@@ -1476,7 +1794,15 @@ export async function startEventSession({ participatingTeams = [], eventName = '
     participatingTeams: []
   };
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({
+    evtId,
+    type: 'EVENT_START',
+    eventState: store.eventState,
+    currentEvent: store.currentEvent
+  });
+
   return {
     success: true,
     eventState: store.eventState,
@@ -1487,7 +1813,7 @@ export async function startEventSession({ participatingTeams = [], eventName = '
 
 export async function endEventSession() {
   try {
-    const res = await fetch(`${API_BASE}/admin/event/end`, {
+    const res = await backendFetch('/admin/event/end', {
       method: 'POST',
       headers: getAdminHeaders()
     });
@@ -1497,10 +1823,11 @@ export async function endEventSession() {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to end event session.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
   // Fallback: Archive current event data and completely clear active dashboard state
+  await pullCloudEvents();
   const store = getFallbackStore();
   if (!Array.isArray(store.archivedEvents)) store.archivedEvents = [];
   const endedAt = new Date().toISOString();
@@ -1581,7 +1908,16 @@ export async function endEventSession() {
     participatingTeams: []
   };
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({
+    evtId,
+    type: 'EVENT_END',
+    eventState: store.eventState,
+    currentEvent: store.currentEvent,
+    archiveRecord
+  });
+
   return {
     success: true,
     eventState: store.eventState,
@@ -1591,7 +1927,7 @@ export async function endEventSession() {
 
 export async function fetchArchivedEvents() {
   try {
-    const res = await fetch(`${API_BASE}/admin/event/archives`, {
+    const res = await backendFetch('/admin/event/archives', {
       headers: getAdminHeaders()
     });
     if (res.ok) {
@@ -1599,13 +1935,14 @@ export async function fetchArchivedEvents() {
       return data.archives || [];
     }
   } catch (e) {}
+  await pullCloudEvents();
   const store = getFallbackStore();
   return store.archivedEvents || [];
 }
 
 export async function batchAcceptRegistrations(registrationIds) {
   try {
-    const res = await fetch(`${API_BASE}/admin/registrations/batch-accept`, {
+    const res = await backendFetch('/admin/registrations/batch-accept', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ registrationIds })
@@ -1616,14 +1953,14 @@ export async function batchAcceptRegistrations(registrationIds) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to batch accept registrations.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
   return { success: true, count: registrationIds.length };
 }
 
 export async function submitTeamRegistration(formData) {
   try {
-    const res = await fetch(`${API_BASE}/register`, {
+    const res = await backendFetch('/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)
@@ -1632,9 +1969,10 @@ export async function submitTeamRegistration(formData) {
     if (res.ok) return data;
     throw new Error(data.error || 'Failed to submit registration.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
+  await pullCloudEvents(true);
   const store = getFallbackStore();
   const status = store.eventState?.status || 'REGISTRATION_CLOSED';
   if (status !== 'EVENT_LIVE' && status !== 'REGISTRATION_OPEN') {
@@ -1679,13 +2017,19 @@ export async function submitTeamRegistration(formData) {
     createdAt: new Date().toISOString()
   };
   store.registrations[regId] = reg;
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({
+    evtId,
+    type: 'REG_SUBMIT',
+    registration: reg
+  });
   return { success: true, registration: reg };
 }
 
 export async function fetchAdminRegistrations() {
   try {
-    const res = await fetch(`${API_BASE}/admin/registrations`, {
+    const res = await backendFetch('/admin/registrations', {
       headers: getAdminHeaders()
     });
     if (res.ok) {
@@ -1694,6 +2038,7 @@ export async function fetchAdminRegistrations() {
     }
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   if (store.eventState?.status !== 'EVENT_LIVE') {
     return [];
@@ -1703,7 +2048,7 @@ export async function fetchAdminRegistrations() {
 
 export async function approveTeamRegistration(regId) {
   try {
-    const res = await fetch(`${API_BASE}/admin/registrations/approve`, {
+    const res = await backendFetch('/admin/registrations/approve', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ id: regId })
@@ -1712,9 +2057,10 @@ export async function approveTeamRegistration(regId) {
     if (res.ok) return data;
     throw new Error(data.error || 'Failed to approve registration.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   const reg = (store.registrations || {})[regId];
   if (!reg) throw new Error('Registration not found in store.');
@@ -1781,13 +2127,21 @@ export async function approveTeamRegistration(regId) {
     }
   }
 
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({
+    evtId,
+    type: 'REG_APPROVE',
+    regId,
+    team: newTeam,
+    registration: reg
+  });
   return { success: true, team: newTeam, registration: reg };
 }
 
 export async function rejectTeamRegistration(regId, reason = '') {
   try {
-    const res = await fetch(`${API_BASE}/admin/registrations/reject`, {
+    const res = await backendFetch('/admin/registrations/reject', {
       method: 'POST',
       headers: getAdminHeaders(),
       body: JSON.stringify({ id: regId, reason })
@@ -1796,26 +2150,35 @@ export async function rejectTeamRegistration(regId, reason = '') {
     if (res.ok) return data;
     throw new Error(data.error || 'Failed to reject registration.');
   } catch (e) {
-    if (e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   const reg = (store.registrations || {})[regId];
   if (!reg) throw new Error('Registration not found.');
   reg.status = 'REJECTED';
   reg.rejectionReason = reason || 'Declined by event administrator.';
+  const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
+  await publishCloudEvent({
+    evtId,
+    type: 'REG_REJECT',
+    regId,
+    reason: reg.rejectionReason
+  });
   return { success: true, registration: reg };
 }
 
 export async function fetchAdminOverview() {
   try {
-    const res = await fetch(`${API_BASE}/admin/overview`, {
+    const res = await backendFetch('/admin/overview', {
       headers: getAdminHeaders()
     });
     if (res.ok) return await res.json();
   } catch (e) {}
 
+  await pullCloudEvents();
   const store = getFallbackStore();
   const isLive = store.eventState?.status === 'EVENT_LIVE';
   const activeTeams = isLive ? Object.values(store.teams || {}) : [];

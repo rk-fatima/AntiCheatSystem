@@ -30,10 +30,13 @@ export function LandingPage({ onNavigateAdmin, onNavigateTeam, onNavigateRegiste
       }
     }
     loadStatus();
-    const interval = setInterval(loadStatus, 3000);
+    const interval = setInterval(loadStatus, 2000);
+    const handleStorage = () => loadStatus();
+    window.addEventListener('storage', handleStorage);
     return () => {
       active = false;
       clearInterval(interval);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
