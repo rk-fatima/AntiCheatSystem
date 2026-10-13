@@ -10,13 +10,27 @@ const IS_STATIC_HOST =
   window.location.hostname !== 'localhost' &&
   window.location.hostname !== '127.0.0.1';
 
+async function fetchWithTimeout(resource, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function backendFetch(path, options = {}) {
   if (IS_STATIC_HOST) {
     const err = new Error('Failed to fetch: static host');
     err.isStaticFallback = true;
     throw err;
   }
-  const res = await fetch(`${API_BASE}${path}`, options);
+  const res = await fetchWithTimeout(`${API_BASE}${path}`, options, 3000);
   const contentType = res.headers.get('content-type') || '';
   if (res.status === 404 || res.status === 405 || res.status >= 502 || !contentType.includes('application/json')) {
     const err = new Error('Failed to fetch: backend endpoint unavailable');
@@ -134,45 +148,63 @@ function recordLocalEvtId(store) {
   return evtId;
 }
 
+let pendingCloudPublishTimer = null;
+let latestPayloadToPublish = null;
+
+function triggerBackgroundCloudSync() {
+  if (pendingCloudPublishTimer) return;
+  pendingCloudPublishTimer = setTimeout(async () => {
+    pendingCloudPublishTimer = null;
+    try {
+      const store = getFallbackStore();
+      const payload = latestPayloadToPublish || { type: 'STATE_SYNC', evtId: recordLocalEvtId(store) };
+      let bbKey = lastSyncedBytebinKey || 'NONE';
+
+      // 1. Upload store snapshot to bytebin with 2.5s timeout (non-blocking)
+      try {
+        const bbRes = await fetchWithTimeout('https://bytebin.lucko.me/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(store)
+        }, 2500);
+        if (bbRes.ok) {
+          const bbData = await bbRes.json();
+          if (bbData && bbData.key) {
+            bbKey = bbData.key;
+            lastSyncedBytebinKey = bbKey;
+          }
+        }
+      } catch (e) {}
+
+      const status = store.eventState?.status || 'REGISTRATION_CLOSED';
+      const ptrValue = `${status}__${bbKey}__${store.updatedAt}`;
+
+      // 2. Publish to KeyVal and ntfy with 2.5s timeout
+      await Promise.allSettled([
+        fetchWithTimeout(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${KV_APP_KEY}/${KV_PTR_KEY}/${encodeURIComponent(ptrValue)}`, {
+          method: 'POST',
+          body: ''
+        }, 2500),
+        fetchWithTimeout(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${KV_APP_KEY}/${KV_STATUS_KEY}/${encodeURIComponent(status)}`, {
+          method: 'POST',
+          body: ''
+        }, 2500),
+        fetchWithTimeout(`https://ntfy.sh/${CLOUD_SYNC_TOPIC}`, {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, bbKey, status, updatedAt: store.updatedAt })
+        }, 2500)
+      ]);
+    } catch (e) {}
+  }, 150); // Batches rapid changes within 150ms into a single cloud sync
+}
+
 async function publishCloudEvent(payload) {
   try {
     const store = getFallbackStore();
     store.updatedAt = Date.now();
     saveFallbackStore(store);
-
-    let bbKey = lastSyncedBytebinKey || 'NONE';
-    try {
-      const bbRes = await fetch('https://bytebin.lucko.me/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(store)
-      });
-      if (bbRes.ok) {
-        const bbData = await bbRes.json();
-        if (bbData && bbData.key) {
-          bbKey = bbData.key;
-          lastSyncedBytebinKey = bbKey;
-        }
-      }
-    } catch (e) {}
-
-    const status = store.eventState?.status || 'REGISTRATION_CLOSED';
-    const ptrValue = `${status}__${bbKey}__${store.updatedAt}`;
-
-    await Promise.allSettled([
-      fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${KV_APP_KEY}/${KV_PTR_KEY}/${encodeURIComponent(ptrValue)}`, {
-        method: 'POST',
-        body: ''
-      }),
-      fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${KV_APP_KEY}/${KV_STATUS_KEY}/${encodeURIComponent(status)}`, {
-        method: 'POST',
-        body: ''
-      }),
-      fetch(`https://ntfy.sh/${CLOUD_SYNC_TOPIC}`, {
-        method: 'POST',
-        body: JSON.stringify({ ...payload, bbKey, status, updatedAt: store.updatedAt })
-      })
-    ]);
+    latestPayloadToPublish = payload;
+    triggerBackgroundCloudSync();
   } catch (e) {}
 }
 
@@ -329,9 +361,8 @@ let activeCloudPull = null;
 
 async function pullCloudEvents(force = false) {
   const now = Date.now();
-  if (!force && now - lastCloudPullAt < 1200) {
-    if (activeCloudPull) return activeCloudPull;
-    return;
+  if (!force && now - lastCloudPullAt < 3500) {
+    return activeCloudPull || Promise.resolve();
   }
   if (activeCloudPull) return activeCloudPull;
   lastCloudPullAt = now;
@@ -339,9 +370,10 @@ async function pullCloudEvents(force = false) {
   activeCloudPull = (async () => {
     let kvSucceeded = false;
     try {
-      const ptrRes = await fetch(
+      const ptrRes = await fetchWithTimeout(
         `https://keyvalue.immanuel.co/api/KeyVal/GetValue/${KV_APP_KEY}/${KV_PTR_KEY}?_t=${Date.now()}`,
-        { cache: 'no-store' }
+        { cache: 'no-store' },
+        2000
       );
       if (ptrRes.ok) {
         const rawText = await ptrRes.text();
@@ -353,7 +385,7 @@ async function pullCloudEvents(force = false) {
 
           if (bbKey && bbKey !== 'NONE' && bbKey !== lastSyncedBytebinKey) {
             try {
-              const bbRes = await fetch(`https://bytebin.lucko.me/${bbKey}`);
+              const bbRes = await fetchWithTimeout(`https://bytebin.lucko.me/${bbKey}`, {}, 2500);
               if (bbRes.ok) {
                 const cloudStore = normalizeStoreShape(await bbRes.json());
                 if (cloudStore && cloudStore.eventState) {
@@ -394,7 +426,7 @@ async function pullCloudEvents(force = false) {
     if (!kvSucceeded || now - lastNtfyPullAt > 15000) {
       lastNtfyPullAt = now;
       try {
-        const res = await fetch(`https://ntfy.sh/${CLOUD_SYNC_TOPIC}/json?poll=1&since=12h`);
+        const res = await fetchWithTimeout(`https://ntfy.sh/${CLOUD_SYNC_TOPIC}/json?poll=1&since=2h`, {}, 2500);
         if (!res.ok) return;
         const text = await res.text();
         if (!text || !text.trim()) return;
@@ -461,7 +493,7 @@ export async function fetchTeamsList() {
     if (res.ok) return await res.json();
   } catch (e) {}
 
-  await pullCloudEvents();
+  pullCloudEvents();
   const store = getFallbackStore();
   if (store.eventState?.status !== 'EVENT_LIVE') {
     return { teams: [] };
@@ -524,10 +556,16 @@ export async function verifyTeamCredentials({ teamName, password }) {
     if (!err.isStaticFallback && err.message && !err.message.toLowerCase().includes('fetch')) throw err;
   }
 
-  await pullCloudEvents(true);
-  const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key];
+  let store = getFallbackStore();
+  let team = store.teams[key];
+
+  if (!team) {
+    await pullCloudEvents(true);
+    store = getFallbackStore();
+    team = store.teams[key];
+  }
+
   if (team) {
     if (team.password && team.password !== password) {
       throw new Error('Invalid team password. Please check your credentials.');
@@ -561,10 +599,16 @@ export async function loginTeam({ teamName, memberId, password }) {
     if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
   }
 
-  await pullCloudEvents(true);
-  const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
-  const team = store.teams[key];
+  let store = getFallbackStore();
+  let team = store.teams[key];
+
+  if (!team) {
+    await pullCloudEvents(true);
+    store = getFallbackStore();
+    team = store.teams[key];
+  }
+
   if (!team) {
     throw new Error(`Team "${teamName}" not found.`);
   }
@@ -589,7 +633,7 @@ export async function getTeamStatus(teamName) {
     }
   }
 
-  await pullCloudEvents();
+  pullCloudEvents();
   const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
@@ -1865,7 +1909,7 @@ export async function fetchEventStatus() {
     }
   } catch (e) {}
 
-  await pullCloudEvents();
+  pullCloudEvents();
   const store = getFallbackStore();
   return store.eventState || { status: 'REGISTRATION_CLOSED', startedAt: null };
 }
@@ -2473,7 +2517,7 @@ export async function fetchAdminOverview() {
     if (res.ok) return await res.json();
   } catch (e) {}
 
-  await pullCloudEvents();
+  pullCloudEvents();
   const store = getFallbackStore();
   const isLive = store.eventState?.status === 'EVENT_LIVE';
   const activeTeams = isLive ? Object.values(store.teams || {}) : [];

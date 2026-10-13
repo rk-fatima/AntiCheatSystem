@@ -190,7 +190,7 @@ export function App() {
       } catch (e) {}
     };
 
-    const interval = setInterval(syncTeamAndPrices, 2000);
+    const interval = setInterval(syncTeamAndPrices, 3500);
     const handleStorageChange = () => {
       syncTeamAndPrices();
     };

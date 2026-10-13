@@ -88,7 +88,7 @@ export function TeamRegistration({ onNavigateLogin }) {
       }
     }
     checkStatus(true);
-    const interval = setInterval(() => checkStatus(false), 2000);
+    const interval = setInterval(() => checkStatus(false), 3500);
     const handleStorage = () => checkStatus(false);
     window.addEventListener('storage', handleStorage);
     return () => {

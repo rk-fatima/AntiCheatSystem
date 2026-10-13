@@ -206,8 +206,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     }
   }, [regUrl, showQrModal]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) setLoading(true);
     try {
       const data = await fetchAdminOverview();
       const loadedTeams = data.teams || [];
@@ -230,14 +230,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
-      setLoading(false);
+      if (isManualRefresh) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 2500);
-    const handleStorage = () => loadData();
+    loadData(true);
+    const interval = setInterval(() => loadData(false), 3500);
+    const handleStorage = () => loadData(false);
     window.addEventListener('storage', handleStorage);
     return () => {
       clearInterval(interval);
@@ -801,7 +801,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
           {/* Refresh Button */}
           <button
             className="btn-ghost"
-            onClick={loadData}
+            onClick={() => loadData(true)}
             title="Sync with live database"
             style={{ fontSize: '12px', padding: '6px 12px' }}
           >

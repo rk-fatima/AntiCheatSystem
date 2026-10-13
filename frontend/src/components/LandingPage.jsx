@@ -30,7 +30,7 @@ export function LandingPage({ onNavigateAdmin, onNavigateTeam, onNavigateRegiste
       }
     }
     loadStatus();
-    const interval = setInterval(loadStatus, 2000);
+    const interval = setInterval(loadStatus, 3500);
     const handleStorage = () => loadStatus();
     window.addEventListener('storage', handleStorage);
     return () => {

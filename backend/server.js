@@ -1300,12 +1300,29 @@ setInterval(async () => {
   } catch (e) {}
 }, 3000);
 
+// Express Error-Handling Middleware to prevent route crashes
+app.use((err, req, res, next) => {
+  console.error('[Server Error]', err.message || err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error handled safely', details: err.message });
+  }
+});
+
 // SPA Fallback
 if (fs.existsSync(FRONTEND_DIST)) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
   });
 }
+
+// Global process-level crash guards to ensure the server never terminates during live event
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH GUARD] Prevented uncaughtException crash:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRASH GUARD] Prevented unhandledRejection crash:', reason);
+});
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Qubit AntiCheat Server running on http://0.0.0.0:${PORT}`);
