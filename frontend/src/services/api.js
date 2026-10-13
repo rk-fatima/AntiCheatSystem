@@ -1564,9 +1564,10 @@ export async function adminLogin(adminId, password) {
   }
 
   // Fallback local auth for static hosting
-  if (adminId === 'Qubit123' && password === 'Abcd.01@#') {
+  const normalizedId = (adminId || '').trim().toLowerCase();
+  if ((normalizedId === 'qubit' || adminId === 'qubit') && password === 'Abcd.01@#') {
     sessionStorage.setItem(ADMIN_SESSION_KEY, 'admin-auth-valid');
-    return { success: true, admin: { id: 'Qubit123', name: 'Administrator' } };
+    return { success: true, admin: { id: 'qubit', name: 'Administrator' } };
   }
   throw new Error('Invalid Admin ID or Password. Access denied.');
 }

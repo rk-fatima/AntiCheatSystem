@@ -828,11 +828,12 @@ function requireAdminAuth(req, res, next) {
 
 app.post('/api/admin/login', (req, res) => {
   const { adminId, password } = req.body;
-  if (adminId === 'Qubit123' && password === 'Abcd.01@#') {
+  const normalizedId = (adminId || '').trim().toLowerCase();
+  if ((normalizedId === 'qubit' || adminId === 'qubit') && password === 'Abcd.01@#') {
     return res.json({
       success: true,
       token: 'qubit-admin-auth-token-valid',
-      admin: { id: 'Qubit123', role: 'HEAD_ADMINISTRATOR' }
+      admin: { id: 'qubit', role: 'HEAD_ADMINISTRATOR' }
     });
   }
   return res.status(401).json({ error: 'Invalid Admin ID or Password. Access denied.' });
