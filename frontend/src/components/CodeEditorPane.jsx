@@ -231,13 +231,13 @@ export function CodeEditorPane({
         width: '440px',
         borderRight: '1px solid rgba(255, 255, 255, 0.08)',
         overflowY: 'auto',
-        padding: '24px 26px',
+        padding: '12px 20px',
         background: '#0a0e1a',
         flexShrink: 0
       }}>
         {/* Title & Difficulty Row */}
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
             <span style={{
               fontSize: '11px',
               fontWeight: 600,
@@ -389,22 +389,22 @@ export function CodeEditorPane({
         flexDirection: 'column',
         minWidth: 0,
         background: '#080c16',
-        padding: '14px 18px',
-        gap: '12px'
+        padding: '8px 16px 10px 16px',
+        gap: '8px'
       }}>
         {/* Editor Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <select
             value={lang}
             onChange={(e) => onLangChange(e.target.value)}
             style={{
               width: 'auto',
-              minWidth: '120px',
+              minWidth: '110px',
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '6px',
-              padding: '6px 12px',
-              fontSize: '13px',
+              padding: '5px 12px',
+              fontSize: '12px',
               fontWeight: 600,
               color: '#ffffff'
             }}
@@ -415,7 +415,7 @@ export function CodeEditorPane({
             <option value="c">C</option>
           </select>
 
-          <button className="btn-ghost" onClick={handleReset} title="Reset starter LeetCode code" style={{ fontSize: '12px' }}>
+          <button className="btn-ghost" onClick={handleReset} title="Reset starter LeetCode code" style={{ fontSize: '12px', padding: '5px 10px' }}>
             <RotateCcw size={13} /> Reset
           </button>
 
@@ -428,14 +428,14 @@ export function CodeEditorPane({
             disabled={isRunning || isSubmitting || isFrozen}
             title={isFrozen ? "Screen is frozen" : "Run solution against test cases"}
             style={{
-              padding: '7px 18px',
-              fontSize: '13px',
+              padding: '6px 16px',
+              fontSize: '12px',
               borderRadius: '6px',
               borderColor: 'rgba(255, 255, 255, 0.16)',
               fontWeight: 600
             }}
           >
-            {isRunning ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+            {isRunning ? <Loader2 size={13} className="spin" /> : <Play size={13} />}
             {isRunning ? 'Running...' : 'Run Code'}
           </button>
 
@@ -445,13 +445,13 @@ export function CodeEditorPane({
             disabled={isRunning || isSubmitting || isFrozen}
             title={isFrozen ? "Screen is frozen" : "Submit solution to judge for full scoring"}
             style={{
-              padding: '7px 20px',
-              fontSize: '13px',
+              padding: '6px 18px',
+              fontSize: '12px',
               borderRadius: '6px',
               fontWeight: 700
             }}
           >
-            {isSubmitting ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+            {isSubmitting ? <Loader2 size={13} className="spin" /> : <Send size={13} />}
             {isSubmitting ? 'Evaluating...' : 'Submit Solution'}
           </button>
         </div>
@@ -469,9 +469,9 @@ export function CodeEditorPane({
           <pre
             ref={gutterRef}
             style={{
-              width: '46px',
+              width: '44px',
               textAlign: 'right',
-              padding: '12px 10px 12px 0',
+              padding: '10px 8px 10px 0',
               margin: 0,
               color: '#484f58',
               background: 'rgba(0, 0, 0, 0.25)',
@@ -500,7 +500,7 @@ export function CodeEditorPane({
               background: 'transparent',
               color: '#f0f6fc',
               font: '13px/20px var(--font-mono)',
-              padding: '12px 14px',
+              padding: '10px 12px',
               resize: 'none',
               outline: 'none',
               tabSize: 4
@@ -515,9 +515,9 @@ export function CodeEditorPane({
           background: '#070a12',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px',
-          padding: '12px 16px',
-          minHeight: '170px',
-          maxHeight: '270px',
+          padding: '10px 14px',
+          minHeight: '160px',
+          maxHeight: '260px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column'
@@ -528,8 +528,8 @@ export function CodeEditorPane({
             alignItems: 'center',
             justifyContent: 'space-between',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            paddingBottom: '8px',
-            marginBottom: '12px'
+            paddingBottom: '6px',
+            marginBottom: '10px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button

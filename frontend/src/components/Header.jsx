@@ -1,7 +1,7 @@
 import React from 'react';
-import { Trophy, ShieldAlert, CheckCircle2, Coins, Settings, BarChart2, Maximize, Crown, Users, Receipt, Flag, Shield } from 'lucide-react';
+import { Trophy, ShieldAlert, CheckCircle2, Coins, Settings, BarChart2, Maximize, Crown, Users, Receipt, Flag } from 'lucide-react';
 
-export function Header({ team, currentMember, onOpenLeaderboard, onOpenTransactions, onToggleFullscreen, onOpenAdmin }) {
+export function Header({ team, currentMember, onOpenLeaderboard, onOpenTransactions, onToggleFullscreen }) {
   const flagsCount = team?.violations?.length || 0;
   const isHighRisk = flagsCount >= 3;
 
@@ -10,13 +10,13 @@ export function Header({ team, currentMember, onOpenLeaderboard, onOpenTransacti
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '12px 24px',
+      padding: '9px 20px',
       background: 'rgba(6, 9, 19, 0.85)',
       backdropFilter: 'blur(12px)',
       borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-      minHeight: '56px',
+      minHeight: '48px',
       flexWrap: 'wrap',
-      gap: '16px',
+      gap: '12px',
       zIndex: 50
     }}>
       {/* Left: Brand + Team Workspace identity */}
@@ -157,16 +157,6 @@ export function Header({ team, currentMember, onOpenLeaderboard, onOpenTransacti
           >
             <Maximize size={14} />
           </button>
-          {onOpenAdmin && (
-            <button
-              className="btn-ghost"
-              onClick={onOpenAdmin}
-              title="Admin Portal (Secure Login)"
-              style={{ fontSize: '12px', padding: '5px 10px', color: '#58a6ff', borderColor: 'rgba(56, 139, 253, 0.3)' }}
-            >
-              <Shield size={13} /> Admin
-            </button>
-          )}
         </div>
       </div>
     </header>

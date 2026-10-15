@@ -477,11 +477,6 @@ export function App() {
         onOpenLeaderboard={() => setShowLeaderboard(true)}
         onOpenTransactions={() => setShowTransactions(true)}
         onToggleFullscreen={enterFullscreen}
-        onOpenAdmin={() => {
-          window.location.hash = '#admin';
-          setViewMode('admin');
-          setIsAdminLoggedIn(isAdminAuthenticated());
-        }}
       />
 
       {/* Main Workspace Layout */}
