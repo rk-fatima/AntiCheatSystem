@@ -1156,7 +1156,7 @@ export async function submitCodeAsync({ teamName, memberId, problemId, lang, cod
   if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
 
   const problem = (fallbackProblemsData.problems || []).find(p => p.id === problemId) || { id: problemId, diff: 'Easy', si: '', eo: '' };
-  const diffPoints = (problemId && problemId.startsWith('H')) || problem.diff === 'Hard' ? 400 : ((problemId && problemId.startsWith('M')) || problem.diff === 'Medium' ? 300 : 200);
+  const diffPoints = problem.pts || ((problemId && problemId.startsWith('H')) || problem.diff === 'Hard' ? 800 : ((problemId && problemId.startsWith('M')) || problem.diff === 'Medium' ? 650 : 400));
 
   // Simulate execution against sample input
   const actualOutput = simulateCodeExecution(lang, code, problem.si || '', problem);

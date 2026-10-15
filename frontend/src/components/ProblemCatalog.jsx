@@ -167,7 +167,7 @@ export function ProblemCatalog({
           {filteredProblems.map((prob) => {
             const isSolved = solvedIds.includes(prob.id);
             const statusInfo = problemStatuses[prob.id];
-            const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
+            const diffPoints = prob.pts || (prob.diff === 'Hard' ? 800 : (prob.diff === 'Medium' ? 650 : 400));
             const wrongCount = team?.problemWrong?.[prob.id] ?? statusInfo?.wrongSubmissions ?? 0;
 
             const purchaseRecord = purchasedProblems[prob.id] || (prob.origId ? purchasedProblems[prob.origId] : null);

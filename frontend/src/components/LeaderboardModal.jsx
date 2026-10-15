@@ -136,7 +136,7 @@ export function LeaderboardModal({ onClose }) {
           gap: '6px'
         }}>
           <div>
-            <span>Scoring: Easy (200) • Medium (300) • Hard (400)</span>
+            <span>Scoring: Easy (400) • Medium (650) • Hard (800)</span>
           </div>
           <div style={{ color: '#ff7b72' }}>
             −10 pts per Wrong Submission

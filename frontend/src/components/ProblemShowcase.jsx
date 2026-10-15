@@ -73,7 +73,7 @@ function buildShowcaseProblem(p, idx) {
     id: p.id,
     origId: p.origId || meta.origId || '',
     title: p.title,
-    pts: p.pts || 200,
+    pts: p.pts || (p.diff === 'Hard' ? 800 : (p.diff === 'Medium' ? 650 : 400)),
     cat: p.cat || 'Algorithms / Data Structures',
     diff: p.diff || 'Easy',
     desc: p.desc,

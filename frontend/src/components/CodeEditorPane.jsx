@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   Sparkles
 } from 'lucide-react';
-import { getStarterTemplate, getProblemMetadata, getWorkingSolution } from '../data/leetcodeRegistry';
+import { getStarterTemplate, getProblemMetadata } from '../data/leetcodeRegistry';
 
 export function CodeEditorPane({
   problem,
@@ -31,6 +31,7 @@ export function CodeEditorPane({
   internalClipboardRef
 }) {
   const meta = getProblemMetadata(problem?.id);
+  const defaultBasePts = problem?.pts || (problem?.diff === 'Hard' ? 800 : (problem?.diff === 'Medium' ? 650 : 400));
 
   // LeetCode Bottom Drawer Tabs: 'testcase' | 'result'
   const [activeBottomTab, setActiveBottomTab] = useState('testcase');
@@ -103,16 +104,6 @@ export function CodeEditorPane({
 
   const handleInput = (e) => {
     onCodeChange(e.target.value);
-  };
-
-  const handleLoadSolution = () => {
-    const sol = getWorkingSolution(problem?.id, lang);
-    if (sol) {
-      onCodeChange(sol);
-      setOutputResult(null);
-    } else {
-      alert(`No preloaded solution for ${problem?.id} in ${lang}`);
-    }
   };
 
   const handleReset = () => {
@@ -259,7 +250,7 @@ export function CodeEditorPane({
               {problem.cat || 'Algorithms'}
             </span>
             <span className={`badge ${problem.diff}`}>
-              {problem.diff} · Base {problem.pts || (problem.diff === 'Hard' ? 400 : (problem.diff === 'Medium' ? 300 : 200))} pts
+              {problem.diff} · Base {defaultBasePts} pts
             </span>
 
             {/* Solved Status & Complexity breakdown badge */}
@@ -277,7 +268,7 @@ export function CodeEditorPane({
                 gap: '4px'
               }}>
                 <CheckCircle2 size={12} />
-                <span>Solved: +{problemStatus?.complexityAdjustedScore ?? problem.pts ?? 200} pts</span>
+                <span>Solved: +{problemStatus?.complexityAdjustedScore ?? defaultBasePts} pts</span>
                 {problemStatus?.timeComplexity && (
                   <span style={{ color: 'var(--txt-muted)', fontWeight: 500, fontSize: '10px' }}>
                     ({problemStatus.timeComplexity} · {problemStatus.spaceComplexity || 'O(1)'})
@@ -426,19 +417,6 @@ export function CodeEditorPane({
 
           <button className="btn-ghost" onClick={handleReset} title="Reset starter LeetCode code" style={{ fontSize: '12px' }}>
             <RotateCcw size={13} /> Reset
-          </button>
-
-          <button
-            className="btn-ghost"
-            onClick={handleLoadSolution}
-            title="Auto-fill passing LeetCode solution for testing"
-            style={{
-              fontSize: '12px',
-              color: '#58a6ff',
-              borderColor: 'rgba(56, 139, 253, 0.3)'
-            }}
-          >
-            ⚡ Load Solution
           </button>
 
           <div style={{ flex: 1 }} />
@@ -739,7 +717,7 @@ export function CodeEditorPane({
                     {outputResult.type === 'submit' && (
                       <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 700 }}>
                         {outputResult.data.passed
-                          ? `+${outputResult.data?.scoring?.complexityAdjustedScore ?? problem.pts ?? 200} pts awarded`
+                          ? `+${outputResult.data?.scoring?.complexityAdjustedScore ?? defaultBasePts} pts awarded`
                           : `−5 Penalty (${outputResult.data.compileError ? 'Compilation Error' : 'Unsuccessful Attempt'})`}
                       </span>
                     )}
@@ -781,7 +759,7 @@ export function CodeEditorPane({
                             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                               <div style={{ fontSize: '10px', color: 'var(--txt-muted)' }}>Difficulty / Base</div>
                               <div style={{ fontWeight: 700, color: '#ffffff', marginTop: '2px' }}>
-                                {problem.diff} ({outputResult.data?.scoring?.baseScore ?? problem.pts ?? 200} pts)
+                                {problem.diff} ({outputResult.data?.scoring?.baseScore ?? defaultBasePts} pts)
                               </div>
                             </div>
 
@@ -802,14 +780,14 @@ export function CodeEditorPane({
                             <div style={{ background: 'rgba(46, 160, 67, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(46, 160, 67, 0.25)' }}>
                               <div style={{ fontSize: '10px', color: '#3fb950', fontWeight: 600 }}>Adjusted Score</div>
                               <div style={{ fontWeight: 800, color: '#3fb950', marginTop: '2px' }}>
-                                {outputResult.data?.scoring?.complexityAdjustedScore ?? problem.pts ?? 200} pts
+                                {outputResult.data?.scoring?.complexityAdjustedScore ?? defaultBasePts} pts
                               </div>
                             </div>
                           </div>
 
                           <div style={{ fontSize: '11px', color: 'var(--txt-muted)', lineHeight: '1.5' }}>
                             <span style={{ color: 'var(--txt-dim)' }}>Formula: </span>
-                            <code>max(0, {outputResult.data?.scoring?.baseScore ?? 200} Base − {outputResult.data?.scoring?.timeDeduction ?? 0} Time − {outputResult.data?.scoring?.spaceDeduction ?? 0} Space) = <strong style={{ color: '#3fb950' }}>{outputResult.data?.scoring?.complexityAdjustedScore ?? 200} pts</strong></code>.
+                            <code>max(0, {outputResult.data?.scoring?.baseScore ?? defaultBasePts} Base − {outputResult.data?.scoring?.timeDeduction ?? 0} Time − {outputResult.data?.scoring?.spaceDeduction ?? 0} Space) = <strong style={{ color: '#3fb950' }}>{outputResult.data?.scoring?.complexityAdjustedScore ?? defaultBasePts} pts</strong></code>.
                             {(outputResult.data?.scoring?.totalTeamWrong || team?.wrong || 0) > 0 && (
                               <span style={{ marginLeft: '6px', color: '#ff7b72' }}>
                                 (Team has {outputResult.data?.scoring?.totalTeamWrong || team?.wrong} total wrong submission(s) across event: −{(outputResult.data?.scoring?.totalTeamWrong || team?.wrong) * 5} pts penalty).

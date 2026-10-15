@@ -116,7 +116,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
 
   // Scoring & Complexity Management State
   const [scoringConfig, setScoringConfig] = useState({
-    baseScores: { Easy: 200, Medium: 300, Hard: 400 },
+    baseScores: { Easy: 400, Medium: 650, Hard: 800 },
     problemBaseScores: {},
     problemDifficulties: {},
     timeComplexityDeductions: {
@@ -733,7 +733,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       problemId: prob.id,
       title: prob.title,
       diff: scoringConfig?.problemDifficulties?.[prob.id] || prob.diff || 'Easy',
-      baseScore: scoringConfig?.problemBaseScores?.[prob.id] ?? (prob.pts || (prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200)))
+      baseScore: scoringConfig?.problemBaseScores?.[prob.id] ?? (prob.pts || (prob.diff === 'Hard' ? 800 : (prob.diff === 'Medium' ? 650 : 400)))
     });
   };
 
@@ -1844,7 +1844,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 const problemOwner = getProblemOwner(prob);
                 const isSoldToOther = Boolean(problemOwner && problemOwner.teamName?.toUpperCase() !== targetTeam?.name?.toUpperCase());
                 const diffColor = prob.diff === 'Hard' ? '#ff7b72' : prob.diff === 'Medium' ? '#d29922' : '#3fb950';
-                const pts = prob.diff === 'Hard' ? 400 : prob.diff === 'Medium' ? 300 : 200;
+                const pts = prob.pts || (prob.diff === 'Hard' ? 800 : prob.diff === 'Medium' ? 650 : 400);
 
                 return (
                   <div
@@ -3090,7 +3090,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     type="number"
                     min="0"
                     step="10"
-                    value={scoringConfig?.baseScores?.Easy ?? 200}
+                    value={scoringConfig?.baseScores?.Easy ?? 400}
                     onChange={(e) => setScoringConfig(prev => ({
                       ...prev,
                       baseScores: { ...prev.baseScores, Easy: parseInt(e.target.value) || 0 }
@@ -3107,7 +3107,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       fontFamily: 'var(--font-mono)'
                     }}
                   />
-                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 200)</span>
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 400)</span>
                 </div>
               </div>
 
@@ -3127,7 +3127,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     type="number"
                     min="0"
                     step="10"
-                    value={scoringConfig?.baseScores?.Medium ?? 300}
+                    value={scoringConfig?.baseScores?.Medium ?? 650}
                     onChange={(e) => setScoringConfig(prev => ({
                       ...prev,
                       baseScores: { ...prev.baseScores, Medium: parseInt(e.target.value) || 0 }
@@ -3144,7 +3144,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       fontFamily: 'var(--font-mono)'
                     }}
                   />
-                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 300)</span>
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 650)</span>
                 </div>
               </div>
 
@@ -3164,7 +3164,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     type="number"
                     min="0"
                     step="10"
-                    value={scoringConfig?.baseScores?.Hard ?? 400}
+                    value={scoringConfig?.baseScores?.Hard ?? 800}
                     onChange={(e) => setScoringConfig(prev => ({
                       ...prev,
                       baseScores: { ...prev.baseScores, Hard: parseInt(e.target.value) || 0 }
@@ -3181,7 +3181,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                       fontFamily: 'var(--font-mono)'
                     }}
                   />
-                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 400)</span>
+                  <span style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>points (Default: 800)</span>
                 </div>
               </div>
 
@@ -4471,7 +4471,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 value={editProblemModal.diff}
                 onChange={(e) => {
                   const newDiff = e.target.value;
-                  const defaultBase = newDiff === 'Hard' ? 400 : (newDiff === 'Medium' ? 300 : 200);
+                  const defaultBase = newDiff === 'Hard' ? 800 : (newDiff === 'Medium' ? 650 : 400);
                   setEditProblemModal(prev => ({ ...prev, diff: newDiff, baseScore: defaultBase }));
                 }}
                 style={{
@@ -4485,9 +4485,9 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   fontWeight: 600
                 }}
               >
-                <option value="Easy">Easy (Default Base: 200 pts)</option>
-                <option value="Medium">Medium (Default Base: 300 pts)</option>
-                <option value="Hard">Hard (Default Base: 400 pts)</option>
+                <option value="Easy">Easy (Default Base: 400 pts)</option>
+                <option value="Medium">Medium (Default Base: 650 pts)</option>
+                <option value="Hard">Hard (Default Base: 800 pts)</option>
               </select>
             </div>
 

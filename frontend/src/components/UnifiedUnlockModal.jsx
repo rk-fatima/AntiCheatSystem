@@ -211,7 +211,7 @@ export function UnifiedUnlockModal({
               {target.title}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--txt-muted)', marginTop: '2px' }}>
-              {target.subtitle || (target.diff ? `${target.diff} · ${target.pts || 200} pts` : 'Power Card')}
+              {target.subtitle || (target.diff ? `${target.diff} · ${target.pts || (target.diff === 'Hard' ? 800 : (target.diff === 'Medium' ? 650 : 400))} pts` : 'Power Card')}
             </div>
           </div>
 

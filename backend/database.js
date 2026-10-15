@@ -71,9 +71,9 @@ class Database {
       },
       scoringConfig: {
         baseScores: {
-          Easy: 200,
-          Medium: 300,
-          Hard: 400
+          Easy: 400,
+          Medium: 650,
+          Hard: 800
         },
         problemBaseScores: {},
         problemDifficulties: {},
@@ -116,7 +116,7 @@ class Database {
           submissions: parsed.submissions || [],
           telemetry: parsed.telemetry || [],
           scoringConfig: {
-            baseScores: { Easy: 200, Medium: 300, Hard: 400, ...(parsed.scoringConfig?.baseScores || {}) },
+            baseScores: { Easy: 400, Medium: 650, Hard: 800, ...(parsed.scoringConfig?.baseScores || {}) },
             problemBaseScores: { ...(parsed.scoringConfig?.problemBaseScores || {}) },
             problemDifficulties: { ...(parsed.scoringConfig?.problemDifficulties || {}) },
             timeComplexityDeductions: { ...DEFAULT_TIME_COMPLEXITY_DEDUCTIONS, ...(parsed.scoringConfig?.timeComplexityDeductions || {}) },
@@ -162,11 +162,11 @@ class Database {
   }
 
   // --- PROBLEM DIFFICULTY & SCORING CONFIGURATION ---
-  // Easy problem → default 200 points
-  // Medium problem → default 300 points
-  // Hard problem → default 400 points
+  // Easy problem → default 400 points
+  // Medium problem → default 650 points
+  // Hard problem → default 800 points
   getProblemDifficultyPoints(prob) {
-    if (!prob) return 200;
+    if (!prob) return 400;
     const probId = typeof prob === 'string' ? prob : prob.id;
 
     // 1. Explicit admin problem base score override
@@ -178,16 +178,16 @@ class Database {
     const customDiff = this.state.scoringConfig?.problemDifficulties?.[probId];
     const diff = customDiff || (typeof prob === 'object' ? prob.diff : 'Easy') || 'Easy';
     const d = String(diff).trim().toLowerCase();
-    const baseScores = this.state.scoringConfig?.baseScores || { Easy: 200, Medium: 300, Hard: 400 };
+    const baseScores = this.state.scoringConfig?.baseScores || { Easy: 400, Medium: 650, Hard: 800 };
 
-    if (d === 'hard') return baseScores.Hard ?? 400;
-    if (d === 'medium') return baseScores.Medium ?? 300;
-    return baseScores.Easy ?? 200;
+    if (d === 'hard') return baseScores.Hard ?? 800;
+    if (d === 'medium') return baseScores.Medium ?? 650;
+    return baseScores.Easy ?? 400;
   }
 
   getScoringConfig() {
     return this.state.scoringConfig || {
-      baseScores: { Easy: 200, Medium: 300, Hard: 400 },
+      baseScores: { Easy: 400, Medium: 650, Hard: 800 },
       problemBaseScores: {},
       problemDifficulties: {},
       timeComplexityDeductions: { ...DEFAULT_TIME_COMPLEXITY_DEDUCTIONS },
@@ -1726,9 +1726,9 @@ class Database {
   }
 
   // --- CONTEST SUBMISSIONS & COMPLEXITY-AWARE SCORING ---
-  // Easy problem → default 200 points
-  // Medium problem → default 300 points
-  // Hard problem → default 400 points
+  // Easy problem → default 400 points
+  // Medium problem → default 650 points
+  // Hard problem → default 800 points
   // Complexity-Adjusted Score = max(0, Base Score − Time Complexity Deduction − Space Complexity Deduction)
   // Wrong submission attempt → −5 points penalty
   // Final Score = max(0, Sum of Complexity-Adjusted Scores − (Total Wrong Submissions × 5))
