@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Copy,
   Check,
@@ -102,9 +102,7 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
   const [copied, setCopied] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
-  const scrollStripRef = useRef(null);
-
-  // 2. Dynamically fetch and synchronize every available problem from database / API
+  // Dynamically fetch and synchronize every available problem from database / API
   useEffect(() => {
     let isMounted = true;
     async function loadAllProblems() {
@@ -131,32 +129,7 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
   // Easy -> Medium -> Hard -> Easy -> Medium -> Hard ...
   const currentDifficulty = DIFFICULTY_SEQUENCE[currentIndex % 3];
 
-  // Auto-scroll the quick pill strip to keep current problem in view
-  useEffect(() => {
-    if (scrollStripRef.current) {
-      const activeEl = scrollStripRef.current.querySelector(`[data-active="true"]`);
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      }
-    }
-  }, [currentIndex]);
 
-  // Keyboard navigation support: Left / Right arrows
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Don't intercept if user is typing in the search input
-      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
-        return;
-      }
-      if (e.key === 'ArrowLeft') {
-        setCurrentIndex((prev) => Math.max(0, prev - 1));
-      } else if (e.key === 'ArrowRight') {
-        setCurrentIndex((prev) => Math.min(total - 1, prev + 1));
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [total]);
 
   // Copy example to clipboard
   const handleCopyExample = () => {
@@ -225,6 +198,42 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
         return matchesQuery && matchesDiff;
       });
   }, [catalogProblems, searchQuery, selectedDifficultyFilter]);
+
+  const currentFilteredPos = searchResults.findIndex((p) => p.originalIdx === currentIndex);
+  const canGoPrev = currentFilteredPos > 0;
+  const canGoNext = currentFilteredPos >= 0 && currentFilteredPos < searchResults.length - 1;
+
+  // Jump to first matching result if search/filter leaves current problem outside results
+  useEffect(() => {
+    if (searchResults.length > 0 && !searchResults.some((p) => p.originalIdx === currentIndex)) {
+      setCurrentIndex(searchResults[0].originalIdx);
+    }
+  }, [searchResults, currentIndex]);
+
+  // Keyboard navigation support: Left / Right arrows
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't intercept if user is typing in the search input or dropdown
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (canGoPrev) {
+          setCurrentIndex(searchResults[currentFilteredPos - 1].originalIdx);
+        } else {
+          setCurrentIndex((prev) => Math.max(0, prev - 1));
+        }
+      } else if (e.key === 'ArrowRight') {
+        if (canGoNext) {
+          setCurrentIndex(searchResults[currentFilteredPos + 1].originalIdx);
+        } else {
+          setCurrentIndex((prev) => Math.min(total - 1, prev + 1));
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [total, canGoPrev, canGoNext, currentFilteredPos, searchResults]);
 
   return (
     <div
@@ -302,11 +311,17 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
             }}
           >
-            {catalogProblems.map((p, idx) => (
-              <option key={p.id} value={idx} style={{ background: '#0b1120', color: '#ffffff' }}>
-                {idx + 1}. {p.id} — {p.title} ({DIFFICULTY_SEQUENCE[idx % 3]})
+            {searchResults.length > 0 ? (
+              searchResults.map((p) => (
+                <option key={p.id} value={p.originalIdx} style={{ background: '#0b1120', color: '#ffffff' }}>
+                  {p.num}. {p.id} — {p.title} ({DIFFICULTY_SEQUENCE[p.originalIdx % 3]})
+                </option>
+              ))
+            ) : (
+              <option value="" disabled style={{ background: '#0b1120', color: '#8b949e' }}>
+                No matching problems
               </option>
-            ))}
+            )}
           </select>
 
           {/* Clearly Visible Logout Button */}
@@ -362,7 +377,7 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          marginBottom: '16px',
+          marginBottom: '20px',
           flexWrap: 'wrap'
         }}
       >
@@ -435,75 +450,6 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               {diff}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Horizontal Scrollable Problem Number Carousel (All 93 Problems) */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '880px',
-          marginBottom: '18px',
-          position: 'relative'
-        }}
-      >
-        <div
-          ref={scrollStripRef}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 12px',
-            background: 'rgba(13, 19, 33, 0.65)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '12px',
-            overflowX: 'auto',
-            scrollbarWidth: 'thin',
-            WebkitOverflowScrolling: 'touch'
-          }}
-        >
-          {searchResults.map((p) => {
-            const isActive = p.originalIdx === currentIndex;
-            const seqDiff = DIFFICULTY_SEQUENCE[p.originalIdx % 3];
-            const diffColor =
-              seqDiff === 'Easy' ? '#3fb950' : seqDiff === 'Medium' ? '#d29922' : '#f85149';
-
-            return (
-              <button
-                key={p.id}
-                data-active={isActive ? 'true' : 'false'}
-                onClick={() => setCurrentIndex(p.originalIdx)}
-                title={`Problem ${p.num}: ${p.id} — ${p.title} (${seqDiff})`}
-                style={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: isActive ? 700 : 500,
-                  border: `1px solid ${isActive ? '#58a6ff' : 'rgba(255, 255, 255, 0.08)'}`,
-                  background: isActive ? 'rgba(56, 139, 253, 0.25)' : 'rgba(255, 255, 255, 0.03)',
-                  color: isActive ? '#ffffff' : '#8b949e',
-                  cursor: 'pointer',
-                  boxShadow: isActive ? '0 0 10px rgba(56, 139, 253, 0.35)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: diffColor
-                  }}
-                />
-                <span>{p.num}</span>
-                <span style={{ fontSize: '11px', opacity: 0.8 }}>({p.id})</span>
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -1037,8 +983,14 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
         >
           <button
             type="button"
-            onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-            disabled={currentIndex === 0}
+            onClick={() => {
+              if (canGoPrev) {
+                setCurrentIndex(searchResults[currentFilteredPos - 1].originalIdx);
+              } else {
+                setCurrentIndex((prev) => Math.max(0, prev - 1));
+              }
+            }}
+            disabled={searchResults.length <= 1 ? currentIndex === 0 : !canGoPrev}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1049,16 +1001,16 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               borderRadius: '8px',
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.14)',
-              color: currentIndex === 0 ? 'var(--txt-dim)' : '#ffffff',
-              cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
-              opacity: currentIndex === 0 ? 0.45 : 1,
+              color: (searchResults.length <= 1 ? currentIndex === 0 : !canGoPrev) ? 'var(--txt-dim)' : '#ffffff',
+              cursor: (searchResults.length <= 1 ? currentIndex === 0 : !canGoPrev) ? 'not-allowed' : 'pointer',
+              opacity: (searchResults.length <= 1 ? currentIndex === 0 : !canGoPrev) ? 0.45 : 1,
               transition: 'background 0.15s'
             }}
             onMouseEnter={(e) => {
-              if (currentIndex > 0) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              if (canGoPrev || currentIndex > 0) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseLeave={(e) => {
-              if (currentIndex > 0) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              if (canGoPrev || currentIndex > 0) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
             }}
           >
             <ChevronLeft size={16} />
@@ -1066,13 +1018,21 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
           </button>
 
           <div style={{ fontSize: '13px', color: '#8b949e', fontWeight: 500 }}>
-            {currentIndex + 1} / {total}
+            {searchResults.length < total
+              ? `Problem ${currentFilteredPos + 1} of ${searchResults.length} (${total} total)`
+              : `Problem ${currentIndex + 1} / ${total}`}
           </div>
 
           <button
             type="button"
-            onClick={() => setCurrentIndex((prev) => Math.min(total - 1, prev + 1))}
-            disabled={currentIndex === total - 1}
+            onClick={() => {
+              if (canGoNext) {
+                setCurrentIndex(searchResults[currentFilteredPos + 1].originalIdx);
+              } else {
+                setCurrentIndex((prev) => Math.min(total - 1, prev + 1));
+              }
+            }}
+            disabled={searchResults.length <= 1 ? currentIndex === total - 1 : !canGoNext}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1084,20 +1044,20 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               background: 'linear-gradient(135deg, #1f6feb 0%, #8957e5 100%)',
               border: '1px solid rgba(88, 166, 255, 0.4)',
               color: '#ffffff',
-              cursor: currentIndex === total - 1 ? 'not-allowed' : 'pointer',
-              opacity: currentIndex === total - 1 ? 0.45 : 1,
+              cursor: (searchResults.length <= 1 ? currentIndex === total - 1 : !canGoNext) ? 'not-allowed' : 'pointer',
+              opacity: (searchResults.length <= 1 ? currentIndex === total - 1 : !canGoNext) ? 0.45 : 1,
               boxShadow:
-                currentIndex === total - 1 ? 'none' : '0 4px 16px rgba(31, 111, 235, 0.35)',
+                (searchResults.length <= 1 ? currentIndex === total - 1 : !canGoNext) ? 'none' : '0 4px 16px rgba(31, 111, 235, 0.35)',
               transition: 'transform 0.15s, box-shadow 0.15s'
             }}
             onMouseEnter={(e) => {
-              if (currentIndex < total - 1) {
+              if (canGoNext || currentIndex < total - 1) {
                 e.currentTarget.style.transform = 'translateY(-1px)';
                 e.currentTarget.style.boxShadow = '0 6px 20px rgba(31, 111, 235, 0.45)';
               }
             }}
             onMouseLeave={(e) => {
-              if (currentIndex < total - 1) {
+              if (canGoNext || currentIndex < total - 1) {
                 e.currentTarget.style.transform = 'none';
                 e.currentTarget.style.boxShadow = '0 4px 16px rgba(31, 111, 235, 0.35)';
               }
