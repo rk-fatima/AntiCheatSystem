@@ -111,6 +111,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   // unlockModal: { type: 'PROBLEM' | 'HINT' | 'SABOTAGE', id, title, team, bidPrice }
   const [unlockModal, setUnlockModal] = useState(null);
   const [unlockSubmitting, setUnlockSubmitting] = useState(false);
+  const [purchasedProblems, setPurchasedProblems] = useState({});
+  const [purchasedCards, setPurchasedCards] = useState({});
 
   // Scoring & Complexity Management State
   const [scoringConfig, setScoringConfig] = useState({
@@ -220,6 +222,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
       if (data.registrations) setRegistrations(data.registrations);
       if (data.scoringConfig) setScoringConfig(data.scoringConfig);
       if (data.complexityReviews) setComplexityReviews(data.complexityReviews);
+      if (data.purchasedProblems) setPurchasedProblems(data.purchasedProblems);
+      if (data.purchasedCards) setPurchasedCards(data.purchasedCards);
 
       // Select only from active participating teams in current live event
       setSelectedTeamName(prev => {
@@ -310,10 +314,64 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   // Problems unlocked for current selected team
   const targetTeamUnlockedCount = (targetTeam?.unlocked || []).length;
 
+  const isAuctionEnded = Boolean(
+    eventState?.auctionEnded ||
+    eventState?.auctionStatus === 'ENDED' ||
+    eventState?.auctionStatus === 'AUCTION_ENDED' ||
+    eventState?.isBiddingActive === false
+  );
+
+  // Helper to determine which team owns a problem across all teams
+  const getProblemOwner = (prob) => {
+    if (!prob) return null;
+    const pId = String(prob.id || prob).toUpperCase();
+    const orig = prob.origId ? String(prob.origId).toUpperCase() : null;
+
+    if (purchasedProblems[pId]) return purchasedProblems[pId];
+    if (orig && purchasedProblems[orig]) return purchasedProblems[orig];
+
+    for (const t of teams) {
+      if (Array.isArray(t.unlocked)) {
+        if (t.unlocked.some(u => String(u).toUpperCase() === pId || (orig && String(u).toUpperCase() === orig))) {
+          return { teamName: t.name, teamKey: t.name.toUpperCase(), problemId: prob.id || prob };
+        }
+      }
+    }
+    return null;
+  };
+
+  // Helper to determine which team owns a card across all teams
+  const getCardOwner = (cardType) => {
+    const type = String(cardType).toUpperCase();
+    if (purchasedCards[type]) return purchasedCards[type];
+
+    for (const t of teams) {
+      if (Array.isArray(t.unlockedCards) && t.unlockedCards.some(c => String(c).toUpperCase() === type)) {
+        return { teamName: t.name, teamKey: t.name.toUpperCase(), cardType: type };
+      }
+      if (type === 'HINT' && t.hintUnlocked) {
+        return { teamName: t.name, teamKey: t.name.toUpperCase(), cardType: type };
+      }
+      if (type === 'SABOTAGE' && t.sabotageUnlocked) {
+        return { teamName: t.name, teamKey: t.name.toUpperCase(), cardType: type };
+      }
+    }
+    return null;
+  };
+
   // --- MODAL TRIGGERS ---
   const handleOpenProblemUnlockModal = (problem) => {
+    if (isAuctionEnded) {
+      showToast('Auction has ended! Purchases are no longer allowed.', false);
+      return;
+    }
     if (!targetTeam) {
       showToast('Please select a target team first.', false);
+      return;
+    }
+    const owner = getProblemOwner(problem);
+    if (owner && owner.teamName?.toUpperCase() !== targetTeam.name.toUpperCase()) {
+      showToast('Cannot buy this problem! It has already been purchased by another team.', false);
       return;
     }
     setUnlockModal({
@@ -326,8 +384,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   };
 
   const handleOpenCardUnlockModal = (cardType) => {
+    if (isAuctionEnded) {
+      showToast('Auction has ended! Purchases are no longer allowed.', false);
+      return;
+    }
     if (!targetTeam) {
       showToast('Please select a target team first.', false);
+      return;
+    }
+    const owner = getCardOwner(cardType);
+    if (owner && owner.teamName?.toUpperCase() !== targetTeam.name.toUpperCase()) {
+      showToast('Cannot buy this card! It has already been purchased by another team.', false);
       return;
     }
     const isHint = cardType === 'HINT';
@@ -343,7 +410,28 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   // --- CONFIRM UNLOCK (DEDUCTION & AUDIT LOG) ---
   const handleConfirmUnlock = async () => {
     if (!unlockModal) return;
+    if (isAuctionEnded) {
+      showToast('Auction has ended! Purchases are no longer allowed.', false);
+      setUnlockModal(null);
+      return;
+    }
     const { type, id, title, team, bidPrice } = unlockModal;
+
+    if (type === 'PROBLEM') {
+      const owner = getProblemOwner({ id });
+      if (owner && owner.teamName?.toUpperCase() !== team.name.toUpperCase()) {
+        showToast('Cannot buy this problem! It has already been purchased by another team.', false);
+        setUnlockModal(null);
+        return;
+      }
+    } else {
+      const owner = getCardOwner(type);
+      if (owner && owner.teamName?.toUpperCase() !== team.name.toUpperCase()) {
+        showToast('Cannot buy this card! It has already been purchased by another team.', false);
+        setUnlockModal(null);
+        return;
+      }
+    }
 
     const bidNum = Number(bidPrice);
     if (!bidPrice || isNaN(bidNum) || bidNum <= 0) {
@@ -735,10 +823,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
   const isHintCardUnlocked = Boolean(
     (targetTeam?.unlockedCards || []).includes('HINT') || targetTeam?.hintUnlocked
   );
+  const hintCardOwner = getCardOwner('HINT');
+  const isHintSoldToOther = Boolean(hintCardOwner && hintCardOwner.teamName?.toUpperCase() !== targetTeam?.name?.toUpperCase());
 
   const isSabotageCardUnlocked = Boolean(
     (targetTeam?.unlockedCards || []).includes('SABOTAGE') || targetTeam?.sabotageUnlocked
   );
+  const sabotageCardOwner = getCardOwner('SABOTAGE');
+  const isSabotageSoldToOther = Boolean(sabotageCardOwner && sabotageCardOwner.teamName?.toUpperCase() !== targetTeam?.name?.toUpperCase());
 
   return (
     <div style={{
@@ -929,7 +1021,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             </div>
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase' }}>
                   EVENT STATUS:
                 </span>
@@ -963,12 +1055,38 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     ? 'EVENT LIVE'
                     : 'REGISTRATION CLOSED'}
                 </span>
+
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', marginLeft: '6px' }}>
+                  AUCTION STATUS:
+                </span>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  letterSpacing: '0.4px',
+                  background: isAuctionEnded
+                    ? 'rgba(239, 68, 68, 0.18)'
+                    : 'rgba(63, 185, 80, 0.18)',
+                  color: isAuctionEnded
+                    ? '#ff7b72'
+                    : '#3fb950',
+                  border: `1px solid ${
+                    isAuctionEnded
+                      ? 'rgba(239, 68, 68, 0.4)'
+                      : 'rgba(63, 185, 80, 0.4)'
+                  }`
+                }}>
+                  {isAuctionEnded ? 'ENDED' : 'ACTIVE'}
+                </span>
               </div>
               <div style={{ fontSize: '13px', color: '#c9d1d9' }}>
                 {eventState.status === 'EVENT_ENDED'
                   ? 'The competition has ended. Registration is closed and current dashboard is cleared.'
                   : eventState.status === 'EVENT_LIVE'
-                  ? 'The competition is live. Public registration and bidding are open.'
+                  ? (isAuctionEnded
+                      ? 'The competition is live, but the auction has ENDED. All purchases and bidding are permanently disabled.'
+                      : 'The competition is live. Public registration and bidding are open.')
                   : 'Registration is closed. Click Start Event to open registration and start the competition.'}
               </div>
             </div>
@@ -1073,6 +1191,28 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             )}
           </div>
         </div>
+
+        {/* Auction Ended Global Notification Banner */}
+        {isAuctionEnded && (
+          <div style={{
+            background: 'rgba(210, 153, 34, 0.12)',
+            border: '1px solid rgba(210, 153, 34, 0.35)',
+            borderRadius: '10px',
+            padding: '12px 18px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            color: '#e3b341',
+            fontSize: '13px',
+            fontWeight: 600
+          }}>
+            <Lock size={16} color="#e3b341" style={{ flexShrink: 0 }} />
+            <span>
+              AUCTION ENDED: Problem purchases, bidding, and card unlocks are permanently closed. Team ByteCoins are 0.
+            </span>
+          </div>
+        )}
 
         {/* 3. TOP SUMMARY CARDS (Compact 4 Cards) */}
         <div style={{
@@ -1701,6 +1841,8 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             }}>
               {filteredProblems.map((prob) => {
                 const isUnlocked = Boolean(targetTeam?.unlocked && targetTeam.unlocked.includes(prob.id));
+                const problemOwner = getProblemOwner(prob);
+                const isSoldToOther = Boolean(problemOwner && problemOwner.teamName?.toUpperCase() !== targetTeam?.name?.toUpperCase());
                 const diffColor = prob.diff === 'Hard' ? '#ff7b72' : prob.diff === 'Medium' ? '#d29922' : '#3fb950';
                 const pts = prob.diff === 'Hard' ? 400 : prob.diff === 'Medium' ? 300 : 200;
 
@@ -1723,12 +1865,26 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                         width: '32px',
                         height: '32px',
                         borderRadius: '6px',
-                        background: isUnlocked ? 'rgba(63, 185, 80, 0.14)' : 'rgba(255, 255, 255, 0.04)',
-                        border: `1px solid ${isUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
+                        background: isUnlocked
+                          ? 'rgba(63, 185, 80, 0.14)'
+                          : isSoldToOther
+                          ? 'rgba(210, 153, 34, 0.14)'
+                          : 'rgba(255, 255, 255, 0.04)',
+                        border: `1px solid ${
+                          isUnlocked
+                            ? 'rgba(63, 185, 80, 0.35)'
+                            : isSoldToOther
+                            ? 'rgba(210, 153, 34, 0.4)'
+                            : 'rgba(255, 255, 255, 0.08)'
+                        }`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: isUnlocked ? '#3fb950' : 'var(--txt-dim)',
+                        color: isUnlocked
+                          ? '#3fb950'
+                          : isSoldToOther
+                          ? '#e3b341'
+                          : 'var(--txt-dim)',
                         flexShrink: 0
                       }}>
                         {isUnlocked ? <Check size={16} /> : <Lock size={15} />}
@@ -1742,6 +1898,14 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                           <span style={{ color: diffColor, fontWeight: 600 }}>{scoringConfig?.problemDifficulties?.[prob.id] || prob.diff}</span>
                           <span>•</span>
                           <span>Base: {pts} pts</span>
+                          {isSoldToOther && (
+                            <>
+                              <span>•</span>
+                              <span style={{ color: '#e3b341', fontWeight: 700 }}>
+                                Owned by {problemOwner.teamName}
+                              </span>
+                            </>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleOpenEditProblemModal(prob)}
@@ -1781,6 +1945,36 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                           gap: '5px'
                         }}>
                           <Check size={13} /> Unlocked
+                        </span>
+                      ) : isSoldToOther ? (
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          background: 'rgba(210, 153, 34, 0.14)',
+                          border: '1px solid rgba(210, 153, 34, 0.4)',
+                          color: '#e3b341',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}>
+                          <Lock size={13} /> SOLD to {problemOwner.teamName}
+                        </span>
+                      ) : isAuctionEnded ? (
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          color: 'var(--txt-dim)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}>
+                          <Lock size={13} /> Auction Ended
                         </span>
                       ) : (
                         <>
@@ -1917,11 +2111,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             {/* Hint Hero Banner */}
             <div
               onClick={() => {
-                if (!isHintCardUnlocked) handleOpenCardUnlockModal('HINT');
+                if (!isHintCardUnlocked && !isHintSoldToOther && !isAuctionEnded) handleOpenCardUnlockModal('HINT');
               }}
               style={{
                 background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.85) 100%)',
-                border: `1px solid ${isHintCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(56, 139, 253, 0.3)'}`,
+                border: `1px solid ${
+                  isHintCardUnlocked
+                    ? 'rgba(63, 185, 80, 0.35)'
+                    : isHintSoldToOther
+                    ? 'rgba(210, 153, 34, 0.4)'
+                    : 'rgba(56, 139, 253, 0.3)'
+                }`,
                 borderRadius: '12px',
                 padding: '22px 24px',
                 marginBottom: '24px',
@@ -1930,7 +2130,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: '16px',
-                cursor: !isHintCardUnlocked ? 'pointer' : 'default',
+                cursor: (!isHintCardUnlocked && !isHintSoldToOther && !isAuctionEnded) ? 'pointer' : 'default',
                 transition: 'border-color 0.2s ease, transform 0.2s ease'
               }}
             >
@@ -1939,14 +2139,24 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   width: '46px',
                   height: '46px',
                   borderRadius: '10px',
-                  background: isHintCardUnlocked ? 'rgba(63, 185, 80, 0.16)' : 'rgba(56, 139, 253, 0.15)',
-                  border: `1px solid ${isHintCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(56, 139, 253, 0.35)'}`,
+                  background: isHintCardUnlocked
+                    ? 'rgba(63, 185, 80, 0.16)'
+                    : isHintSoldToOther
+                    ? 'rgba(210, 153, 34, 0.16)'
+                    : 'rgba(56, 139, 253, 0.15)',
+                  border: `1px solid ${
+                    isHintCardUnlocked
+                      ? 'rgba(63, 185, 80, 0.35)'
+                      : isHintSoldToOther
+                      ? 'rgba(210, 153, 34, 0.4)'
+                      : 'rgba(56, 139, 253, 0.35)'
+                  }`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isHintCardUnlocked ? '#3fb950' : '#58a6ff'
+                  color: isHintCardUnlocked ? '#3fb950' : isHintSoldToOther ? '#e3b341' : '#58a6ff'
                 }}>
-                  {isHintCardUnlocked ? <Check size={24} /> : <Lightbulb size={24} />}
+                  {isHintCardUnlocked ? <Check size={24} /> : isHintSoldToOther ? <Lock size={24} /> : <Lightbulb size={24} />}
                 </div>
                 <div>
                   <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
@@ -1954,8 +2164,23 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   </h3>
                   <div style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>
                     Current State for <b>{targetTeam?.name || 'Selected Team'}</b>:{' '}
-                    <span style={{ color: isHintCardUnlocked ? '#3fb950' : '#ff7b72', fontWeight: 700 }}>
-                      {isHintCardUnlocked ? '🔓 UNLOCKED' : '🔒 LOCKED'}
+                    <span style={{
+                      color: isHintCardUnlocked
+                        ? '#3fb950'
+                        : isHintSoldToOther
+                        ? '#e3b341'
+                        : isAuctionEnded
+                        ? 'var(--txt-dim)'
+                        : '#ff7b72',
+                      fontWeight: 700
+                    }}>
+                      {isHintCardUnlocked
+                        ? '🔓 UNLOCKED'
+                        : isHintSoldToOther
+                        ? `🔒 SOLD TO ${hintCardOwner.teamName.toUpperCase()}`
+                        : isAuctionEnded
+                        ? '🔒 AUCTION ENDED'
+                        : '🔒 LOCKED'}
                     </span>
                     {' · Inventory: '}
                     <b style={{ color: '#ffffff' }}>{targetTeam?.hintPassesCount || 0} Available</b>
@@ -1991,6 +2216,36 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     gap: '6px'
                   }}>
                     <Check size={14} /> Unlocked
+                  </span>
+                ) : isHintSoldToOther ? (
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(210, 153, 34, 0.14)',
+                    border: '1px solid rgba(210, 153, 34, 0.4)',
+                    color: '#e3b341',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Lock size={14} /> SOLD to {hintCardOwner.teamName}
+                  </span>
+                ) : isAuctionEnded ? (
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: 'var(--txt-dim)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Lock size={14} /> Auction Ended
                   </span>
                 ) : (
                   <button
@@ -2088,11 +2343,17 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
             {/* Sabotage Hero Banner */}
             <div
               onClick={() => {
-                if (!isSabotageCardUnlocked) handleOpenCardUnlockModal('SABOTAGE');
+                if (!isSabotageCardUnlocked && !isSabotageSoldToOther && !isAuctionEnded) handleOpenCardUnlockModal('SABOTAGE');
               }}
               style={{
                 background: 'linear-gradient(180deg, rgba(180, 25, 60, 0.12) 0%, rgba(20, 10, 16, 0.85) 100%)',
-                border: `1px solid ${isSabotageCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(248, 81, 73, 0.3)'}`,
+                border: `1px solid ${
+                  isSabotageCardUnlocked
+                    ? 'rgba(63, 185, 80, 0.35)'
+                    : isSabotageSoldToOther
+                    ? 'rgba(210, 153, 34, 0.4)'
+                    : 'rgba(248, 81, 73, 0.3)'
+                }`,
                 borderRadius: '12px',
                 padding: '22px 24px',
                 marginBottom: '24px',
@@ -2101,7 +2362,7 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: '16px',
-                cursor: !isSabotageCardUnlocked ? 'pointer' : 'default',
+                cursor: (!isSabotageCardUnlocked && !isSabotageSoldToOther && !isAuctionEnded) ? 'pointer' : 'default',
                 transition: 'border-color 0.2s ease, transform 0.2s ease'
               }}
             >
@@ -2110,14 +2371,24 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   width: '46px',
                   height: '46px',
                   borderRadius: '10px',
-                  background: isSabotageCardUnlocked ? 'rgba(63, 185, 80, 0.16)' : 'rgba(248, 81, 73, 0.15)',
-                  border: `1px solid ${isSabotageCardUnlocked ? 'rgba(63, 185, 80, 0.35)' : 'rgba(248, 81, 73, 0.35)'}`,
+                  background: isSabotageCardUnlocked
+                    ? 'rgba(63, 185, 80, 0.16)'
+                    : isSabotageSoldToOther
+                    ? 'rgba(210, 153, 34, 0.16)'
+                    : 'rgba(248, 81, 73, 0.15)',
+                  border: `1px solid ${
+                    isSabotageCardUnlocked
+                      ? 'rgba(63, 185, 80, 0.35)'
+                      : isSabotageSoldToOther
+                      ? 'rgba(210, 153, 34, 0.4)'
+                      : 'rgba(248, 81, 73, 0.35)'
+                  }`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isSabotageCardUnlocked ? '#3fb950' : '#ff7b72'
+                  color: isSabotageCardUnlocked ? '#3fb950' : isSabotageSoldToOther ? '#e3b341' : '#ff7b72'
                 }}>
-                  {isSabotageCardUnlocked ? <Check size={24} /> : <Zap size={24} />}
+                  {isSabotageCardUnlocked ? <Check size={24} /> : isSabotageSoldToOther ? <Lock size={24} /> : <Zap size={24} />}
                 </div>
                 <div>
                   <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
@@ -2125,8 +2396,23 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                   </h3>
                   <div style={{ fontSize: '13px', color: 'var(--txt-muted)' }}>
                     Current State for <b>{targetTeam?.name || 'Selected Team'}</b>:{' '}
-                    <span style={{ color: isSabotageCardUnlocked ? '#3fb950' : '#ff7b72', fontWeight: 700 }}>
-                      {isSabotageCardUnlocked ? '🔓 UNLOCKED' : '🔒 LOCKED'}
+                    <span style={{
+                      color: isSabotageCardUnlocked
+                        ? '#3fb950'
+                        : isSabotageSoldToOther
+                        ? '#e3b341'
+                        : isAuctionEnded
+                        ? 'var(--txt-dim)'
+                        : '#ff7b72',
+                      fontWeight: 700
+                    }}>
+                      {isSabotageCardUnlocked
+                        ? '🔓 UNLOCKED'
+                        : isSabotageSoldToOther
+                        ? `🔒 SOLD TO ${sabotageCardOwner.teamName.toUpperCase()}`
+                        : isAuctionEnded
+                        ? '🔒 AUCTION ENDED'
+                        : '🔒 LOCKED'}
                     </span>
                     {' · Inventory: '}
                     <b style={{ color: '#ffffff' }}>{targetTeam?.sabotageCardsCount || 0} Available</b>
@@ -2162,6 +2448,36 @@ export function AdminDashboard({ onLogout, onSwitchToWorkspace }) {
                     gap: '6px'
                   }}>
                     <Check size={14} /> Unlocked
+                  </span>
+                ) : isSabotageSoldToOther ? (
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(210, 153, 34, 0.14)',
+                    border: '1px solid rgba(210, 153, 34, 0.4)',
+                    color: '#e3b341',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Lock size={14} /> SOLD to {sabotageCardOwner.teamName}
+                  </span>
+                ) : isAuctionEnded ? (
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: 'var(--txt-dim)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Lock size={14} /> Auction Ended
                   </span>
                 ) : (
                   <button

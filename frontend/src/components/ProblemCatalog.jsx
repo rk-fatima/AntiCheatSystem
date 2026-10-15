@@ -10,6 +10,9 @@ export function ProblemCatalog({
   teamBalance = 1000,
   currentMember,
   team,
+  purchasedProblems = {},
+  purchasedCards = {},
+  eventState = null,
   onTeamUpdated,
   onSelectProblem
 }) {
@@ -17,16 +20,27 @@ export function ProblemCatalog({
   const [diffFilter, setDiffFilter] = useState('ALL');
   const [notification, setNotification] = useState(null);
 
+  const isAuctionEnded = Boolean(
+    eventState?.auctionStatus === 'ENDED' ||
+    (eventState && eventState.isAuctionActive === false)
+  );
+
   const filteredProblems = problems.filter((prob) => {
     const matchesSearch =
       prob.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prob.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (prob.cat || '').toLowerCase().includes(searchTerm.toLowerCase());
 
+    const isOwnedByThisTeam = Boolean(
+      unlockedIds.includes(prob.id) ||
+      purchasedProblems[prob.id]?.teamName === team?.name ||
+      (prob.origId && purchasedProblems[prob.origId]?.teamName === team?.name)
+    );
+
     const matchesDiff =
       diffFilter === 'ALL' ||
       prob.diff.toUpperCase() === diffFilter ||
-      (diffFilter === 'UNLOCKED' && unlockedIds.includes(prob.id));
+      (diffFilter === 'UNLOCKED' && isOwnedByThisTeam);
 
     return matchesSearch && matchesDiff;
   });
@@ -64,6 +78,8 @@ export function ProblemCatalog({
           team={team}
           currentMember={currentMember}
           unlockedProblems={problems.filter(p => unlockedIds.includes(p.id))}
+          purchasedCards={purchasedCards}
+          eventState={eventState}
           onTeamUpdated={onTeamUpdated}
           onOpenProblem={onSelectProblem}
         />
@@ -149,11 +165,14 @@ export function ProblemCatalog({
           borderTop: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
           {filteredProblems.map((prob) => {
-            const isUnlocked = unlockedIds.includes(prob.id);
             const isSolved = solvedIds.includes(prob.id);
             const statusInfo = problemStatuses[prob.id];
             const diffPoints = prob.diff === 'Hard' ? 400 : (prob.diff === 'Medium' ? 300 : 200);
             const wrongCount = team?.problemWrong?.[prob.id] ?? statusInfo?.wrongSubmissions ?? 0;
+
+            const purchaseRecord = purchasedProblems[prob.id] || (prob.origId ? purchasedProblems[prob.origId] : null);
+            const isOwnedByOther = Boolean(purchaseRecord && purchaseRecord.teamName && purchaseRecord.teamName !== team?.name);
+            const isOwnedBySelf = Boolean(unlockedIds.includes(prob.id) || (purchaseRecord && purchaseRecord.teamName === team?.name));
 
             return (
               <div
@@ -181,8 +200,10 @@ export function ProblemCatalog({
                   <div style={{ flexShrink: 0, width: '20px', textAlign: 'center' }}>
                     {isSolved ? (
                       <span style={{ color: '#3fb950', fontSize: '16px', fontWeight: 700 }}>✓</span>
-                    ) : isUnlocked ? (
+                    ) : isOwnedBySelf ? (
                       <span style={{ color: '#58a6ff', fontSize: '13px' }}>●</span>
+                    ) : isOwnedByOther ? (
+                      <span style={{ color: '#d29922', fontSize: '13px' }}>🔒</span>
                     ) : (
                       <span style={{ color: 'var(--txt-dim)', fontSize: '14px' }}>🔒</span>
                     )}
@@ -194,7 +215,7 @@ export function ProblemCatalog({
                       <span style={{
                         fontSize: '15px',
                         fontWeight: 600,
-                        color: isUnlocked ? '#ffffff' : '#c9d1d9',
+                        color: isOwnedBySelf ? '#ffffff' : (isOwnedByOther ? '#e3b341' : '#c9d1d9'),
                         letterSpacing: '0.1px'
                       }}>
                         {prob.id} &nbsp;{prob.title}
@@ -231,6 +252,15 @@ export function ProblemCatalog({
                         </>
                       )}
 
+                      {isOwnedByOther && (
+                        <>
+                          <span>•</span>
+                          <span style={{ color: '#d29922', fontWeight: 500 }}>
+                            Purchased by {purchaseRecord.teamName}
+                          </span>
+                        </>
+                      )}
+
                       {wrongCount > 0 && !isSolved && (
                         <>
                           <span>•</span>
@@ -245,7 +275,7 @@ export function ProblemCatalog({
 
                 {/* Right: Clean Action Button / Lock Status (Admin Controlled) */}
                 <div style={{ flexShrink: 0 }}>
-                  {isUnlocked ? (
+                  {isOwnedBySelf ? (
                     <button
                       className="btn-ghost"
                       onClick={() => onSelectProblem(prob.id)}
@@ -258,6 +288,37 @@ export function ProblemCatalog({
                     >
                       Open →
                     </button>
+                  ) : isOwnedByOther ? (
+                    <span style={{
+                      fontSize: '12px',
+                      color: '#d29922',
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(210, 153, 34, 0.1)',
+                      border: '1px solid rgba(210, 153, 34, 0.3)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontWeight: 600,
+                      userSelect: 'none'
+                    }}>
+                      <Lock size={12} /> SOLD to {purchaseRecord.teamName}
+                    </span>
+                  ) : isAuctionEnded ? (
+                    <span style={{
+                      fontSize: '12px',
+                      color: 'var(--txt-dim)',
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      userSelect: 'none'
+                    }}>
+                      <Lock size={12} /> Auction Ended
+                    </span>
                   ) : (
                     <span style={{
                       fontSize: '12px',

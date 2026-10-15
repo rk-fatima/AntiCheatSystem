@@ -3370,5 +3370,7 @@
       "O(n³+)": 30
     },
     "wrongSubmissionPenalty": 5
-  }
+  },
+  "purchasedProblems": {},
+  "purchasedCards": {}
 }

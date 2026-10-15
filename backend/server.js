@@ -172,7 +172,18 @@ app.get('/api/problems', (req, res) => {
   // STRICT SECURITY: Hidden tests and expected outputs are never exposed!
   res.json({
     problems: db.getPublicProblems(),
-    prices: db.getAllPrices()
+    prices: db.getAllPrices(),
+    purchasedProblems: db.getPurchasedProblems(),
+    purchasedCards: db.getPurchasedCards(),
+    eventState: db.getEventState()
+  });
+});
+
+app.get('/api/problems/purchased', (req, res) => {
+  res.json({
+    purchasedProblems: db.getPurchasedProblems(),
+    purchasedCards: db.getPurchasedCards(),
+    eventState: db.getEventState()
   });
 });
 
@@ -184,7 +195,15 @@ app.post('/api/problems/purchase', (req, res) => {
   }
 
   try {
-    const { team, txn, problem } = db.purchaseProblem(teamName, memberId, problemId, bidAmount, password);
+    const { team, txn, problem, purchasedProblems } = db.purchaseProblem(teamName, memberId, problemId, bidAmount, password);
+
+    // Global broadcast to ALL teams so this problem immediately shows as SOLD across the board
+    broadcastToAll({
+      type: 'PROBLEM_PURCHASED',
+      problemId: problem.id,
+      teamName: team.name,
+      purchasedProblems: db.getPurchasedProblems()
+    });
 
     // Real-time broadcast to all members of this team
     broadcastToTeam(teamName, {
@@ -207,7 +226,8 @@ app.post('/api/problems/purchase', (req, res) => {
       success: true,
       team,
       transaction: txn,
-      problem
+      problem,
+      purchasedProblems: db.getPurchasedProblems()
     });
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -979,6 +999,12 @@ app.post('/api/admin/problems/unlock', (req, res) => {
   const { teamName, problemId, bidPrice } = req.body;
   try {
     const result = db.adminUnlockProblem(teamName, problemId, bidPrice);
+    broadcastToAll({
+      type: 'PROBLEM_PURCHASED',
+      problemId,
+      teamName,
+      purchasedProblems: db.getPurchasedProblems()
+    });
     broadcastTeamsAndLeaderboard(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1001,6 +1027,12 @@ app.post('/api/admin/cards/unlock', (req, res) => {
   const { teamName, cardType, bidPrice } = req.body;
   try {
     const result = db.adminUnlockCard(teamName, cardType, bidPrice);
+    broadcastToAll({
+      type: 'CARD_PURCHASED',
+      cardType,
+      teamName,
+      purchasedCards: db.getPurchasedCards()
+    });
     broadcastTeamsAndLeaderboard(result, res);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1186,7 +1218,9 @@ app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
     archivedEvents: db.getArchivedEvents(),
     registrations: db.getAllRegistrations(),
     scoringConfig: db.getScoringConfig(),
-    complexityReviews: db.getAllComplexityReviews()
+    complexityReviews: db.getAllComplexityReviews(),
+    purchasedProblems: db.getPurchasedProblems(),
+    purchasedCards: db.getPurchasedCards()
   });
 });
 

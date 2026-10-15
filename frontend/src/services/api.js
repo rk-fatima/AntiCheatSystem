@@ -90,7 +90,77 @@ function normalizeStoreShape(parsed) {
   if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
   if (!Array.isArray(parsed.unlockHistory)) parsed.unlockHistory = [];
   if (!Array.isArray(parsed.appliedEventIds)) parsed.appliedEventIds = [];
+  if (!parsed.purchasedProblems || typeof parsed.purchasedProblems !== 'object' || Array.isArray(parsed.purchasedProblems)) {
+    parsed.purchasedProblems = {};
+  }
+  if (!parsed.purchasedCards || typeof parsed.purchasedCards !== 'object' || Array.isArray(parsed.purchasedCards)) {
+    parsed.purchasedCards = {};
+  }
   return parsed;
+}
+
+function isAuctionEndedHelper(store) {
+  const es = store?.eventState || {};
+  const ce = store?.currentEvent || {};
+  return (
+    es.auctionStatus === 'ENDED' ||
+    es.auctionStatus === 'AUCTION_ENDED' ||
+    es.auctionEnded === true ||
+    ce.auctionStatus === 'ENDED' ||
+    ce.auctionStatus === 'AUCTION_ENDED' ||
+    ce.auctionEnded === true ||
+    es.isBiddingActive === false
+  );
+}
+
+function getPurchasedProblemsMap(store) {
+  const map = { ...(store?.purchasedProblems || {}) };
+  if (store?.teams) {
+    for (const [teamKey, team] of Object.entries(store.teams)) {
+      if (Array.isArray(team.unlocked)) {
+        for (const pId of team.unlocked) {
+          const canonical = String(pId).toUpperCase();
+          if (!map[canonical]) {
+            map[canonical] = {
+              problemId: pId,
+              teamName: team.name,
+              teamKey: teamKey.toUpperCase(),
+              purchasedAt: team.problemStatuses?.[pId]?.unlockedAt || new Date().toISOString()
+            };
+          }
+        }
+      }
+    }
+  }
+  return map;
+}
+
+function getPurchasedCardsMap(store) {
+  const map = { ...(store?.purchasedCards || {}) };
+  if (store?.teams) {
+    for (const [teamKey, team] of Object.entries(store.teams)) {
+      if (Array.isArray(team.unlockedCards)) {
+        for (const cType of team.unlockedCards) {
+          const type = String(cType).toUpperCase();
+          if (!map[type]) {
+            map[type] = {
+              cardType: type,
+              teamName: team.name,
+              teamKey: teamKey.toUpperCase(),
+              purchasedAt: new Date().toISOString()
+            };
+          }
+        }
+      }
+      if (team.hintUnlocked && !map['HINT']) {
+        map['HINT'] = { cardType: 'HINT', teamName: team.name, teamKey: teamKey.toUpperCase(), purchasedAt: new Date().toISOString() };
+      }
+      if (team.sabotageUnlocked && !map['SABOTAGE']) {
+        map['SABOTAGE'] = { cardType: 'SABOTAGE', teamName: team.name, teamKey: teamKey.toUpperCase(), purchasedAt: new Date().toISOString() };
+      }
+    }
+  }
+  return map;
 }
 
 function getFallbackStore() {
@@ -118,7 +188,9 @@ function getFallbackStore() {
     transactions: [],
     unlockHistory: [],
     appliedEventIds: [],
-    teams: {}
+    teams: {},
+    purchasedProblems: {},
+    purchasedCards: {}
   };
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialStore));
@@ -220,6 +292,8 @@ function applyCloudEvent(store, evt) {
     store.unlockHistory = [];
     store.registrations = {};
     store.teams = {};
+    store.purchasedProblems = {};
+    store.purchasedCards = {};
     store.currentEvent = evt.currentEvent || {
       id: evt.eventState?.currentEventId || `EVT-${Date.now()}`,
       name: evt.eventState?.currentEventName || 'QUBIT Code Auctioneer',
@@ -227,13 +301,19 @@ function applyCloudEvent(store, evt) {
       startedAt: evt.eventState?.startedAt || new Date().toISOString(),
       endedAt: null,
       participatingTeams: [],
-      teamParticipationRecords: {}
+      teamParticipationRecords: {},
+      auctionStatus: 'ACTIVE',
+      auctionEnded: false,
+      isBiddingActive: true
     };
     store.eventState = evt.eventState || {
       status: 'EVENT_LIVE',
       startedAt: new Date().toISOString(),
       endedAt: null,
-      participatingTeams: []
+      participatingTeams: [],
+      auctionStatus: 'ACTIVE',
+      auctionEnded: false,
+      isBiddingActive: true
     };
     return true;
   }
@@ -247,6 +327,8 @@ function applyCloudEvent(store, evt) {
     store.registrations = {};
     store.transactions = [];
     store.unlockHistory = [];
+    store.purchasedProblems = {};
+    store.purchasedCards = {};
     store.currentEvent = evt.currentEvent || {
       id: null,
       name: null,
@@ -254,7 +336,10 @@ function applyCloudEvent(store, evt) {
       startedAt: null,
       endedAt: evt.eventState?.endedAt || new Date().toISOString(),
       participatingTeams: [],
-      teamParticipationRecords: {}
+      teamParticipationRecords: {},
+      auctionStatus: 'ENDED',
+      auctionEnded: true,
+      isBiddingActive: false
     };
     store.eventState = evt.eventState || {
       status: 'EVENT_ENDED',
@@ -262,20 +347,24 @@ function applyCloudEvent(store, evt) {
       endedAt: new Date().toISOString(),
       currentEventId: null,
       currentEventName: null,
-      participatingTeams: []
+      participatingTeams: [],
+      auctionStatus: 'ENDED',
+      auctionEnded: true,
+      isBiddingActive: false
     };
     return true;
   }
 
   if (evt.type === 'AUCTION_END') {
     if (!store.eventState) store.eventState = {};
-    store.eventState.auctionStatus = 'AUCTION_ENDED';
+    store.eventState.auctionStatus = 'ENDED';
     store.eventState.auctionEnded = true;
     store.eventState.isBiddingActive = false;
     store.eventState.auctionEndedAt = evt.auctionEndedAt || new Date().toISOString();
     if (store.currentEvent) {
       store.currentEvent.auctionEnded = true;
-      store.currentEvent.auctionStatus = 'AUCTION_ENDED';
+      store.currentEvent.auctionStatus = 'ENDED';
+      store.currentEvent.isBiddingActive = false;
     }
     if (!store.teams) store.teams = {};
     for (const team of Object.values(store.teams)) {
@@ -286,7 +375,32 @@ function applyCloudEvent(store, evt) {
         team.auctionBonusAwarded = true;
         team.auctionBonusAwardedAt = store.eventState.auctionEndedAt;
       }
+      team.balance = 0;
     }
+    return true;
+  }
+
+  if (evt.type === 'PROBLEM_PURCHASED' && evt.problemId) {
+    if (!store.purchasedProblems) store.purchasedProblems = {};
+    store.purchasedProblems[String(evt.problemId).toUpperCase()] = {
+      problemId: evt.problemId,
+      teamName: evt.teamName,
+      teamKey: (evt.teamName || '').toUpperCase(),
+      purchasedAt: evt.purchasedAt || new Date().toISOString(),
+      bidAmount: evt.bidAmount
+    };
+    return true;
+  }
+
+  if (evt.type === 'CARD_PURCHASED' && evt.cardType) {
+    if (!store.purchasedCards) store.purchasedCards = {};
+    store.purchasedCards[String(evt.cardType).toUpperCase()] = {
+      cardType: String(evt.cardType).toUpperCase(),
+      teamName: evt.teamName,
+      teamKey: (evt.teamName || '').toUpperCase(),
+      purchasedAt: evt.purchasedAt || new Date().toISOString(),
+      bidAmount: evt.bidAmount
+    };
     return true;
   }
 
@@ -481,9 +595,13 @@ export async function fetchProblems() {
   } catch (e) {}
 
   // Fallback
+  const store = getFallbackStore();
   return {
     problems: fallbackProblemsData.problems || [],
-    prices: {}
+    prices: {},
+    purchasedProblems: getPurchasedProblemsMap(store),
+    purchasedCards: getPurchasedCardsMap(store),
+    eventState: store?.eventState || {}
   };
 }
 
@@ -680,16 +798,17 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
     const errData = await res.json().catch(() => ({}));
     if (errData.error) throw new Error(errData.error);
   } catch (e) {
-    if (!e.isStaticFallback && e.message && e.message.includes('Incorrect password')) throw e;
+    if (!e.isStaticFallback) throw e;
   }
 
   const store = getFallbackStore();
+  if (isAuctionEndedHelper(store)) {
+    throw new Error('Auction has ended! Purchases are no longer allowed.');
+  }
   if (store.eventState?.status !== 'EVENT_LIVE') {
     throw new Error('The event is not live. Problem bidding will activate once the competition starts.');
   }
-  if (store.eventState?.auctionEnded || store.eventState?.isBiddingActive === false) {
-    throw new Error('The auction has ended. Problem bidding and purchasing are closed.');
-  }
+
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) {
@@ -697,6 +816,13 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
   }
   if (team.isLocked) {
     throw new Error('Your screen has been locked by the administrator.');
+  }
+
+  const canonicalId = (problemId || '').trim().toUpperCase();
+  const purchasedMap = getPurchasedProblemsMap(store);
+  const existingOwner = purchasedMap[canonicalId];
+  if (existingOwner && existingOwner.teamKey !== key) {
+    throw new Error('Cannot buy this problem! It has already been purchased by another team.');
   }
 
   // Client-side password validation
@@ -743,9 +869,26 @@ export async function purchaseProblem({ teamName, memberId, problemId, bidAmount
     displayTime: new Date().toLocaleTimeString()
   });
 
+  store.purchasedProblems = store.purchasedProblems || {};
+  store.purchasedProblems[canonicalId] = {
+    problemId,
+    teamName: team.name,
+    teamKey: key,
+    purchasedAt: new Date().toISOString(),
+    bidAmount: cost,
+    memberId
+  };
+
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
-  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
+  await publishCloudEvent({
+    evtId,
+    type: 'PROBLEM_PURCHASED',
+    problemId,
+    teamName: team.name,
+    bidAmount: cost,
+    team
+  });
   return { success: true, team, problem: { id: problemId } };
 }
 
@@ -1387,25 +1530,51 @@ export async function purchaseHintPass({ teamName, memberId, problemId }) {
       body: JSON.stringify({ teamName, memberId, problemId })
     });
     if (res.ok) return await res.json();
-  } catch (e) {}
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error) throw new Error(errData.error);
+  } catch (e) {
+    if (!e.isStaticFallback) throw e;
+  }
 
   const store = getFallbackStore();
+  if (isAuctionEndedHelper(store)) {
+    throw new Error('Auction has ended! Purchases are no longer allowed.');
+  }
   if (store.eventState?.status !== 'EVENT_LIVE') {
     throw new Error('The event is not live. Hint Pass purchase will activate once the competition starts.');
-  }
-  if (store.eventState?.auctionEnded || store.eventState?.isBiddingActive === false) {
-    throw new Error('The auction has ended. Hint Pass purchasing is closed.');
   }
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) throw new Error('Team not found.');
   if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
+
+  const purchasedCards = getPurchasedCardsMap(store);
+  if (purchasedCards['HINT'] && purchasedCards['HINT'].teamKey !== key) {
+    throw new Error('Cannot buy this card! It has already been purchased by another team.');
+  }
+
   if (team.balance < 40) throw new Error('Insufficient ByteCoins for Hint Pass.');
   team.balance -= 40;
   team.hintPassesCount = (team.hintPassesCount || 0) + 1;
+  store.purchasedCards = store.purchasedCards || {};
+  store.purchasedCards['HINT'] = {
+    cardType: 'HINT',
+    teamName: team.name,
+    teamKey: key,
+    purchasedAt: new Date().toISOString(),
+    bidAmount: 40
+  };
+
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
-  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
+  await publishCloudEvent({
+    evtId,
+    type: 'CARD_PURCHASED',
+    cardType: 'HINT',
+    teamName: team.name,
+    bidAmount: 40,
+    team
+  });
   return { success: true, team };
 }
 
@@ -1453,25 +1622,51 @@ export async function purchaseSabotageCard({ teamName, memberId }) {
       body: JSON.stringify({ teamName, memberId })
     });
     if (res.ok) return await res.json();
-  } catch (e) {}
+    const errData = await res.json().catch(() => ({}));
+    if (errData.error) throw new Error(errData.error);
+  } catch (e) {
+    if (!e.isStaticFallback) throw e;
+  }
 
   const store = getFallbackStore();
+  if (isAuctionEndedHelper(store)) {
+    throw new Error('Auction has ended! Purchases are no longer allowed.');
+  }
   if (store.eventState?.status !== 'EVENT_LIVE') {
     throw new Error('The event is not live. Sabotage Card purchase will activate once the competition starts.');
-  }
-  if (store.eventState?.auctionEnded || store.eventState?.isBiddingActive === false) {
-    throw new Error('The auction has ended. Sabotage Card purchasing is closed.');
   }
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) throw new Error('Team not found.');
   if (team.isLocked) throw new Error('Your screen has been locked by the administrator.');
+
+  const purchasedCards = getPurchasedCardsMap(store);
+  if (purchasedCards['SABOTAGE'] && purchasedCards['SABOTAGE'].teamKey !== key) {
+    throw new Error('Cannot buy this card! It has already been purchased by another team.');
+  }
+
   if (team.balance < 40) throw new Error('Insufficient ByteCoins for Sabotage Card.');
   team.balance -= 40;
   team.sabotageCardsCount = (team.sabotageCardsCount || 0) + 1;
+  store.purchasedCards = store.purchasedCards || {};
+  store.purchasedCards['SABOTAGE'] = {
+    cardType: 'SABOTAGE',
+    teamName: team.name,
+    teamKey: key,
+    purchasedAt: new Date().toISOString(),
+    bidAmount: 40
+  };
+
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
-  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
+  await publishCloudEvent({
+    evtId,
+    type: 'CARD_PURCHASED',
+    cardType: 'SABOTAGE',
+    teamName: team.name,
+    bidAmount: 40,
+    team
+  });
   return { success: true, team };
 }
 
@@ -1523,15 +1718,23 @@ export async function unlockCard({ teamName, memberId, cardType, password }) {
     const errData = await res.json().catch(() => ({}));
     if (errData.error) throw new Error(errData.error);
   } catch (e) {
-    if (!e.isStaticFallback && e.message && e.message.includes('Incorrect password')) throw e;
+    if (!e.isStaticFallback) throw e;
   }
 
   const store = getFallbackStore();
+  if (isAuctionEndedHelper(store)) {
+    throw new Error('Auction has ended! Purchases are no longer allowed.');
+  }
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) throw new Error('Team not found.');
   const p = String(password || '').trim().toLowerCase();
   const type = String(cardType || '').trim().toUpperCase();
+
+  const purchasedCards = getPurchasedCardsMap(store);
+  if (purchasedCards[type] && purchasedCards[type].teamKey !== key) {
+    throw new Error('Cannot buy this card! It has already been purchased by another team.');
+  }
 
   let isValid = (p === 'qubit' || p === 'admin');
   if (type === 'HINT') {
@@ -1548,9 +1751,26 @@ export async function unlockCard({ teamName, memberId, cardType, password }) {
   if (!team.unlockedCards.includes(type)) {
     team.unlockedCards.push(type);
   }
+  if (type === 'HINT') team.hintUnlocked = true;
+  if (type === 'SABOTAGE') team.sabotageUnlocked = true;
+
+  store.purchasedCards = store.purchasedCards || {};
+  store.purchasedCards[type] = {
+    cardType: type,
+    teamName: team.name,
+    teamKey: key,
+    purchasedAt: new Date().toISOString()
+  };
+
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
-  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team });
+  await publishCloudEvent({
+    evtId,
+    type: 'CARD_PURCHASED',
+    cardType: type,
+    teamName: team.name,
+    team
+  });
   return { success: true, team, cardType: type };
 }
 
@@ -1678,14 +1898,25 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
     const errData = await res.json().catch(() => null);
     if (errData?.error) throw new Error(errData.error);
   } catch (e) {
-    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback) throw e;
   }
 
   const store = getFallbackStore();
+  if (isAuctionEndedHelper(store)) {
+    throw new Error('Auction has ended! Purchases are no longer allowed.');
+  }
+
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) {
     throw new Error(`Team "${teamName}" not found.`);
+  }
+
+  const canonicalId = (problemId || '').trim().toUpperCase();
+  const purchasedMap = getPurchasedProblemsMap(store);
+  const existingOwner = purchasedMap[canonicalId];
+  if (existingOwner && existingOwner.teamKey !== key) {
+    throw new Error('Cannot buy this problem! It has already been purchased by another team.');
   }
 
   const bid = Number(bidPrice);
@@ -1717,6 +1948,16 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
     };
   }
 
+  store.purchasedProblems = store.purchasedProblems || {};
+  store.purchasedProblems[canonicalId] = {
+    problemId,
+    teamName: team.name,
+    teamKey: key,
+    purchasedAt: new Date().toISOString(),
+    bidPrice: bid,
+    unlockedBy: 'ADMIN'
+  };
+
   const prob = (fallbackProblemsData.problems || []).find(p => p.id === problemId);
   const problemTitle = prob ? prob.title : problemId;
 
@@ -1730,7 +1971,15 @@ export async function adminUnlockProblem({ teamName, problemId, bidPrice }) {
 
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
-  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team, unlockRecord: record });
+  await publishCloudEvent({
+    evtId,
+    type: 'PROBLEM_PURCHASED',
+    problemId,
+    teamName: team.name,
+    bidAmount: bid,
+    team,
+    unlockRecord: record
+  });
   return { success: true, team, teams: [team], txn: record, unlockRecord: record };
 }
 
@@ -1749,15 +1998,25 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
     const errData = await res.json().catch(() => null);
     if (errData?.error) throw new Error(errData.error);
   } catch (e) {
-    if (!e.isStaticFallback && e.message && !e.message.toLowerCase().includes('fetch')) throw e;
+    if (!e.isStaticFallback) throw e;
+  }
+
+  const store = getFallbackStore();
+  if (isAuctionEndedHelper(store)) {
+    throw new Error('Auction has ended! Purchases are no longer allowed.');
   }
 
   const type = String(cardType || '').trim().toUpperCase();
-  const store = getFallbackStore();
   const key = (teamName || '').trim().toUpperCase();
   const team = store.teams[key];
   if (!team) {
     throw new Error(`Team "${teamName}" not found.`);
+  }
+
+  const purchasedCards = getPurchasedCardsMap(store);
+  const existingCard = purchasedCards[type];
+  if (existingCard && existingCard.teamKey !== key) {
+    throw new Error('Cannot buy this card! It has already been purchased by another team.');
   }
 
   const cardTitle = type === 'HINT' ? 'Hint Pass' : 'Sabotage Card';
@@ -1793,6 +2052,16 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
     if (!team.sabotageCardsCount || team.sabotageCardsCount < 1) team.sabotageCardsCount = 1;
   }
 
+  store.purchasedCards = store.purchasedCards || {};
+  store.purchasedCards[type] = {
+    cardType: type,
+    teamName: team.name,
+    teamKey: key,
+    purchasedAt: new Date().toISOString(),
+    bidPrice: bid,
+    unlockedBy: 'ADMIN'
+  };
+
   const record = createAndRecordUnlockTxn(store, team, {
     id: `TXN-ADM-CARD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     problemId: type,
@@ -1805,7 +2074,15 @@ export async function adminUnlockCard({ teamName, cardType, bidPrice }) {
 
   const evtId = recordLocalEvtId(store);
   saveFallbackStore(store);
-  await publishCloudEvent({ evtId, type: 'TEAM_UPDATE', teamName: team.name, team, unlockRecord: record });
+  await publishCloudEvent({
+    evtId,
+    type: 'CARD_PURCHASED',
+    cardType: type,
+    teamName: team.name,
+    bidAmount: bid,
+    team,
+    unlockRecord: record
+  });
   return { success: true, team, teams: [team], cardType: type, txn: record, unlockRecord: record };
 }
 
@@ -1984,6 +2261,8 @@ export async function startEventSession({ participatingTeams = [], eventName = '
   store.unlockHistory = [];
   store.registrations = {};
   store.teams = {};
+  store.purchasedProblems = {};
+  store.purchasedCards = {};
 
   store.currentEvent = {
     id: sessionId,
@@ -1993,7 +2272,7 @@ export async function startEventSession({ participatingTeams = [], eventName = '
     endedAt: null,
     participatingTeams: [],
     teamParticipationRecords: {},
-    auctionStatus: 'AUCTION_ACTIVE',
+    auctionStatus: 'ACTIVE',
     auctionEnded: false,
     isBiddingActive: true,
     auctionEndedAt: null
@@ -2006,7 +2285,7 @@ export async function startEventSession({ participatingTeams = [], eventName = '
     currentEventId: sessionId,
     currentEventName: sessionTitle,
     participatingTeams: [],
-    auctionStatus: 'AUCTION_ACTIVE',
+    auctionStatus: 'ACTIVE',
     auctionEnded: false,
     isBiddingActive: true,
     auctionEndedAt: null
@@ -2100,7 +2379,9 @@ export async function endEventSession() {
     teamSnapshots,
     registrationsArchive: Object.values(store.registrations || {}),
     transactions: [...(store.transactions || [])],
-    unlockHistory: [...(store.unlockHistory || [])]
+    unlockHistory: [...(store.unlockHistory || [])],
+    purchasedProblems: { ...(store.purchasedProblems || {}) },
+    purchasedCards: { ...(store.purchasedCards || {}) }
   };
 
   store.archivedEvents.push(archiveRecord);
@@ -2110,6 +2391,8 @@ export async function endEventSession() {
   store.registrations = {};
   store.transactions = [];
   store.unlockHistory = [];
+  store.purchasedProblems = {};
+  store.purchasedCards = {};
 
   store.currentEvent = {
     id: null,
@@ -2119,7 +2402,7 @@ export async function endEventSession() {
     endedAt,
     participatingTeams: [],
     teamParticipationRecords: {},
-    auctionStatus: 'AUCTION_ENDED',
+    auctionStatus: 'ENDED',
     auctionEnded: true,
     isBiddingActive: false,
     auctionEndedAt: store.eventState?.auctionEndedAt || endedAt
@@ -2132,7 +2415,7 @@ export async function endEventSession() {
     currentEventId: null,
     currentEventName: null,
     participatingTeams: [],
-    auctionStatus: 'AUCTION_ENDED',
+    auctionStatus: 'ENDED',
     auctionEnded: true,
     isBiddingActive: false,
     auctionEndedAt: store.eventState?.auctionEndedAt || endedAt
@@ -2180,14 +2463,15 @@ export async function endAuctionSession() {
   if (!store.eventState) store.eventState = {};
 
   const endedAt = backendResult?.eventState?.auctionEndedAt || new Date().toISOString();
-  store.eventState.auctionStatus = 'AUCTION_ENDED';
+  store.eventState.auctionStatus = 'ENDED';
   store.eventState.auctionEnded = true;
   store.eventState.isBiddingActive = false;
   store.eventState.auctionEndedAt = endedAt;
 
   if (store.currentEvent) {
     store.currentEvent.auctionEnded = true;
-    store.currentEvent.auctionStatus = 'AUCTION_ENDED';
+    store.currentEvent.auctionStatus = 'ENDED';
+    store.currentEvent.isBiddingActive = false;
     store.currentEvent.auctionEndedAt = endedAt;
   }
 
@@ -2208,6 +2492,8 @@ export async function endAuctionSession() {
         newScore: team.score
       });
     }
+    // Set remaining ByteCoins to 0 permanently for every team
+    team.balance = 0;
   }
 
   const evtId = recordLocalEvtId(store);
@@ -2234,7 +2520,7 @@ export async function endAuctionSession() {
         score: t.score || 0,
         bytecoinBonus: t.bytecoinBonus || 0,
         auctionBonusAwarded: Boolean(t.auctionBonusAwarded),
-        balance: t.balance ?? 1000,
+        balance: 0,
         solvedCount: (t.solved || []).length
       }))
       .sort((a, b) => b.score - a.score || b.balance - a.balance)
@@ -2535,7 +2821,9 @@ export async function fetchAdminOverview() {
     currentEvent: store.currentEvent || null,
     registrations: activeRegistrations,
     scoringConfig: store.scoringConfig || null,
-    complexityReviews: []
+    complexityReviews: [],
+    purchasedProblems: getPurchasedProblemsMap(store),
+    purchasedCards: getPurchasedCardsMap(store)
   };
 }
 

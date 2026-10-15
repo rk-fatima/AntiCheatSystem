@@ -7,6 +7,8 @@ export function PowerCardsSection({
   team,
   currentMember,
   unlockedProblems = [],
+  purchasedCards = {},
+  eventState = null,
   onTeamUpdated,
   onOpenProblem
 }) {
@@ -23,14 +25,51 @@ export function PowerCardsSection({
   const sabotageCardsCount = team?.sabotageCardsCount || 0;
   const canAfford = teamBalance >= 40;
 
-  const isHintUnlocked = Boolean(team?.unlockedCards?.includes('HINT') || team?.hintUnlocked);
-  const isSabotageUnlocked = Boolean(team?.unlockedCards?.includes('SABOTAGE') || team?.sabotageUnlocked);
+  const isAuctionEnded = Boolean(
+    eventState?.auctionStatus === 'ENDED' ||
+    (eventState && eventState.isAuctionActive === false)
+  );
+
+  const hintPurchase = purchasedCards?.HINT;
+  const sabotagePurchase = purchasedCards?.SABOTAGE;
+
+  const isHintSoldToOther = Boolean(
+    hintPurchase && hintPurchase.teamName && hintPurchase.teamName !== team?.name
+  );
+  const isSabotageSoldToOther = Boolean(
+    sabotagePurchase && sabotagePurchase.teamName && sabotagePurchase.teamName !== team?.name
+  );
+
+  const isHintUnlocked = Boolean(
+    team?.unlockedCards?.includes('HINT') ||
+    team?.hintUnlocked ||
+    (hintPurchase && hintPurchase.teamName === team?.name)
+  );
+  const isSabotageUnlocked = Boolean(
+    team?.unlockedCards?.includes('SABOTAGE') ||
+    team?.sabotageUnlocked ||
+    (sabotagePurchase && sabotagePurchase.teamName === team?.name)
+  );
 
   const unlockedWithoutHints = unlockedProblems.filter(
     (p) => !team?.revealedHints || !team.revealedHints[p.id]
   );
 
   const handlePurchaseHintPass = async () => {
+    if (isAuctionEnded) {
+      setNotification({
+        type: 'error',
+        message: 'Auction has ended! Purchases are no longer allowed.'
+      });
+      return;
+    }
+    if (isHintSoldToOther) {
+      setNotification({
+        type: 'error',
+        message: 'Cannot buy this card! It has already been purchased by another team.'
+      });
+      return;
+    }
     if (!canAfford) {
       setNotification({
         type: 'error',
@@ -84,6 +123,20 @@ export function PowerCardsSection({
   };
 
   const handlePurchaseSabotage = async () => {
+    if (isAuctionEnded) {
+      setNotification({
+        type: 'error',
+        message: 'Auction has ended! Purchases are no longer allowed.'
+      });
+      return;
+    }
+    if (isSabotageSoldToOther) {
+      setNotification({
+        type: 'error',
+        message: 'Cannot buy this card! It has already been purchased by another team.'
+      });
+      return;
+    }
     if (!canAfford) {
       setNotification({
         type: 'error',
@@ -246,14 +299,14 @@ export function PowerCardsSection({
                 gap: '6px',
                 fontSize: '13px',
                 fontWeight: 600,
-                color: '#58a6ff',
-                background: 'rgba(56, 139, 253, 0.1)',
-                border: '1px solid rgba(56, 139, 253, 0.25)',
+                color: isHintSoldToOther ? '#d29922' : isAuctionEnded ? 'var(--txt-dim)' : '#58a6ff',
+                background: isHintSoldToOther ? 'rgba(210, 153, 34, 0.12)' : isAuctionEnded ? 'rgba(255, 255, 255, 0.04)' : 'rgba(56, 139, 253, 0.1)',
+                border: `1px solid ${isHintSoldToOther ? 'rgba(210, 153, 34, 0.3)' : isAuctionEnded ? 'rgba(255, 255, 255, 0.1)' : 'rgba(56, 139, 253, 0.25)'}`,
                 padding: '5px 14px',
                 borderRadius: '20px'
               }}>
                 <Lock size={12} />
-                <span>Locked</span>
+                <span>{isHintSoldToOther ? `SOLD to ${hintPurchase.teamName}` : isAuctionEnded ? 'Auction Ended' : 'Locked'}</span>
               </div>
             </div>
           ) : (
@@ -328,7 +381,7 @@ export function PowerCardsSection({
                       type="button"
                       className="btn-ghost"
                       onClick={handlePurchaseHintPass}
-                      disabled={loadingHint || !canAfford}
+                      disabled={loadingHint || !canAfford || isAuctionEnded || isHintSoldToOther}
                       style={{
                         padding: '9px 14px',
                         fontSize: '13px',
@@ -336,7 +389,7 @@ export function PowerCardsSection({
                       }}
                       title="Purchase additional Hint Pass"
                     >
-                      + Buy
+                      {isAuctionEnded ? 'Ended' : isHintSoldToOther ? 'Sold' : '+ Buy'}
                     </button>
                   </>
                 ) : (
@@ -344,7 +397,7 @@ export function PowerCardsSection({
                     type="button"
                     className="btn-blue"
                     onClick={handlePurchaseHintPass}
-                    disabled={loadingHint || !canAfford}
+                    disabled={loadingHint || !canAfford || isAuctionEnded || isHintSoldToOther}
                     style={{
                       width: '100%',
                       padding: '10px 14px',
@@ -352,7 +405,7 @@ export function PowerCardsSection({
                       borderRadius: '8px'
                     }}
                   >
-                    {loadingHint ? 'Purchasing...' : canAfford ? 'Purchase' : 'Unavailable'}
+                    {loadingHint ? 'Purchasing...' : isAuctionEnded ? 'Auction Ended' : isHintSoldToOther ? 'Sold' : canAfford ? 'Purchase' : 'Unavailable'}
                   </button>
                 )}
               </div>
@@ -428,14 +481,14 @@ export function PowerCardsSection({
                 gap: '6px',
                 fontSize: '13px',
                 fontWeight: 600,
-                color: '#ff7b72',
-                background: 'rgba(248, 81, 73, 0.1)',
-                border: '1px solid rgba(248, 81, 73, 0.25)',
+                color: isSabotageSoldToOther ? '#d29922' : isAuctionEnded ? 'var(--txt-dim)' : '#ff7b72',
+                background: isSabotageSoldToOther ? 'rgba(210, 153, 34, 0.12)' : isAuctionEnded ? 'rgba(255, 255, 255, 0.04)' : 'rgba(248, 81, 73, 0.1)',
+                border: `1px solid ${isSabotageSoldToOther ? 'rgba(210, 153, 34, 0.3)' : isAuctionEnded ? 'rgba(255, 255, 255, 0.1)' : 'rgba(248, 81, 73, 0.25)'}`,
                 padding: '5px 14px',
                 borderRadius: '20px'
               }}>
                 <Lock size={12} />
-                <span>Locked</span>
+                <span>{isSabotageSoldToOther ? `SOLD to ${sabotagePurchase.teamName}` : isAuctionEnded ? 'Auction Ended' : 'Locked'}</span>
               </div>
             </div>
           ) : (
@@ -510,7 +563,7 @@ export function PowerCardsSection({
                       type="button"
                       className="btn-ghost"
                       onClick={handlePurchaseSabotage}
-                      disabled={loadingSabotage || !canAfford}
+                      disabled={loadingSabotage || !canAfford || isAuctionEnded || isSabotageSoldToOther}
                       style={{
                         padding: '9px 14px',
                         fontSize: '13px',
@@ -518,7 +571,7 @@ export function PowerCardsSection({
                       }}
                       title="Purchase additional Sabotage Card"
                     >
-                      + Buy
+                      {isAuctionEnded ? 'Ended' : isSabotageSoldToOther ? 'Sold' : '+ Buy'}
                     </button>
                   </>
                 ) : (
@@ -526,18 +579,18 @@ export function PowerCardsSection({
                     type="button"
                     className="btn-danger"
                     onClick={handlePurchaseSabotage}
-                    disabled={loadingSabotage || !canAfford}
+                    disabled={loadingSabotage || !canAfford || isAuctionEnded || isSabotageSoldToOther}
                     style={{
                       width: '100%',
                       padding: '10px 14px',
                       fontSize: '13px',
                       borderRadius: '8px',
-                      background: canAfford ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                      color: canAfford ? '#ff7b72' : 'var(--txt-dim)',
-                      border: `1px solid ${canAfford ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`
+                      background: canAfford && !isAuctionEnded && !isSabotageSoldToOther ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                      color: canAfford && !isAuctionEnded && !isSabotageSoldToOther ? '#ff7b72' : 'var(--txt-dim)',
+                      border: `1px solid ${canAfford && !isAuctionEnded && !isSabotageSoldToOther ? 'rgba(248, 81, 73, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`
                     }}
                   >
-                    {loadingSabotage ? 'Purchasing...' : canAfford ? 'Purchase' : 'Unavailable'}
+                    {loadingSabotage ? 'Purchasing...' : isAuctionEnded ? 'Auction Ended' : isSabotageSoldToOther ? 'Sold' : canAfford ? 'Purchase' : 'Unavailable'}
                   </button>
                 )}
               </div>

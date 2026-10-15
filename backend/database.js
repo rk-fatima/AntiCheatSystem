@@ -45,7 +45,8 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 class Database {
-  constructor() {
+  constructor(storePath = STORE_PATH) {
+    this.storePath = storePath;
     this.state = {
       problems: [],
       problemPrices: {}, // problemId -> number (dynamically set by organizer)
@@ -79,8 +80,12 @@ class Database {
         timeComplexityDeductions: { ...DEFAULT_TIME_COMPLEXITY_DEDUCTIONS },
         spaceComplexityDeductions: { ...DEFAULT_SPACE_COMPLEXITY_DEDUCTIONS },
         wrongSubmissionPenalty: 5
-      }
+      },
+      purchasedProblems: {}, // problemId -> { problemId, origId, teamId, teamName, purchasedBy, purchasedByName, bidAmount, purchasedAt, status: 'SOLD' }
+      purchasedCards: {}     // cardType -> { cardType, teamId, teamName, purchasedAt, status: 'SOLD' }
     };
+    this._purchaseLocks = new Set();
+    this._cardPurchaseLocks = new Set();
     this.load();
     this.seedProblems();
     // Ensure clean state: remove dummy/test data
@@ -89,12 +94,14 @@ class Database {
 
   load() {
     try {
-      if (fs.existsSync(STORE_PATH)) {
-        const raw = fs.readFileSync(STORE_PATH, 'utf-8');
+      if (fs.existsSync(this.storePath)) {
+        const raw = fs.readFileSync(this.storePath, 'utf-8');
         const parsed = JSON.parse(raw);
         this.state = {
           ...this.state,
           ...parsed,
+          purchasedProblems: parsed.purchasedProblems || {},
+          purchasedCards: parsed.purchasedCards || {},
           problemPrices: parsed.problemPrices || {},
           transactions: parsed.transactions || [],
           unlockHistory: parsed.unlockHistory || [],
@@ -125,7 +132,7 @@ class Database {
 
   save() {
     try {
-      fs.writeFileSync(STORE_PATH, JSON.stringify(this.state, null, 2), 'utf-8');
+      fs.writeFileSync(this.storePath, JSON.stringify(this.state, null, 2), 'utf-8');
     } catch (err) {
       console.error('Failed to persist store:', err);
     }
@@ -514,17 +521,115 @@ class Database {
   }
 
   // --- EVENT STATUS & SESSION CONTROLS ---
+  isAuctionEnded() {
+    const es = this.state.eventState || {};
+    const current = this.state.currentEvent || {};
+    return Boolean(
+      es.auctionEnded ||
+      current.auctionEnded ||
+      es.auctionStatus === 'ENDED' ||
+      es.auctionStatus === 'AUCTION_ENDED' ||
+      current.auctionStatus === 'ENDED' ||
+      current.auctionStatus === 'AUCTION_ENDED' ||
+      es.isBiddingActive === false ||
+      es.status === 'EVENT_ENDED'
+    );
+  }
+
+  getPurchasedProblems() {
+    if (!this.state.purchasedProblems) {
+      this.state.purchasedProblems = {};
+    }
+    // Reconcile with any problem unlocked by any team in current active session
+    for (const teamKey of Object.keys(this.state.teams || {})) {
+      const team = this.state.teams[teamKey];
+      if (team && Array.isArray(team.unlocked)) {
+        for (const pId of team.unlocked) {
+          const normProb = this.getFullProblem(pId) || this.findProblemByKey(pId);
+          const canonicalId = normProb ? normProb.id : pId;
+          if (!this.state.purchasedProblems[canonicalId]) {
+            const statusInfo = team.problemStatuses?.[pId] || team.problemStatuses?.[canonicalId] || {};
+            this.state.purchasedProblems[canonicalId] = {
+              problemId: canonicalId,
+              origId: normProb?.origId || null,
+              teamId: team.name,
+              teamName: team.name,
+              purchasedBy: statusInfo.unlockedBy || 'TEAM',
+              purchasedByName: statusInfo.unlockedByName || team.name,
+              bidAmount: statusInfo.bidAmount || statusInfo.bidPrice || 0,
+              purchasedAt: statusInfo.unlockedAt || new Date().toISOString(),
+              status: 'SOLD'
+            };
+          }
+        }
+      }
+    }
+    return this.state.purchasedProblems;
+  }
+
+  getPurchasedCards() {
+    if (!this.state.purchasedCards) {
+      this.state.purchasedCards = {};
+    }
+    for (const teamKey of Object.keys(this.state.teams || {})) {
+      const team = this.state.teams[teamKey];
+      if (!team) continue;
+      const cards = [];
+      if (Array.isArray(team.unlockedCards)) cards.push(...team.unlockedCards);
+      if (team.hintUnlocked && !cards.includes('HINT')) cards.push('HINT');
+      if (team.sabotageUnlocked && !cards.includes('SABOTAGE')) cards.push('SABOTAGE');
+      for (const cType of cards) {
+        const type = String(cType).toUpperCase();
+        if (!this.state.purchasedCards[type]) {
+          this.state.purchasedCards[type] = {
+            cardType: type,
+            teamId: team.name,
+            teamName: team.name,
+            purchasedAt: new Date().toISOString(),
+            status: 'SOLD'
+          };
+        }
+      }
+    }
+    return this.state.purchasedCards;
+  }
+
+  isProblemPurchased(problemId) {
+    const map = this.getPurchasedProblems();
+    const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
+    const canonicalId = problem ? problem.id : problemId;
+    return Boolean(map[canonicalId] || (problem?.origId && map[problem.origId]));
+  }
+
+  getProblemOwner(problemId) {
+    const map = this.getPurchasedProblems();
+    const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
+    const canonicalId = problem ? problem.id : problemId;
+    return map[canonicalId] || (problem?.origId ? map[problem.origId] : null);
+  }
+
+  isCardPurchased(cardId) {
+    const map = this.getPurchasedCards();
+    return Boolean(map[String(cardId).toUpperCase()]);
+  }
+
+  getCardOwner(cardId) {
+    const map = this.getPurchasedCards();
+    return map[String(cardId).toUpperCase()] || null;
+  }
+
   getEventState() {
     if (!this.state.eventState) {
       this.state.eventState = { status: 'REGISTRATION_CLOSED', startedAt: null, endedAt: null };
     }
     const current = this.state.currentEvent;
     const isLive = this.state.eventState.status === 'EVENT_LIVE';
+    const auctionEnded = this.isAuctionEnded();
     return {
       ...this.state.eventState,
-      auctionStatus: this.state.eventState.auctionStatus || (isLive ? (this.state.eventState.auctionEnded ? 'AUCTION_ENDED' : 'AUCTION_ACTIVE') : 'AUCTION_ENDED'),
-      auctionEnded: Boolean(this.state.eventState.auctionEnded),
-      isBiddingActive: this.state.eventState.isBiddingActive !== undefined ? Boolean(this.state.eventState.isBiddingActive) : (isLive && !this.state.eventState.auctionEnded),
+      auctionStatus: auctionEnded ? 'ENDED' : (isLive ? 'ACTIVE' : 'ENDED'),
+      auctionEnded,
+      isBiddingActive: isLive && !auctionEnded,
       auctionEndedAt: this.state.eventState.auctionEndedAt || null,
       currentEventId: current?.id || null,
       currentEventName: current?.name || 'QUBIT Code Auctioneer',
@@ -643,11 +748,13 @@ class Database {
     const sessionTitle = (eventName || '').trim() || `QUBIT Code Auctioneer #${sessionNum}`;
     const sessionId = `EVT-${Date.now().toString(36).toUpperCase()}`;
 
-    // Clear active session logs and registrations for this fresh competition
+    // Clear active session logs, auction purchases, and registrations for this fresh competition
     this.state.transactions = [];
     this.state.unlockHistory = [];
     this.state.submissions = [];
     this.state.registrations = {};
+    this.state.purchasedProblems = {};
+    this.state.purchasedCards = {};
 
     // Reset event-specific participation, scores, and bidding data for pre-specified teams (if any)
     const teamParticipationRecords = {};
@@ -670,6 +777,8 @@ class Database {
         team.lockReason = '';
         team.attempts = [];
         team.frozenUntil = 0;
+        team.auctionBonusAwarded = false;
+        team.bytecoinBonus = 0;
         this.updateTeam(team);
 
         teamParticipationRecords[team.name] = {
@@ -691,7 +800,10 @@ class Database {
       startedAt,
       endedAt: null,
       participatingTeams: validatedTeamNames,
-      teamParticipationRecords
+      teamParticipationRecords,
+      auctionStatus: 'ACTIVE',
+      auctionEnded: false,
+      isBiddingActive: true
     };
 
     if (!this.state.eventState) this.state.eventState = {};
@@ -701,7 +813,7 @@ class Database {
     this.state.eventState.currentEventId = sessionId;
     this.state.eventState.currentEventName = sessionTitle;
     this.state.eventState.participatingTeams = validatedTeamNames;
-    this.state.eventState.auctionStatus = 'AUCTION_ACTIVE';
+    this.state.eventState.auctionStatus = 'ACTIVE';
     this.state.eventState.auctionEnded = false;
     this.state.eventState.isBiddingActive = true;
     this.state.eventState.auctionEndedAt = null;
@@ -778,7 +890,9 @@ class Database {
         return safe;
       }),
       transactions: [...(this.state.transactions || [])],
-      unlockHistory: [...(this.state.unlockHistory || [])]
+      unlockHistory: [...(this.state.unlockHistory || [])],
+      purchasedProblems: { ...(this.state.purchasedProblems || {}) },
+      purchasedCards: { ...(this.state.purchasedCards || {}) }
     };
 
     if (!this.state.archivedEvents) {
@@ -786,12 +900,13 @@ class Database {
     }
     this.state.archivedEvents.push(archiveRecord);
 
-    // Clear active session transactions, unlock history, submissions, and previous event registrations
-    // (all are safely preserved in archiveRecord!)
+    // Clear active session transactions, unlock history, submissions, auction purchases, and registrations
     this.state.transactions = [];
     this.state.unlockHistory = [];
     this.state.submissions = [];
     this.state.registrations = {};
+    this.state.purchasedProblems = {};
+    this.state.purchasedCards = {};
 
     // Reset each team's session data while preserving their permanent account
     for (const team of Object.values(this.state.teams)) {
@@ -811,6 +926,8 @@ class Database {
       team.lockReason = '';
       team.attempts = [];
       team.frozenUntil = 0;
+      team.auctionBonusAwarded = false;
+      team.bytecoinBonus = 0;
     }
 
     // Mark current event as completed and clear active participation list to prepare for next session
@@ -820,7 +937,7 @@ class Database {
     this.state.eventState.currentEventId = null;
     this.state.eventState.currentEventName = null;
     this.state.eventState.participatingTeams = [];
-    this.state.eventState.auctionStatus = 'AUCTION_ENDED';
+    this.state.eventState.auctionStatus = 'ENDED';
     this.state.eventState.auctionEnded = true;
     this.state.eventState.isBiddingActive = false;
 
@@ -831,7 +948,10 @@ class Database {
       startedAt: null,
       endedAt,
       participatingTeams: [],
-      teamParticipationRecords: {}
+      teamParticipationRecords: {},
+      auctionStatus: 'ENDED',
+      auctionEnded: true,
+      isBiddingActive: false
     };
 
     this.save();
@@ -847,74 +967,74 @@ class Database {
       throw new Error('Auction can only be ended while an event is live.');
     }
 
-    if (this.state.eventState?.auctionEnded) {
+    if (this.isAuctionEnded()) {
       throw new Error('Auction has already been finalized. Remaining ByteCoin bonus points cannot be awarded again.');
     }
 
     if (!this.state.eventState) this.state.eventState = {};
-    this.state.eventState.auctionStatus = 'AUCTION_ENDED';
+    const endedAt = new Date().toISOString();
+    this.state.eventState.auctionStatus = 'ENDED';
     this.state.eventState.auctionEnded = true;
     this.state.eventState.isBiddingActive = false;
-    this.state.eventState.auctionEndedAt = new Date().toISOString();
+    this.state.eventState.auctionEndedAt = endedAt;
 
     if (this.state.currentEvent) {
       this.state.currentEvent.auctionEnded = true;
-      this.state.currentEvent.auctionStatus = 'AUCTION_ENDED';
-      this.state.currentEvent.auctionEndedAt = this.state.eventState.auctionEndedAt;
+      this.state.currentEvent.auctionStatus = 'ENDED';
+      this.state.currentEvent.auctionEndedAt = endedAt;
+      this.state.currentEvent.isBiddingActive = false;
     }
-
-    const participatingNames = (this.state.currentEvent?.participatingTeams && this.state.currentEvent.participatingTeams.length > 0)
-      ? this.state.currentEvent.participatingTeams
-      : Object.keys(this.state.teams || {});
 
     const awardedBonuses = [];
 
-    for (const name of participatingNames) {
-      const team = this.getTeam(name);
+    // CRITICAL: Reset EVERY team's remaining BC balance to 0 across ALL registered teams in the system
+    for (const teamKey of Object.keys(this.state.teams || {})) {
+      const team = this.state.teams[teamKey];
       if (!team) continue;
 
-      if (team.auctionBonusAwarded) {
-        continue;
+      const remainingBC = Number(team.balance ?? 0);
+      if (!team.auctionBonusAwarded) {
+        const bonusPoints = Math.floor(remainingBC / 10);
+        const prevScore = team.score || 0;
+        const newScore = prevScore + bonusPoints;
+
+        team.score = newScore;
+        team.bytecoinBonus = bonusPoints;
+        team.auctionBonusAwarded = true;
+        team.auctionBonusAwardedAt = endedAt;
+        team.lastScoreTime = Date.now();
+
+        const txn = {
+          id: `TXN-AUC-BONUS-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          type: 'AUCTION_BONUS',
+          teamName: team.name,
+          problemId: 'AUCTION_FINALIZE',
+          problemTitle: 'Auction ByteCoin Conversion Bonus',
+          cardType: 'BONUS',
+          bidPrice: 0,
+          bidAmount: 0,
+          price: 0,
+          previousBalance: remainingBC,
+          remainingBalance: 0,
+          bonusPoints,
+          previousScore: prevScore,
+          newScore,
+          status: 'AWARDED',
+          timestamp: endedAt,
+          displayTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        };
+
+        if (!team.transactions) team.transactions = [];
+        team.transactions.unshift(txn);
+        if (!this.state.transactions) this.state.transactions = [];
+        this.state.transactions.unshift(txn);
+
+        awardedBonuses.push({ teamName: team.name, remainingBC, bonusPoints, prevScore, newScore });
       }
 
-      const remainingBC = team.balance ?? (this.state.config.initialTeamBalance || 1000);
-      const bonusPoints = Math.floor(remainingBC / 10);
-      const prevScore = team.score || 0;
-      const newScore = prevScore + bonusPoints;
-
-      team.score = newScore;
-      team.bytecoinBonus = bonusPoints;
-      team.auctionBonusAwarded = true;
-      team.auctionBonusAwardedAt = new Date().toISOString();
-      team.lastScoreTime = Date.now();
-
-      const txn = {
-        id: `TXN-AUC-BONUS-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-        type: 'AUCTION_BONUS',
-        teamName: team.name,
-        problemId: 'AUCTION_FINALIZE',
-        problemTitle: 'Auction ByteCoin Conversion Bonus',
-        cardType: 'BONUS',
-        bidPrice: 0,
-        bidAmount: 0,
-        price: 0,
-        previousBalance: remainingBC,
-        remainingBalance: remainingBC,
-        bonusPoints,
-        previousScore: prevScore,
-        newScore,
-        status: 'AWARDED',
-        timestamp: new Date().toISOString(),
-        displayTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-      };
-
-      if (!team.transactions) team.transactions = [];
-      team.transactions.unshift(txn);
-      if (!this.state.transactions) this.state.transactions = [];
-      this.state.transactions.unshift(txn);
-
+      // STRICT RULE 3: Set every team's remaining BC balance to exactly 0
+      team.balance = 0;
       this.updateTeam(team);
-      awardedBonuses.push({ teamName: team.name, remainingBC, bonusPoints, prevScore, newScore });
     }
 
     this.save();
@@ -1431,8 +1551,10 @@ class Database {
       }
       throw new Error('The event is not live. Problem bidding will activate once the competition starts.');
     }
-    if (eventState.auctionEnded || eventState.isBiddingActive === false) {
-      throw new Error('The auction has ended. Problem bidding and purchasing are closed.');
+
+    // STRICT RULE 4: Auction End check
+    if (this.isAuctionEnded()) {
+      throw new Error('Auction has ended! Purchases are no longer allowed.');
     }
 
     const team = this.getTeam(teamName);
@@ -1452,6 +1574,34 @@ class Database {
       throw new Error(`Problem "${problemId}" not found in catalog.`);
     }
 
+    const canonicalId = problem.id;
+
+    // STRICT RULE 2: Atomic concurrency protection
+    if (this._purchaseLocks.has(canonicalId)) {
+      throw new Error('Cannot buy this problem! It has already been purchased by another team.');
+    }
+
+    // STRICT RULE 1: Only ONE team can purchase a problem per auction
+    const purchasedMap = this.getPurchasedProblems();
+    const existing = purchasedMap[canonicalId] || (problem.origId && purchasedMap[problem.origId]);
+    if (existing && existing.teamId && existing.teamId.toLowerCase() !== team.name.toLowerCase()) {
+      throw new Error('Cannot buy this problem! It has already been purchased by another team.');
+    }
+
+    for (const otherTeam of Object.values(this.state.teams || {})) {
+      if (
+        otherTeam.name.toLowerCase() !== team.name.toLowerCase() &&
+        otherTeam.unlocked &&
+        (otherTeam.unlocked.includes(canonicalId) || (problem.origId && otherTeam.unlocked.includes(problem.origId)))
+      ) {
+        throw new Error('Cannot buy this problem! It has already been purchased by another team.');
+      }
+    }
+
+    if (team.unlocked && (team.unlocked.includes(canonicalId) || (problem.origId && team.unlocked.includes(problem.origId)))) {
+      throw new Error(`Problem "${problem.id} — ${problem.title}" is already unlocked for your team!`);
+    }
+
     if (password) {
       const p = String(password).trim().toLowerCase();
       const validPasswords = [
@@ -1465,10 +1615,6 @@ class Database {
       if (!validPasswords.includes(p)) {
         throw new Error('Incorrect password. Problem remains locked.');
       }
-    }
-
-    if (team.unlocked.includes(problem.id)) {
-      throw new Error(`Problem "${problem.id} — ${problem.title}" is already unlocked for your team!`);
     }
 
     // Determine bid amount: use entered winning bid amount or configured price
@@ -1488,45 +1634,71 @@ class Database {
       throw new Error(`Insufficient budget! Your winning bid is ₹${finalBidAmount}, but team only has ₹${team.balance} remaining.`);
     }
 
-    const member = this.getTeamMember(team, memberId);
+    // Enter critical atomic section
+    this._purchaseLocks.add(canonicalId);
+    try {
+      const member = this.getTeamMember(team, memberId);
 
-    // Deduct bid amount at the TEAM level
-    team.balance -= finalBidAmount;
-    team.unlocked.push(problem.id);
+      // Deduct bid amount at the TEAM level
+      team.balance -= finalBidAmount;
+      if (!team.unlocked) team.unlocked = [];
+      team.unlocked.push(canonicalId);
 
-    // Initialize problem status in shared workspace
-    if (!team.problemStatuses) team.problemStatuses = {};
-    team.problemStatuses[problem.id] = {
-      status: 'UNLOCKED',
-      unlockedBy: member.memberId,
-      unlockedByName: member.name,
-      bidAmount: finalBidAmount,
-      unlockedAt: new Date().toISOString()
-    };
+      // Initialize problem status in shared workspace
+      if (!team.problemStatuses) team.problemStatuses = {};
+      team.problemStatuses[canonicalId] = {
+        status: 'UNLOCKED',
+        unlockedBy: member.memberId,
+        unlockedByName: member.name,
+        bidAmount: finalBidAmount,
+        unlockedAt: new Date().toISOString()
+      };
 
-    // Maintain immutable transaction record
-    const now = new Date();
-    const txn = {
-      id: `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-      teamId: team.name,
-      teamName: team.name,
-      problemId: problem.id,
-      problemTitle: problem.title,
-      bidAmount: finalBidAmount,
-      price: finalBidAmount, // compatibility alias
-      purchasedBy: member.memberId,
-      purchasedByName: member.name,
-      remainingBalance: team.balance,
-      purchaseTime: now.toISOString(),
-      displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-    };
+      // Persistent global ownership mapping
+      if (!this.state.purchasedProblems) this.state.purchasedProblems = {};
+      this.state.purchasedProblems[canonicalId] = {
+        problemId: canonicalId,
+        origId: problem.origId || null,
+        teamId: team.name,
+        teamName: team.name,
+        purchasedBy: member.memberId,
+        purchasedByName: member.name,
+        bidAmount: finalBidAmount,
+        purchasedAt: new Date().toISOString(),
+        status: 'SOLD'
+      };
 
-    this.recordTransaction(team, txn);
+      // Maintain immutable transaction record
+      const now = new Date();
+      const txn = {
+        id: `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        teamId: team.name,
+        teamName: team.name,
+        problemId: canonicalId,
+        problemTitle: problem.title,
+        bidAmount: finalBidAmount,
+        price: finalBidAmount, // compatibility alias
+        purchasedBy: member.memberId,
+        purchasedByName: member.name,
+        remainingBalance: team.balance,
+        purchaseTime: now.toISOString(),
+        displayTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+      };
 
-    this.updateTeam(team);
-    this.save();
+      this.recordTransaction(team, txn);
+      this.updateTeam(team);
+      this.save();
 
-    return { team, txn, problem };
+      return {
+        success: true,
+        team,
+        txn,
+        problem,
+        purchasedProblems: this.getPurchasedProblems()
+      };
+    } finally {
+      this._purchaseLocks.delete(canonicalId);
+    }
   }
 
   // --- SHARED WORKSPACE ACTIVITY TRACKING ---
@@ -1854,8 +2026,8 @@ class Database {
       }
       throw new Error('The event is not live. Hint Pass purchase will activate once the competition starts.');
     }
-    if (eventState.auctionEnded || eventState.isBiddingActive === false) {
-      throw new Error('The auction has ended. Hint Pass purchasing is closed.');
+    if (this.isAuctionEnded()) {
+      throw new Error('Auction has ended! Purchases are no longer allowed.');
     }
 
     const team = this.getTeam(teamName);
@@ -1993,8 +2165,8 @@ class Database {
       }
       throw new Error('The event is not live. Sabotage Card purchase will activate once the competition starts.');
     }
-    if (eventState.auctionEnded || eventState.isBiddingActive === false) {
-      throw new Error('The auction has ended. Sabotage Card purchasing is closed.');
+    if (this.isAuctionEnded()) {
+      throw new Error('Auction has ended! Purchases are no longer allowed.');
     }
 
     const team = this.getTeam(teamName);
@@ -2142,6 +2314,10 @@ class Database {
 
   // --- POWER CARDS: PASSWORD-PROTECTED UNLOCK ---
   unlockCard(teamName, memberId, cardType, password) {
+    if (this.isAuctionEnded()) {
+      throw new Error('Auction has ended! Purchases are no longer allowed.');
+    }
+
     const team = this.getTeam(teamName);
     if (!team) throw new Error('Team not found.');
     if (this.isTeamFrozen(team.name)) {
@@ -2152,6 +2328,18 @@ class Database {
 
     const p = String(password || '').trim().toLowerCase();
     const type = String(cardType || '').trim().toUpperCase();
+
+    // Check if card is already purchased by another team
+    const purchasedCards = this.getPurchasedCards();
+    const existing = purchasedCards[type];
+    if (existing && existing.teamId && existing.teamId.toLowerCase() !== team.name.toLowerCase()) {
+      throw new Error('Cannot buy this card! It has already been purchased by another team.');
+    }
+    for (const otherTeam of Object.values(this.state.teams || {})) {
+      if (otherTeam.name.toLowerCase() !== team.name.toLowerCase() && otherTeam.unlockedCards && otherTeam.unlockedCards.includes(type)) {
+        throw new Error('Cannot buy this card! It has already been purchased by another team.');
+      }
+    }
 
     const adminPin = (this.state.config?.adminPin || 'qubit').toLowerCase();
     let isValid = (p === adminPin || p === 'qubit' || p === 'admin');
@@ -2171,9 +2359,21 @@ class Database {
     if (!team.unlockedCards) team.unlockedCards = [];
     if (!team.unlockedCards.includes(type)) {
       team.unlockedCards.push(type);
+      if (!this.state.purchasedCards) this.state.purchasedCards = {};
+      this.state.purchasedCards[type] = {
+        cardType: type,
+        teamId: team.name,
+        teamName: team.name,
+        purchasedBy: memberId || 'TEAM',
+        purchasedByName: memberId || team.name,
+        bidAmount: 40,
+        purchasedAt: new Date().toISOString(),
+        status: 'SOLD'
+      };
+      this.updateTeam(team);
       this.save();
     }
-    return { success: true, team, cardType: type };
+    return { success: true, team, cardType: type, purchasedCards: this.getPurchasedCards() };
   }
 
   // --- SUBMISSIONS ---
@@ -2215,6 +2415,9 @@ class Database {
     if (eventState.status === 'EVENT_ENDED') {
       throw new Error('The competition has concluded. Problem unlocks are no longer allowed.');
     }
+    if (this.isAuctionEnded()) {
+      throw new Error('Auction has ended! Purchases are no longer allowed.');
+    }
 
     if (!teamName || teamName.toUpperCase() === 'ALL') {
       throw new Error('Please select a specific target team to unlock a problem.');
@@ -2223,6 +2426,36 @@ class Database {
     const team = this.getTeam(teamName);
     if (!team) {
       throw new Error(`Team "${teamName}" not found.`);
+    }
+
+    const problem = this.getFullProblem(problemId) || this.findProblemByKey(problemId);
+    const canonicalId = problem ? problem.id : problemId;
+    const problemTitle = problem ? problem.title : problemId;
+
+    // Concurrency lock
+    if (this._purchaseLocks.has(canonicalId)) {
+      throw new Error('Cannot buy this problem! It has already been purchased by another team.');
+    }
+
+    // STRICT RULE 1: Only ONE team can purchase a problem per auction
+    const purchasedMap = this.getPurchasedProblems();
+    const existing = purchasedMap[canonicalId] || (problem?.origId && purchasedMap[problem.origId]);
+    if (existing && existing.teamId && existing.teamId.toLowerCase() !== team.name.toLowerCase()) {
+      throw new Error('Cannot buy this problem! It has already been purchased by another team.');
+    }
+
+    for (const otherTeam of Object.values(this.state.teams || {})) {
+      if (
+        otherTeam.name.toLowerCase() !== team.name.toLowerCase() &&
+        otherTeam.unlocked &&
+        (otherTeam.unlocked.includes(canonicalId) || (problem?.origId && otherTeam.unlocked.includes(problem.origId)))
+      ) {
+        throw new Error('Cannot buy this problem! It has already been purchased by another team.');
+      }
+    }
+
+    if (team.unlocked && (team.unlocked.includes(canonicalId) || (problem?.origId && team.unlocked.includes(problem.origId)))) {
+      throw new Error(`Problem "${canonicalId}" is already unlocked for team "${team.name}".`);
     }
 
     if (bidPrice === undefined || bidPrice === null || String(bidPrice).trim() === '') {
@@ -2239,43 +2472,61 @@ class Database {
       throw new Error('Insufficient ByteCoins');
     }
 
-    const problem = this.getProblem(problemId);
-    const problemTitle = problem ? problem.title : problemId;
+    this._purchaseLocks.add(canonicalId);
+    try {
+      const previousBalance = currentBalance;
+      team.balance = currentBalance - bid;
+      const remainingBalance = team.balance;
 
-    const previousBalance = currentBalance;
-    team.balance = currentBalance - bid;
-    const remainingBalance = team.balance;
+      if (!team.unlocked) team.unlocked = [];
+      team.unlocked.push(canonicalId);
 
-    if (!team.unlocked) team.unlocked = [];
-    if (!team.unlocked.includes(problemId)) {
-      team.unlocked.push(problemId);
-    }
-    if (!team.problemStatuses) team.problemStatuses = {};
-    if (!team.problemStatuses[problemId] || team.problemStatuses[problemId].status !== 'SOLVED') {
-      team.problemStatuses[problemId] = {
-        status: 'UNLOCKED',
-        unlockedBy: 'ADMIN',
-        unlockedByName: 'Administrator',
-        unlockedAt: new Date().toISOString(),
-        bidPrice: bid
+      if (!team.problemStatuses) team.problemStatuses = {};
+      if (!team.problemStatuses[canonicalId] || team.problemStatuses[canonicalId].status !== 'SOLVED') {
+        team.problemStatuses[canonicalId] = {
+          status: 'UNLOCKED',
+          unlockedBy: 'ADMIN',
+          unlockedByName: 'Administrator',
+          unlockedAt: new Date().toISOString(),
+          bidPrice: bid
+        };
+      }
+
+      if (!this.state.purchasedProblems) this.state.purchasedProblems = {};
+      this.state.purchasedProblems[canonicalId] = {
+        problemId: canonicalId,
+        origId: problem?.origId || null,
+        teamId: team.name,
+        teamName: team.name,
+        purchasedBy: 'ADMIN',
+        purchasedByName: 'Administrator',
+        bidAmount: bid,
+        purchasedAt: new Date().toISOString(),
+        status: 'SOLD'
       };
+
+      const txn = this.recordUnlockTransaction(team, {
+        problemId: canonicalId,
+        problemTitle,
+        bid,
+        previousBalance,
+        remainingBalance
+      });
+
+      this.updateTeam(team);
+      this.save();
+
+      return {
+        success: true,
+        team,
+        teams: [team],
+        txn,
+        unlockRecord: txn,
+        purchasedProblems: this.getPurchasedProblems()
+      };
+    } finally {
+      this._purchaseLocks.delete(canonicalId);
     }
-
-    const txn = this.recordUnlockTransaction(team, {
-      problemId,
-      problemTitle,
-      bid,
-      previousBalance,
-      remainingBalance
-    });
-
-    return {
-      success: true,
-      team,
-      teams: [team],
-      txn,
-      unlockRecord: txn
-    };
   }
 
   adminLockProblem(teamName, problemId) {
@@ -2286,6 +2537,9 @@ class Database {
     const eventState = this.getEventState();
     if (eventState.status === 'EVENT_ENDED') {
       throw new Error('The competition has concluded. Card unlocks are no longer allowed.');
+    }
+    if (this.isAuctionEnded()) {
+      throw new Error('Auction has ended! Purchases are no longer allowed.');
     }
 
     const type = String(cardType || '').trim().toUpperCase();
@@ -2299,6 +2553,18 @@ class Database {
     }
 
     const cardTitle = type === 'HINT' ? 'Hint Pass' : 'Sabotage Card';
+
+    // STRICT RULE 5: Check if card is already purchased by another team
+    const purchasedCards = this.getPurchasedCards();
+    const existing = purchasedCards[type];
+    if (existing && existing.teamId && existing.teamId.toLowerCase() !== team.name.toLowerCase()) {
+      throw new Error('Cannot buy this card! It has already been purchased by another team.');
+    }
+    for (const otherTeam of Object.values(this.state.teams || {})) {
+      if (otherTeam.name.toLowerCase() !== team.name.toLowerCase() && otherTeam.unlockedCards && otherTeam.unlockedCards.includes(type)) {
+        throw new Error('Cannot buy this card! It has already been purchased by another team.');
+      }
+    }
 
     if (
       (team.unlockedCards && team.unlockedCards.includes(type)) ||
@@ -2342,6 +2608,18 @@ class Database {
       }
     }
 
+    if (!this.state.purchasedCards) this.state.purchasedCards = {};
+    this.state.purchasedCards[type] = {
+      cardType: type,
+      teamId: team.name,
+      teamName: team.name,
+      purchasedBy: 'ADMIN',
+      purchasedByName: 'Administrator',
+      bidAmount: bid,
+      purchasedAt: new Date().toISOString(),
+      status: 'SOLD'
+    };
+
     const txn = this.recordUnlockTransaction(team, {
       id: `TXN-ADM-CARD-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       problemId: type,
@@ -2352,13 +2630,17 @@ class Database {
       remainingBalance
     });
 
+    this.updateTeam(team);
+    this.save();
+
     return {
       success: true,
       team,
       teams: [team],
       cardType: type,
       txn,
-      unlockRecord: txn
+      unlockRecord: txn,
+      purchasedCards: this.getPurchasedCards()
     };
   }
 
@@ -2413,4 +2695,6 @@ class Database {
   }
 }
 
+export { Database };
 export const db = new Database();
+export default db;

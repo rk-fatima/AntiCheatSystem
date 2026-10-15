@@ -38,6 +38,9 @@ export function App() {
   const [codeMap, setCodeMap] = useState({});
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
+  const [purchasedProblems, setPurchasedProblems] = useState({});
+  const [purchasedCards, setPurchasedCards] = useState({});
+  const [eventState, setEventState] = useState(null);
 
   const [viewMode, setViewMode] = useState(() => {
     const hash = window.location.hash.toLowerCase();
@@ -99,6 +102,15 @@ export function App() {
       const data = await fetchProblems();
       setProblems(data.problems || []);
       setProblemPrices(data.prices || {});
+      if (data.purchasedProblems) {
+        setPurchasedProblems(data.purchasedProblems);
+      }
+      if (data.purchasedCards) {
+        setPurchasedCards(data.purchasedCards);
+      }
+      if (data.eventState) {
+        setEventState(data.eventState);
+      }
     } catch (err) {
       console.error('Error fetching problems:', err);
     }
@@ -151,6 +163,42 @@ export function App() {
             }));
           } else if (msg.type === 'PRICES_UPDATED') {
             setProblemPrices(msg.prices || {});
+          } else if (msg.type === 'PROBLEM_PURCHASED') {
+            setPurchasedProblems(prev => ({
+              ...prev,
+              [msg.problemId]: {
+                teamId: msg.teamId,
+                teamName: msg.teamName,
+                itemType: 'PROBLEM',
+                problemId: msg.problemId,
+                purchasedAt: msg.purchasedAt || new Date().toISOString(),
+                price: msg.price
+              }
+            }));
+            if (msg.team && team && msg.team.name === team.name) {
+              setTeam(msg.team);
+            }
+          } else if (msg.type === 'CARD_PURCHASED') {
+            setPurchasedCards(prev => ({
+              ...prev,
+              [msg.cardId]: {
+                teamId: msg.teamId,
+                teamName: msg.teamName,
+                itemType: 'CARD',
+                cardId: msg.cardId,
+                purchasedAt: msg.purchasedAt || new Date().toISOString()
+              }
+            }));
+            if (msg.team && team && msg.team.name === team.name) {
+              setTeam(msg.team);
+            }
+          } else if (msg.type === 'AUCTION_ENDED') {
+            setEventState(prev => ({ ...prev, auctionStatus: 'ENDED' }));
+            setTeam(prev => prev ? { ...prev, balance: 0 } : prev);
+          } else if (msg.type === 'EVENT_STARTED' || msg.type === 'AUCTION_STARTED') {
+            setPurchasedProblems({});
+            setPurchasedCards({});
+            loadProblemsAndPrices();
           } else if (msg.type === 'TEAM_LOCKED') {
             if (msg.team) {
               setTeam(msg.team);
@@ -186,6 +234,18 @@ export function App() {
         }
         if (probData?.prices) {
           setProblemPrices(probData.prices);
+        }
+        if (probData?.purchasedProblems) {
+          setPurchasedProblems(probData.purchasedProblems);
+        }
+        if (probData?.purchasedCards) {
+          setPurchasedCards(probData.purchasedCards);
+        }
+        if (probData?.eventState) {
+          setEventState(probData.eventState);
+          if (probData.eventState.auctionStatus === 'ENDED') {
+            setTeam(prev => prev ? { ...prev, balance: 0 } : prev);
+          }
         }
       } catch (e) {}
     };
@@ -231,6 +291,14 @@ export function App() {
   // 6. Dynamic Team-Level Problem Purchase
   const handlePurchaseProblem = async (problemId, bidAmount, password) => {
     if (!team?.name) return;
+    const isAuctionEnded = eventState?.auctionStatus === 'ENDED' || eventState?.isAuctionActive === false;
+    if (isAuctionEnded) {
+      throw new Error("Auction has ended! Purchases are no longer allowed.");
+    }
+    const existing = purchasedProblems?.[problemId];
+    if (existing && existing.teamName !== team.name) {
+      throw new Error("Cannot buy this problem! It has already been purchased by another team.");
+    }
     const res = await purchaseProblem({
       teamName: team.name,
       memberId: currentMember?.memberId,
@@ -599,6 +667,9 @@ export function App() {
             teamBalance={team?.balance ?? 1000}
             currentMember={currentMember}
             team={team}
+            purchasedProblems={purchasedProblems}
+            purchasedCards={purchasedCards}
+            eventState={eventState}
             onTeamUpdated={setTeam}
             onSelectProblem={handleSelectProblem}
             onPurchaseProblem={handlePurchaseProblem}
