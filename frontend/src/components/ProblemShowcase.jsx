@@ -8,7 +8,6 @@ import {
   LogOut,
   Search,
   BookOpen,
-  Lightbulb,
   Tag,
   ArrowRight,
   Download
@@ -101,7 +100,6 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficultyFilter, setSelectedDifficultyFilter] = useState('ALL');
   const [copied, setCopied] = useState(false);
-  const [showHint, setShowHint] = useState(false);
 
   // Dynamically fetch and synchronize every available problem from database / API
   useEffect(() => {
@@ -823,70 +821,6 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
             </div>
           </div>
         </div>
-
-        {/* Algorithmic Strategy & Technical Insights (More Description) */}
-        {problem.hint && (
-          <div
-            style={{
-              marginBottom: '26px',
-              background: 'rgba(137, 87, 229, 0.08)',
-              border: '1px solid rgba(137, 87, 229, 0.25)',
-              borderRadius: '12px',
-              padding: '16px 20px'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '8px'
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#d2a8ff',
-                  fontSize: '14px',
-                  fontWeight: 700
-                }}
-              >
-                <Lightbulb size={16} color="#d2a8ff" />
-                <span>Algorithmic Strategy & Insights</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowHint(!showHint)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#58a6ff',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                {showHint ? 'Hide details' : 'Show strategy'}
-              </button>
-            </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: '13.5px',
-                color: '#c9d1d9',
-                lineHeight: 1.6,
-                display: showHint ? 'block' : '-webkit-box',
-                WebkitLineClamp: showHint ? 'unset' : 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden'
-              }}
-            >
-              {problem.hint}
-            </p>
-          </div>
-        )}
 
         {/* Example Section — Perfectly Aligned Left */}
         {problem.example && (
