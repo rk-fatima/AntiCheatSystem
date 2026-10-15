@@ -10,7 +10,8 @@ import {
   BookOpen,
   Lightbulb,
   Tag,
-  ArrowRight
+  ArrowRight,
+  Download
 } from 'lucide-react';
 import fallbackProblemsData from '../data/problems.json';
 import { LEETCODE_REGISTRY } from '../data/leetcodeRegistry';
@@ -422,7 +423,7 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
         </div>
 
         {/* Difficulty Filter Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           {['ALL', 'Easy', 'Medium', 'Hard'].map((diff) => (
             <button
               key={diff}
@@ -450,6 +451,42 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               {diff}
             </button>
           ))}
+
+          {/* Download PDF Catalogue Button */}
+          <a
+            href={`${import.meta.env.BASE_URL}QUBIT_PROBLEMS_CATALOGUE.pdf`}
+            download="QUBIT_PROBLEMS_CATALOGUE.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              background: 'rgba(56, 189, 248, 0.12)',
+              color: '#38bdf8',
+              textDecoration: 'none',
+              marginLeft: '4px',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)';
+              e.currentTarget.style.borderColor = '#38bdf8';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
+              e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+            }}
+            title="Download Complete 93 Problems PDF Catalogue"
+          >
+            <Download size={13} />
+            <span>Download PDF</span>
+          </a>
         </div>
       </div>
 
