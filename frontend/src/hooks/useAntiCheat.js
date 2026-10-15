@@ -68,8 +68,11 @@ export function useAntiCheat({ teamName, memberId, isStarted, isLocked, onLockSt
       }
     };
 
-    // 5. Context menu blocking
+    // 5. Context menu blocking (allow inside editor / textarea for copy-paste)
     const handleContextMenu = (e) => {
+      if (e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) {
+        return;
+      }
       e.preventDefault();
     };
 

@@ -8,15 +8,11 @@ import {
   AlertTriangle,
   XCircle,
   Terminal,
-  Lightbulb,
-  Zap,
-  Lock,
   Code2,
   Check,
   CheckCircle2,
   Sparkles
 } from 'lucide-react';
-import { useHintPass } from '../services/api';
 import { getStarterTemplate, getProblemMetadata, getWorkingSolution } from '../data/leetcodeRegistry';
 
 export function CodeEditorPane({
@@ -56,13 +52,8 @@ export function CodeEditorPane({
   const [outputResult, setOutputResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allowPaste, setAllowPaste] = useState(false);
-  const [hintLoading, setHintLoading] = useState(false);
-  const [hintError, setHintError] = useState('');
 
   const isFrozen = Boolean(team?.frozenUntil && team.frozenUntil > Date.now());
-  const isHintCardUnlocked = Boolean(team?.unlockedCards?.includes('HINT') || team?.hintUnlocked);
-  const hasHintPass = (team?.hintPassesCount || 0) > 0;
 
   // Refresh testcases when problem changes
   useEffect(() => {
@@ -83,30 +74,8 @@ export function CodeEditorPane({
     setActiveBottomTab('testcase');
   }, [problem?.id]);
 
-  const handleUseHintPassDirect = async () => {
-    if (!problem?.id || !team?.name) return;
-    setHintLoading(true);
-    setHintError('');
-    try {
-      const res = await useHintPass({
-        teamName: team.name,
-        memberId: currentMember?.memberId,
-        problemId: problem.id
-      });
-      if (onTeamUpdated && res.team) {
-        onTeamUpdated(res.team);
-      }
-    } catch (err) {
-      setHintError(err.message || 'Failed to unlock hint.');
-    } finally {
-      setHintLoading(false);
-    }
-  };
-
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
-  const prevCodeLenRef = useRef(code.length);
-  const bulkAllowedRef = useRef(false);
 
   // Sync line number gutter with code textarea
   const lineCount = (code || '').split('\n').length;
@@ -133,83 +102,13 @@ export function CodeEditorPane({
   };
 
   const handleInput = (e) => {
-    const newCode = e.target.value;
-    const delta = newCode.length - prevCodeLenRef.current;
-
-    // Detect bulk insertion without paste permission (>40 chars added in 1 event)
-    if (delta > 40 && !bulkAllowedRef.current && !allowPaste) {
-      reportViolation('BULK_TEXT_INSERTION', `Blocked abnormal bulk text insertion of ${delta} characters.`);
-      e.target.value = code; // Revert
-      return;
-    }
-
-    prevCodeLenRef.current = newCode.length;
-    onCodeChange(newCode);
-  };
-
-  // Anti-Cheat: Intercept copy / paste to detect unauthorized external copy-paste
-  const handleCopy = (e) => {
-    e.preventDefault();
-    const target = textareaRef.current;
-    if (target) {
-      const selectedText = target.value.substring(target.selectionStart, target.selectionEnd);
-      internalClipboardRef.current = selectedText;
-    }
-  };
-
-  const handleCut = (e) => {
-    e.preventDefault();
-    const target = textareaRef.current;
-    if (target) {
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      internalClipboardRef.current = target.value.substring(start, end);
-      const newCode = target.value.substring(0, start) + target.value.substring(end);
-      bulkAllowedRef.current = true;
-      onCodeChange(newCode);
-      bulkAllowedRef.current = false;
-    }
-  };
-
-  const handlePaste = (e) => {
-    e.preventDefault();
-    const clipboardText = e.clipboardData ? e.clipboardData.getData('text') : '';
-
-    if (allowPaste) {
-      if (clipboardText) {
-        const target = textareaRef.current;
-        const start = target.selectionStart;
-        const end = target.selectionEnd;
-        const newCode = target.value.substring(0, start) + clipboardText + target.value.substring(end);
-        bulkAllowedRef.current = true;
-        onCodeChange(newCode);
-        bulkAllowedRef.current = false;
-      }
-      return;
-    }
-
-    if (clipboardText && clipboardText !== internalClipboardRef.current) {
-      reportViolation(
-        'EXTERNAL_PASTE_ATTEMPT',
-        `Blocked attempt to paste external code (${clipboardText.length} characters).`
-      );
-    } else if (internalClipboardRef.current) {
-      const target = textareaRef.current;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const newCode = target.value.substring(0, start) + internalClipboardRef.current + target.value.substring(end);
-      bulkAllowedRef.current = true;
-      onCodeChange(newCode);
-      bulkAllowedRef.current = false;
-    }
+    onCodeChange(e.target.value);
   };
 
   const handleLoadSolution = () => {
     const sol = getWorkingSolution(problem?.id, lang);
     if (sol) {
-      bulkAllowedRef.current = true;
       onCodeChange(sol);
-      bulkAllowedRef.current = false;
       setOutputResult(null);
     } else {
       alert(`No preloaded solution for ${problem?.id} in ${lang}`);
@@ -408,90 +307,6 @@ export function CodeEditorPane({
           </h1>
         </div>
 
-        {/* 💡 Algorithmic Hint Banner */}
-        {team?.revealedHints?.[problem.id] ? (
-          <div
-            className="card-unlocked-reveal"
-            style={{
-              background: 'linear-gradient(180deg, rgba(30, 80, 180, 0.12) 0%, rgba(13, 17, 28, 0.8) 100%)',
-              border: '1px solid rgba(56, 139, 253, 0.3)',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              marginBottom: '18px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#58a6ff', fontWeight: 700, fontSize: '12px' }}>
-                <Lightbulb size={15} /> Algorithmic Hint
-              </div>
-              <span style={{ fontSize: '11px', color: 'var(--txt-dim)' }}>
-                Unlocked by {team.revealedHints[problem.id].revealedByName || team.revealedHints[problem.id].revealedBy}
-              </span>
-            </div>
-            <div style={{ fontSize: '13px', color: '#f0f6fc', lineHeight: 1.55 }}>
-              {team.revealedHints[problem.id].hint}
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(56, 139, 253, 0.04)',
-            border: '1px dashed rgba(56, 139, 253, 0.25)',
-            borderRadius: '8px',
-            padding: '12px 14px',
-            marginBottom: '18px'
-          }}>
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#58a6ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Lock size={14} /> Locked Algorithmic Hint
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--txt-dim)', marginTop: '2px' }}>
-                {isHintCardUnlocked && hasHintPass
-                  ? `Your team has ${team.hintPassesCount} Hint Pass available.`
-                  : 'Hint is locked by Administrator. Admin unlock or unlocked Hint Pass required.'}
-              </div>
-            </div>
-            {isHintCardUnlocked && hasHintPass ? (
-              <button
-                type="button"
-                className="btn-blue"
-                onClick={handleUseHintPassDirect}
-                disabled={hintLoading}
-                style={{
-                  fontSize: '11px',
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  fontWeight: 600
-                }}
-              >
-                {hintLoading ? 'Revealing...' : `💡 Use Hint Pass (${team.hintPassesCount})`}
-              </button>
-            ) : (
-              <span style={{
-                fontSize: '11px',
-                color: 'var(--txt-dim)',
-                padding: '5px 10px',
-                borderRadius: '6px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <Lock size={12} /> Locked (Admin Control)
-              </span>
-            )}
-          </div>
-        )}
-
-        {hintError && (
-          <div style={{ padding: '8px 12px', background: 'rgba(248, 81, 73, 0.1)', border: '1px solid rgba(248, 81, 73, 0.3)', borderRadius: '6px', color: '#ff7b72', fontSize: '12px', marginBottom: '14px' }}>
-            {hintError}
-          </div>
-        )}
-
         {/* Solved Status Banner */}
         {problemStatus?.status === 'SOLVED' && (
           <div style={{
@@ -626,18 +441,6 @@ export function CodeEditorPane({
             ⚡ Load Solution
           </button>
 
-          <button
-            className="btn-ghost"
-            onClick={() => setAllowPaste(!allowPaste)}
-            title={allowPaste ? "Paste is allowed" : "Paste is strict (Exam Mode)"}
-            style={{
-              fontSize: '11px',
-              color: allowPaste ? '#d29922' : 'var(--txt-dim)'
-            }}
-          >
-            {allowPaste ? '🔓 Paste: Dev' : '🔒 Paste: Strict'}
-          </button>
-
           <div style={{ flex: 1 }} />
 
           {/* Action Buttons: Run Code and Submit Solution */}
@@ -709,9 +512,7 @@ export function CodeEditorPane({
             onInput={handleInput}
             onKeyDown={handleKeyDown}
             onScroll={handleScroll}
-            onCopy={handleCopy}
-            onCut={handleCut}
-            onPaste={handlePaste}
+            onContextMenu={(e) => e.stopPropagation()}
             spellCheck="false"
             wrap="off"
             style={{
