@@ -113,6 +113,33 @@ export function CodeEditorPane({
     }
   };
 
+  const handleParamChange = (paramName, newVal) => {
+    setTestCases(prev => {
+      const updated = [...prev];
+      const curr = { ...(updated[selectedCaseIdx] || {}) };
+      const updatedParams = { ...(curr.params || {}), [paramName]: newVal };
+      curr.params = updatedParams;
+
+      // Synchronize rawStdin for execution if structured
+      if (curr.rawStdin) {
+        if (Object.keys(updatedParams).length === 1 && (paramName === 'input' || paramName === 'x' || paramName === 's')) {
+          curr.rawStdin = newVal.replace(/^"(.*)"$/, '$1');
+        } else if (updatedParams.nums && updatedParams.target !== undefined) {
+          try {
+            const arr = JSON.parse(updatedParams.nums.replace(/'/g, '"'));
+            if (Array.isArray(arr)) {
+              curr.rawStdin = `${arr.length} ${updatedParams.target.trim()}\n${arr.join(' ')}`;
+            }
+          } catch {
+            // retain existing stdin while editing
+          }
+        }
+      }
+      updated[selectedCaseIdx] = curr;
+      return updated;
+    });
+  };
+
   // Run Code against the currently active testcase
   const handleRun = async () => {
     setIsRunning(true);
@@ -390,7 +417,7 @@ export function CodeEditorPane({
         minWidth: 0,
         background: '#080c16',
         padding: '8px 16px 10px 16px',
-        gap: '8px'
+        gap: '6px'
       }}>
         {/* Editor Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -458,8 +485,8 @@ export function CodeEditorPane({
 
         {/* Code Editor with Line Number Gutter */}
         <div style={{
-          flex: 1,
-          minHeight: '260px',
+          flex: '1 1 0%',
+          minHeight: '190px',
           display: 'flex',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px',
@@ -515,12 +542,13 @@ export function CodeEditorPane({
           background: '#070a12',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '8px',
-          padding: '10px 14px',
-          minHeight: '160px',
-          maxHeight: '260px',
+          padding: '12px 16px',
+          minHeight: '235px',
+          maxHeight: '340px',
           overflowY: 'auto',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          flexShrink: 0
         }}>
           {/* Drawer Navigation Bar */}
           <div style={{
@@ -528,8 +556,8 @@ export function CodeEditorPane({
             alignItems: 'center',
             justifyContent: 'space-between',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            paddingBottom: '6px',
-            marginBottom: '10px'
+            paddingBottom: '8px',
+            marginBottom: '12px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
@@ -603,19 +631,19 @@ export function CodeEditorPane({
 
           {/* TAB 1: TESTCASE PANEL */}
           {activeBottomTab === 'testcase' && (
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {/* Case Selectors Pills (Case 1, Case 2, Case 3) */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 {testCases.map((tc, idx) => (
                   <button
                     key={tc.id || idx}
                     type="button"
                     onClick={() => setSelectedCaseIdx(idx)}
                     style={{
-                      background: selectedCaseIdx === idx ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-                      border: `1px solid ${selectedCaseIdx === idx ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.07)'}`,
+                      background: selectedCaseIdx === idx ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                      border: `1px solid ${selectedCaseIdx === idx ? 'rgba(255, 255, 255, 0.28)' : 'rgba(255, 255, 255, 0.08)'}`,
                       borderRadius: '6px',
-                      padding: '4px 12px',
+                      padding: '6px 14px',
                       color: selectedCaseIdx === idx ? '#ffffff' : 'var(--txt-muted)',
                       fontSize: '12px',
                       fontWeight: 600,
@@ -628,23 +656,41 @@ export function CodeEditorPane({
               </div>
 
               {/* Formatted Parameter Inputs */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
                 {Object.entries(activeCase.params || {}).map(([paramName, paramVal]) => (
-                  <div key={paramName}>
-                    <div style={{ fontSize: '11px', color: 'var(--txt-muted)', fontWeight: 600, marginBottom: '4px' }}>
+                  <div key={paramName} style={{ width: '100%' }}>
+                    <div style={{ fontSize: '12px', color: '#8b949e', fontWeight: 600, marginBottom: '6px' }}>
                       {paramName} =
                     </div>
-                    <div style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid rgba(255, 255, 255, 0.09)',
-                      borderRadius: '6px',
-                      padding: '8px 12px',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '13px',
-                      color: '#f0f6fc'
-                    }}>
-                      {paramVal}
-                    </div>
+                    <input
+                      type="text"
+                      value={paramVal ?? ''}
+                      onChange={(e) => handleParamChange(paramName, e.target.value)}
+                      onContextMenu={(e) => e.stopPropagation()}
+                      spellCheck="false"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        background: 'rgba(255, 255, 255, 0.035)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '6px',
+                        padding: '10px 14px',
+                        minHeight: '40px',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '13px',
+                        color: '#f0f6fc',
+                        outline: 'none',
+                        transition: 'border-color 0.2s, background 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = 'rgba(88, 166, 255, 0.5)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.07)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                        e.target.style.background = 'rgba(255, 255, 255, 0.035)';
+                      }}
+                    />
                   </div>
                 ))}
               </div>
