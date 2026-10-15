@@ -1,191 +1,153 @@
-import React, { useState, useEffect } from 'react';
-import { Copy, Check, ChevronLeft, ChevronRight, Home, LogOut } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Copy,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  LogOut,
+  Search,
+  BookOpen,
+  Lightbulb,
+  Tag,
+  ArrowRight
+} from 'lucide-react';
+import fallbackProblemsData from '../data/problems.json';
+import { LEETCODE_REGISTRY } from '../data/leetcodeRegistry';
+import { getProblemHint } from '../data/hints';
+import { fetchProblems } from '../services/api';
 
 const DIFFICULTY_SEQUENCE = ['Easy', 'Medium', 'Hard'];
 
-const SHOWCASE_PROBLEMS = [
-  {
-    num: 1,
-    id: "E1",
-    title: "Two Sum",
-    pts: 200,
-    desc: "Given an array of integers `nums` and an integer `target`, return the indices of the two numbers that add up to `target`.",
-    example: {
-      input: "nums = [2,7,11,15], target = 9",
-      output: "[0,1]",
-      explanation: "nums[0] + nums[1] == 9"
-    },
-    constraints: [
-      "2 <= nums.length <= 10⁴",
-      "-10⁹ <= nums[i] <= 10⁹",
-      "Each input has exactly one solution."
-    ]
-  },
-  {
-    num: 2,
-    id: "E2",
-    title: "Palindrome Number",
-    pts: 200,
-    desc: "Given an integer `x`, return true if `x` is a palindrome, and false otherwise.",
-    example: {
-      input: "x = 121",
-      output: "true",
-      explanation: "121 reads as 121 from left to right and from right to left."
-    },
-    constraints: [
-      "-2³¹ <= x <= 2³¹ - 1",
-      "Could you solve it without converting the integer to a string?"
-    ]
-  },
-  {
-    num: 3,
-    id: "E3",
-    title: "Valid Parentheses",
-    pts: 200,
-    desc: "Given a string `s` containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
-    example: {
-      input: "s = \"()[]{}\"",
-      output: "true",
-      explanation: "Open brackets must be closed by the same type of brackets in the correct order."
-    },
-    constraints: [
-      "1 <= s.length <= 10⁴",
-      "s consists of parentheses only '()[]{}'."
-    ]
-  },
-  {
-    num: 4,
-    id: "E4",
-    title: "Merge Two Sorted Lists",
-    pts: 200,
-    desc: "You are given the heads of two sorted linked lists `list1` and `list2`. Merge the two lists into one sorted list and return its head.",
-    example: {
-      input: "list1 = [1,2,4], list2 = [1,3,4]",
-      output: "[1,1,2,3,4,4]",
-      explanation: "Merged into a single continuous sorted sequence."
-    },
-    constraints: [
-      "The number of nodes in both lists is in the range [0, 50].",
-      "-100 <= Node.val <= 100",
-      "Both list1 and list2 are sorted in non-decreasing order."
-    ]
-  },
-  {
-    num: 5,
-    id: "E5",
-    title: "Remove Duplicates from Sorted Array",
-    pts: 200,
-    desc: "Given an integer array `nums` sorted in non-decreasing order, remove the duplicates in-place such that each unique element appears only once. Return `k` after placing the final result in the first `k` slots.",
-    example: {
-      input: "nums = [1,1,2]",
-      output: "2, nums = [1,2,_]",
-      explanation: "Your function should return k = 2, with the first two elements of nums being 1 and 2."
-    },
-    constraints: [
-      "1 <= nums.length <= 3 * 10⁴",
-      "-100 <= nums[i] <= 100",
-      "nums is sorted in non-decreasing order."
-    ]
-  },
-  {
-    num: 6,
-    id: "E6",
-    title: "Remove Element",
-    pts: 200,
-    desc: "Given an integer array `nums` and an integer `val`, remove all occurrences of `val` in `nums` in-place. The relative order of the elements may be changed. Return `k`.",
-    example: {
-      input: "nums = [3,2,2,3], val = 3",
-      output: "2, nums = [2,2,_,_]",
-      explanation: "Your function should return k = 2, with the first two elements of nums being 2."
-    },
-    constraints: [
-      "0 <= nums.length <= 100",
-      "0 <= nums[i] <= 50",
-      "0 <= val <= 100"
-    ]
-  },
-  {
-    num: 7,
-    id: "E7",
-    title: "Search Insert Position",
-    pts: 200,
-    desc: "Given a sorted array of distinct integers `nums` and a target value `target`, return the index if the target is found. If not, return the index where it would be if it were inserted in order.",
-    example: {
-      input: "nums = [1,3,5,6], target = 5",
-      output: "2",
-      explanation: "5 is found at index 2."
-    },
-    constraints: [
-      "1 <= nums.length <= 10⁴",
-      "-10⁴ <= nums[i], target <= 10⁴",
-      "nums contains distinct values sorted in ascending order."
-    ]
-  },
-  {
-    num: 8,
-    id: "E8",
-    title: "Plus One",
-    pts: 200,
-    desc: "You are given a large integer represented as an integer array `digits`, where each `digits[i]` is the ith digit of the integer. Increment the large integer by one and return the resulting array of digits.",
-    example: {
-      input: "digits = [1,2,3]",
-      output: "[1,2,4]",
-      explanation: "The array represents the integer 123. Incrementing by one gives 124."
-    },
-    constraints: [
-      "1 <= digits.length <= 100",
-      "0 <= digits[i] <= 9",
-      "digits does not contain any leading 0's."
-    ]
-  },
-  {
-    num: 9,
-    id: "E9",
-    title: "Add Binary",
-    pts: 200,
-    desc: "Given two binary strings `a` and `b`, return their sum as a binary string.",
-    example: {
-      input: "a = \"11\", b = \"1\"",
-      output: "\"100\"",
-      explanation: "Binary 11 (3 in decimal) + 1 (1 in decimal) equals 100 (4 in decimal)."
-    },
-    constraints: [
-      "1 <= a.length, b.length <= 10⁴",
-      "a and b consist only of '0' or '1' characters.",
-      "Each string does not contain leading zeros except for the zero itself."
-    ]
-  },
-  {
-    num: 10,
-    id: "E10",
-    title: "Remove Duplicates from Sorted List",
-    pts: 200,
-    desc: "Given the head of a sorted linked list `head`, delete all duplicates such that each element appears only once. Return the linked list sorted as well.",
-    example: {
-      input: "head = [1,1,2]",
-      output: "[1,2]",
-      explanation: "Duplicates removed from the sequence."
-    },
-    constraints: [
-      "The number of nodes in the list is in the range [0, 300].",
-      "-100 <= Node.val <= 100",
-      "The list is guaranteed to be sorted in ascending order."
-    ]
+/**
+ * Normalizes and splits raw constraints string into distinct bullet points.
+ */
+function formatConstraints(conStr) {
+  if (!conStr) {
+    return [
+      'Standard execution time (2000ms) and memory (256MB) limits apply.',
+      'Ensure algorithm handles minimum and maximum edge boundaries.'
+    ];
   }
-];
+  const parts = conStr
+    .split(/(?<=[.!?])\s+|;\s*|,\s*(?=[0-9A-Za-z-–<≤])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : [conStr];
+}
+
+/**
+ * Enriches problem item with LeetCode metadata, examples, constraints, and hints.
+ */
+function buildShowcaseProblem(p, idx) {
+  const meta = LEETCODE_REGISTRY[p.id] || {};
+  const regExample = meta.examples && meta.examples.length > 0 ? meta.examples[0] : null;
+
+  let exampleInput = regExample?.input;
+  if (!exampleInput) {
+    exampleInput = p.si ? p.si.replace(/\r?\n/g, '  |  ') : 'nums = [2, 7, 11, 15], target = 9';
+  }
+
+  let exampleOutput = regExample?.output;
+  if (!exampleOutput) {
+    exampleOutput = p.so ? p.so.replace(/\r?\n/g, ' ') : (p.eo || '[0, 1]');
+  }
+
+  let exampleExplanation = regExample?.explanation;
+  if (!exampleExplanation) {
+    exampleExplanation = `Given the input (${exampleInput}), the algorithm evaluates and returns ${exampleOutput}.`;
+  }
+
+  const inputFormat = meta.args && meta.args.length > 0
+    ? meta.args.map((a) => `${a.name}: ${a.cpp || a.py || 'data'}`).join(', ')
+    : (p.si ? 'Standard Input (stdin)' : 'Standard parameter inputs');
+
+  const outputFormat = meta.ret?.cpp || meta.ret?.py
+    ? `Returns ${meta.ret.cpp || meta.ret.py} (or prints to stdout)`
+    : (p.so ? 'Standard Output (stdout)' : 'Calculated result value');
+
+  const strategyHint = getProblemHint(p);
+
+  return {
+    num: idx + 1,
+    id: p.id,
+    origId: p.origId || meta.origId || '',
+    title: p.title,
+    pts: p.pts || 200,
+    cat: p.cat || 'Algorithms / Data Structures',
+    diff: p.diff || 'Easy',
+    desc: p.desc,
+    inputFormat,
+    outputFormat,
+    hint: strategyHint,
+    example: {
+      input: exampleInput,
+      output: exampleOutput,
+      explanation: exampleExplanation
+    },
+    constraints: formatConstraints(p.con)
+  };
+}
 
 export function ProblemShowcase({ onNavigateHome, onLogout }) {
+  // 1. Initialize with all available problems from the comprehensive catalog (zero delay/no blank screen)
+  const [catalogProblems, setCatalogProblems] = useState(() => {
+    const raw = fallbackProblemsData.problems || [];
+    return raw.map((p, idx) => buildShowcaseProblem(p, idx));
+  });
+
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDifficultyFilter, setSelectedDifficultyFilter] = useState('ALL');
   const [copied, setCopied] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
-  const problem = SHOWCASE_PROBLEMS[currentIndex] || SHOWCASE_PROBLEMS[0];
-  const total = SHOWCASE_PROBLEMS.length;
+  const scrollStripRef = useRef(null);
 
-  // Repeating sequence: Easy -> Medium -> Hard -> Easy -> Medium -> Hard ...
+  // 2. Dynamically fetch and synchronize every available problem from database / API
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAllProblems() {
+      try {
+        const data = await fetchProblems();
+        if (isMounted && data && Array.isArray(data.problems) && data.problems.length > 0) {
+          const mapped = data.problems.map((p, idx) => buildShowcaseProblem(p, idx));
+          setCatalogProblems(mapped);
+        }
+      } catch (err) {
+        console.warn('Showcase using local master catalog fallback:', err);
+      }
+    }
+    loadAllProblems();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const total = catalogProblems.length;
+  const problem = catalogProblems[currentIndex] || catalogProblems[0] || {};
+
+  // Repeating difficulty progression throughout problem navigation:
+  // Easy -> Medium -> Hard -> Easy -> Medium -> Hard ...
   const currentDifficulty = DIFFICULTY_SEQUENCE[currentIndex % 3];
 
+  // Auto-scroll the quick pill strip to keep current problem in view
+  useEffect(() => {
+    if (scrollStripRef.current) {
+      const activeEl = scrollStripRef.current.querySelector(`[data-active="true"]`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }, [currentIndex]);
+
+  // Keyboard navigation support: Left / Right arrows
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't intercept if user is typing in the search input
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
+        return;
+      }
       if (e.key === 'ArrowLeft') {
         setCurrentIndex((prev) => Math.max(0, prev - 1));
       } else if (e.key === 'ArrowRight') {
@@ -196,7 +158,9 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [total]);
 
+  // Copy example to clipboard
   const handleCopyExample = () => {
+    if (!problem.example) return;
     const textToCopy = `Input: ${problem.example.input}\nOutput: ${problem.example.output}\nExplanation: ${problem.example.explanation}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(textToCopy);
@@ -240,6 +204,28 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
     });
   };
 
+  // Filtered list for search and dropdown selection
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return catalogProblems
+      .map((p, originalIdx) => ({ ...p, originalIdx }))
+      .filter((p) => {
+        const matchesQuery =
+          !q ||
+          p.id.toLowerCase().includes(q) ||
+          p.title.toLowerCase().includes(q) ||
+          p.cat.toLowerCase().includes(q) ||
+          (p.origId && p.origId.toLowerCase().includes(q));
+
+        const matchesDiff =
+          selectedDifficultyFilter === 'ALL' ||
+          DIFFICULTY_SEQUENCE[p.originalIdx % 3].toUpperCase() === selectedDifficultyFilter.toUpperCase() ||
+          p.diff.toUpperCase() === selectedDifficultyFilter.toUpperCase();
+
+        return matchesQuery && matchesDiff;
+      });
+  }, [catalogProblems, searchQuery, selectedDifficultyFilter]);
+
   return (
     <div
       style={{
@@ -250,7 +236,7 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '28px 16px',
+        padding: '24px 16px',
         boxSizing: 'border-box'
       }}
     >
@@ -258,11 +244,11 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
       <div
         style={{
           width: '100%',
-          maxWidth: '860px',
+          maxWidth: '880px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '20px',
+          marginBottom: '16px',
           gap: '12px',
           flexWrap: 'wrap'
         }}
@@ -296,47 +282,34 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
           <span>Exit to Home</span>
         </button>
 
-        {/* Right Header Controls: Problem Progress Indicators & Clearly Visible Logout Button */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            flexWrap: 'wrap'
-          }}
-        >
-          {/* Quick Problem Selector Dot Indicators */}
-          <div
+        {/* Quick Problem Selector Dropdown (Access all 93 problems instantly) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <select
+            value={currentIndex}
+            onChange={(e) => setCurrentIndex(Number(e.target.value))}
+            aria-label="Select problem"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 10px',
-              background: 'rgba(255, 255, 255, 0.03)',
-              borderRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.06)'
+              background: 'rgba(8, 13, 24, 0.9)',
+              border: '1px solid rgba(56, 139, 253, 0.35)',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '13px',
+              fontWeight: 500,
+              padding: '7px 12px',
+              outline: 'none',
+              cursor: 'pointer',
+              maxWidth: '280px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
             }}
           >
-            {SHOWCASE_PROBLEMS.map((p, idx) => (
-              <button
-                key={p.id}
-                onClick={() => setCurrentIndex(idx)}
-                title={`Problem ${idx + 1}: ${p.id} — ${p.title} (${DIFFICULTY_SEQUENCE[idx % 3]})`}
-                style={{
-                  width: idx === currentIndex ? '24px' : '8px',
-                  height: '8px',
-                  borderRadius: '4px',
-                  border: 'none',
-                  background: idx === currentIndex ? '#58a6ff' : 'rgba(255, 255, 255, 0.2)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  padding: 0
-                }}
-              />
+            {catalogProblems.map((p, idx) => (
+              <option key={p.id} value={idx} style={{ background: '#0b1120', color: '#ffffff' }}>
+                {idx + 1}. {p.id} — {p.title} ({DIFFICULTY_SEQUENCE[idx % 3]})
+              </option>
             ))}
-          </div>
+          </select>
 
-          {/* Clearly Visible Logout Button (top-right corner) */}
+          {/* Clearly Visible Logout Button */}
           {onLogout && (
             <button
               type="button"
@@ -358,14 +331,16 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
                 transition: 'all 0.15s ease'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(88, 166, 255, 0.22) 0%, rgba(137, 87, 229, 0.3) 100%)';
+                e.currentTarget.style.background =
+                  'linear-gradient(135deg, rgba(88, 166, 255, 0.22) 0%, rgba(137, 87, 229, 0.3) 100%)';
                 e.currentTarget.style.color = '#ffffff';
                 e.currentTarget.style.borderColor = 'rgba(137, 87, 229, 0.7)';
                 e.currentTarget.style.boxShadow = '0 4px 16px rgba(137, 87, 229, 0.35)';
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(88, 166, 255, 0.12) 0%, rgba(137, 87, 229, 0.18) 100%)';
+                e.currentTarget.style.background =
+                  'linear-gradient(135deg, rgba(88, 166, 255, 0.12) 0%, rgba(137, 87, 229, 0.18) 100%)';
                 e.currentTarget.style.color = '#d2a8ff';
                 e.currentTarget.style.borderColor = 'rgba(137, 87, 229, 0.38)';
                 e.currentTarget.style.boxShadow = '0 2px 10px rgba(137, 87, 229, 0.18)';
@@ -379,11 +354,164 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
         </div>
       </div>
 
-      {/* Main Problem Showcase Card (Matching Mockup & Screenshot) */}
+      {/* Quick Search & Filter Controls Strip */}
       <div
         style={{
           width: '100%',
-          maxWidth: '860px',
+          maxWidth: '880px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          marginBottom: '16px',
+          flexWrap: 'wrap'
+        }}
+      >
+        {/* Search Input Bar */}
+        <div
+          style={{
+            flex: '1 1 240px',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
+          <Search
+            size={14}
+            style={{
+              position: 'absolute',
+              left: '12px',
+              color: '#8b949e',
+              pointerEvents: 'none'
+            }}
+          />
+          <input
+            type="text"
+            placeholder={`Search all ${total} problems by name, ID (e.g. E15, M3), or topic...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px 8px 34px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '13px',
+              outline: 'none',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s'
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = '#58a6ff')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)')}
+          />
+        </div>
+
+        {/* Difficulty Filter Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {['ALL', 'Easy', 'Medium', 'Hard'].map((diff) => (
+            <button
+              key={diff}
+              type="button"
+              onClick={() => setSelectedDifficultyFilter(diff)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid',
+                background:
+                  selectedDifficultyFilter === diff
+                    ? 'rgba(56, 139, 253, 0.25)'
+                    : 'rgba(255, 255, 255, 0.03)',
+                borderColor:
+                  selectedDifficultyFilter === diff
+                    ? '#58a6ff'
+                    : 'rgba(255, 255, 255, 0.08)',
+                color: selectedDifficultyFilter === diff ? '#ffffff' : '#8b949e',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {diff}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Horizontal Scrollable Problem Number Carousel (All 93 Problems) */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '880px',
+          marginBottom: '18px',
+          position: 'relative'
+        }}
+      >
+        <div
+          ref={scrollStripRef}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 12px',
+            background: 'rgba(13, 19, 33, 0.65)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '12px',
+            overflowX: 'auto',
+            scrollbarWidth: 'thin',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {searchResults.map((p) => {
+            const isActive = p.originalIdx === currentIndex;
+            const seqDiff = DIFFICULTY_SEQUENCE[p.originalIdx % 3];
+            const diffColor =
+              seqDiff === 'Easy' ? '#3fb950' : seqDiff === 'Medium' ? '#d29922' : '#f85149';
+
+            return (
+              <button
+                key={p.id}
+                data-active={isActive ? 'true' : 'false'}
+                onClick={() => setCurrentIndex(p.originalIdx)}
+                title={`Problem ${p.num}: ${p.id} — ${p.title} (${seqDiff})`}
+                style={{
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: isActive ? 700 : 500,
+                  border: `1px solid ${isActive ? '#58a6ff' : 'rgba(255, 255, 255, 0.08)'}`,
+                  background: isActive ? 'rgba(56, 139, 253, 0.25)' : 'rgba(255, 255, 255, 0.03)',
+                  color: isActive ? '#ffffff' : '#8b949e',
+                  cursor: 'pointer',
+                  boxShadow: isActive ? '0 0 10px rgba(56, 139, 253, 0.35)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: diffColor
+                  }}
+                />
+                <span>{p.num}</span>
+                <span style={{ fontSize: '11px', opacity: 0.8 }}>({p.id})</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Problem Showcase Card (Matching Mockup & Design Requirements) */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '880px',
           background: 'rgba(13, 19, 33, 0.88)',
           border: '1px solid rgba(56, 139, 253, 0.22)',
           borderRadius: '18px',
@@ -395,18 +523,38 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
           textAlign: 'left'
         }}
       >
-        {/* Top Problem Counter */}
+        {/* Top Problem Counter Header */}
         <div
           style={{
-            fontSize: '13px',
-            fontWeight: 600,
-            color: '#58a6ff',
-            marginBottom: '10px',
-            letterSpacing: '0.2px',
-            textAlign: 'left'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '10px'
           }}
         >
-          Problem {currentIndex + 1} of {total}
+          <div
+            style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#58a6ff',
+              letterSpacing: '0.2px',
+              textAlign: 'left'
+            }}
+          >
+            Problem {currentIndex + 1} of {total}
+          </div>
+
+          {problem.origId && (
+            <div
+              style={{
+                fontSize: '12px',
+                color: '#8b949e',
+                fontFamily: 'ui-monospace, monospace'
+              }}
+            >
+              Catalog Ref: {problem.origId}
+            </div>
+          )}
         </div>
 
         {/* Problem Title */}
@@ -429,7 +577,8 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            marginBottom: '18px'
+            marginBottom: '18px',
+            flexWrap: 'wrap'
           }}
         >
           {/* Easy Badge */}
@@ -442,8 +591,13 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 700,
-              background: currentDifficulty === 'Easy' ? 'rgba(46, 160, 67, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${currentDifficulty === 'Easy' ? 'rgba(46, 160, 67, 0.55)' : 'rgba(255, 255, 255, 0.08)'}`,
+              background:
+                currentDifficulty === 'Easy'
+                  ? 'rgba(46, 160, 67, 0.18)'
+                  : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${
+                currentDifficulty === 'Easy' ? 'rgba(46, 160, 67, 0.55)' : 'rgba(255, 255, 255, 0.08)'
+              }`,
               color: currentDifficulty === 'Easy' ? '#3fb950' : 'var(--txt-dim)',
               boxShadow: currentDifficulty === 'Easy' ? '0 0 12px rgba(46, 160, 67, 0.25)' : 'none',
               transition: 'all 0.2s ease'
@@ -470,8 +624,15 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 700,
-              background: currentDifficulty === 'Medium' ? 'rgba(210, 153, 34, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${currentDifficulty === 'Medium' ? 'rgba(210, 153, 34, 0.55)' : 'rgba(255, 255, 255, 0.08)'}`,
+              background:
+                currentDifficulty === 'Medium'
+                  ? 'rgba(210, 153, 34, 0.18)'
+                  : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${
+                currentDifficulty === 'Medium'
+                  ? 'rgba(210, 153, 34, 0.55)'
+                  : 'rgba(255, 255, 255, 0.08)'
+              }`,
               color: currentDifficulty === 'Medium' ? '#d29922' : 'var(--txt-dim)',
               boxShadow: currentDifficulty === 'Medium' ? '0 0 12px rgba(210, 153, 34, 0.25)' : 'none',
               transition: 'all 0.2s ease'
@@ -498,8 +659,13 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 700,
-              background: currentDifficulty === 'Hard' ? 'rgba(248, 81, 73, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${currentDifficulty === 'Hard' ? 'rgba(248, 81, 73, 0.55)' : 'rgba(255, 255, 255, 0.08)'}`,
+              background:
+                currentDifficulty === 'Hard'
+                  ? 'rgba(248, 81, 73, 0.18)'
+                  : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${
+                currentDifficulty === 'Hard' ? 'rgba(248, 81, 73, 0.55)' : 'rgba(255, 255, 255, 0.08)'
+              }`,
               color: currentDifficulty === 'Hard' ? '#f85149' : 'var(--txt-dim)',
               boxShadow: currentDifficulty === 'Hard' ? '0 0 12px rgba(248, 81, 73, 0.25)' : 'none',
               transition: 'all 0.2s ease'
@@ -515,6 +681,27 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
             />
             <span>Hard</span>
           </div>
+
+          {/* Category Pill */}
+          {problem.cat && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: 600,
+                background: 'rgba(56, 139, 253, 0.12)',
+                border: '1px solid rgba(56, 139, 253, 0.28)',
+                color: '#79c0ff'
+              }}
+            >
+              <Tag size={12} />
+              <span>{problem.cat}</span>
+            </div>
+          )}
         </div>
 
         {/* Win Points Meta Pill */}
@@ -535,7 +722,14 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
             <span>Win: {problem.pts} pts</span>
           </span>
           <span style={{ color: 'var(--txt-dim)' }}>•</span>
-          <span style={{ color: 'var(--txt-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span
+            style={{
+              color: 'var(--txt-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
             <span>📄</span>
             <span>Problem {currentIndex + 1}</span>
           </span>
@@ -571,114 +765,265 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
           </p>
         </div>
 
-        {/* Example Section — Perfectly Aligned Left */}
-        <div style={{ marginBottom: '26px', textAlign: 'left' }}>
-          <h3
-            style={{
-              margin: '0 0 10px',
-              fontSize: '17px',
-              fontWeight: 700,
-              color: '#ffffff',
-              letterSpacing: '0.2px',
-              textAlign: 'left'
-            }}
-          >
-            Example
-          </h3>
-
+        {/* Input & Output Specifications (More Description Details) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '12px',
+            marginBottom: '26px'
+          }}
+        >
+          {/* Input Format Box */}
           <div
             style={{
-              position: 'relative',
-              background: 'rgba(8, 13, 24, 0.85)',
-              border: '1px solid rgba(56, 139, 253, 0.25)',
-              borderRadius: '12px',
-              padding: '18px 20px',
-              fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
-              fontSize: '13px',
-              lineHeight: 1.7,
-              textAlign: 'left',
-              wordBreak: 'break-word'
+              background: 'rgba(8, 13, 24, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '14px 16px'
             }}
           >
-            {/* Copy Button */}
-            <button
-              type="button"
-              onClick={handleCopyExample}
+            <div
               style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '6px',
-                color: copied ? '#3fb950' : '#8b949e',
                 fontSize: '12px',
-                padding: '5px 10px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                transition: 'all 0.15s'
+                fontWeight: 700,
+                color: '#58a6ff',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = copied ? '#3fb950' : '#8b949e')}
             >
-              {copied ? <Check size={13} color="#3fb950" /> : <Copy size={13} />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
+              Input Specification
+            </div>
+            <div
+              style={{
+                fontSize: '13px',
+                color: '#c9d1d9',
+                fontFamily: 'ui-monospace, monospace',
+                lineHeight: 1.5
+              }}
+            >
+              {problem.inputFormat}
+            </div>
+          </div>
 
-            <div>
-              <span style={{ color: '#58a6ff', fontWeight: 600 }}>Input: </span>
-              <span style={{ color: '#c9d1d9' }}>{problem.example.input}</span>
+          {/* Output Format Box */}
+          <div
+            style={{
+              background: 'rgba(8, 13, 24, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '10px',
+              padding: '14px 16px'
+            }}
+          >
+            <div
+              style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#3fb950',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}
+            >
+              Output Specification
             </div>
-            <div>
-              <span style={{ color: '#3fb950', fontWeight: 600 }}>Output: </span>
-              <span style={{ color: '#c9d1d9' }}>{problem.example.output}</span>
-            </div>
-            <div>
-              <span style={{ color: '#bc8cff', fontWeight: 600 }}>Explanation: </span>
-              <span style={{ color: '#c9d1d9' }}>{problem.example.explanation}</span>
+            <div
+              style={{
+                fontSize: '13px',
+                color: '#c9d1d9',
+                fontFamily: 'ui-monospace, monospace',
+                lineHeight: 1.5
+              }}
+            >
+              {problem.outputFormat}
             </div>
           </div>
         </div>
+
+        {/* Algorithmic Strategy & Technical Insights (More Description) */}
+        {problem.hint && (
+          <div
+            style={{
+              marginBottom: '26px',
+              background: 'rgba(137, 87, 229, 0.08)',
+              border: '1px solid rgba(137, 87, 229, 0.25)',
+              borderRadius: '12px',
+              padding: '16px 20px'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '8px'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#d2a8ff',
+                  fontSize: '14px',
+                  fontWeight: 700
+                }}
+              >
+                <Lightbulb size={16} color="#d2a8ff" />
+                <span>Algorithmic Strategy & Insights</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHint(!showHint)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#58a6ff',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                {showHint ? 'Hide details' : 'Show strategy'}
+              </button>
+            </div>
+            <p
+              style={{
+                margin: 0,
+                fontSize: '13.5px',
+                color: '#c9d1d9',
+                lineHeight: 1.6,
+                display: showHint ? 'block' : '-webkit-box',
+                WebkitLineClamp: showHint ? 'unset' : 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden'
+              }}
+            >
+              {problem.hint}
+            </p>
+          </div>
+        )}
+
+        {/* Example Section — Perfectly Aligned Left */}
+        {problem.example && (
+          <div style={{ marginBottom: '26px', textAlign: 'left' }}>
+            <h3
+              style={{
+                margin: '0 0 10px',
+                fontSize: '17px',
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '0.2px',
+                textAlign: 'left'
+              }}
+            >
+              Example
+            </h3>
+
+            <div
+              style={{
+                position: 'relative',
+                background: 'rgba(8, 13, 24, 0.85)',
+                border: '1px solid rgba(56, 139, 253, 0.25)',
+                borderRadius: '12px',
+                padding: '18px 20px',
+                fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
+                fontSize: '13px',
+                lineHeight: 1.7,
+                textAlign: 'left',
+                wordBreak: 'break-word'
+              }}
+            >
+              {/* Copy Button */}
+              <button
+                type="button"
+                onClick={handleCopyExample}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '6px',
+                  color: copied ? '#3fb950' : '#8b949e',
+                  fontSize: '12px',
+                  padding: '5px 10px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = copied ? '#3fb950' : '#8b949e')
+                }
+              >
+                {copied ? <Check size={13} color="#3fb950" /> : <Copy size={13} />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+
+              <div>
+                <span style={{ color: '#58a6ff', fontWeight: 600 }}>Input: </span>
+                <span style={{ color: '#c9d1d9' }}>{problem.example.input}</span>
+              </div>
+              <div>
+                <span style={{ color: '#3fb950', fontWeight: 600 }}>Output: </span>
+                <span style={{ color: '#c9d1d9' }}>{problem.example.output}</span>
+              </div>
+              <div>
+                <span style={{ color: '#bc8cff', fontWeight: 600 }}>Explanation: </span>
+                <span style={{ color: '#c9d1d9' }}>{problem.example.explanation}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Constraints Section — Perfectly Aligned Left */}
-        <div style={{ marginBottom: '32px', textAlign: 'left' }}>
-          <h3
-            style={{
-              margin: '0 0 10px',
-              fontSize: '17px',
-              fontWeight: 700,
-              color: '#ffffff',
-              letterSpacing: '0.2px',
-              textAlign: 'left'
-            }}
-          >
-            Constraints
-          </h3>
+        {problem.constraints && problem.constraints.length > 0 && (
+          <div style={{ marginBottom: '32px', textAlign: 'left' }}>
+            <h3
+              style={{
+                margin: '0 0 10px',
+                fontSize: '17px',
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '0.2px',
+                textAlign: 'left'
+              }}
+            >
+              Constraints
+            </h3>
 
-          <div
-            style={{
-              background: 'rgba(8, 13, 24, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '12px',
-              padding: '16px 20px',
-              fontSize: '14px',
-              color: '#c9d1d9',
-              lineHeight: 1.8,
-              textAlign: 'left'
-            }}
-          >
-            {problem.constraints.map((c, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', textAlign: 'left' }}>
-                <span style={{ color: '#8b949e', fontWeight: 600 }}>{i + 1}.</span>
-                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace', fontSize: '13px' }}>
-                  {c}
-                </span>
-              </div>
-            ))}
+            <div
+              style={{
+                background: 'rgba(8, 13, 24, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '16px 20px',
+                fontSize: '14px',
+                color: '#c9d1d9',
+                lineHeight: 1.8,
+                textAlign: 'left'
+              }}
+            >
+              {problem.constraints.map((c, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', textAlign: 'left' }}>
+                  <span style={{ color: '#8b949e', fontWeight: 600 }}>{i + 1}.</span>
+                  <span
+                    style={{
+                      fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace',
+                      fontSize: '13px'
+                    }}
+                  >
+                    {c}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Bottom Navigation Buttons (Previous / Next) */}
         <div
@@ -720,6 +1065,10 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
             <span>Previous</span>
           </button>
 
+          <div style={{ fontSize: '13px', color: '#8b949e', fontWeight: 500 }}>
+            {currentIndex + 1} / {total}
+          </div>
+
           <button
             type="button"
             onClick={() => setCurrentIndex((prev) => Math.min(total - 1, prev + 1))}
@@ -737,7 +1086,8 @@ export function ProblemShowcase({ onNavigateHome, onLogout }) {
               color: '#ffffff',
               cursor: currentIndex === total - 1 ? 'not-allowed' : 'pointer',
               opacity: currentIndex === total - 1 ? 0.45 : 1,
-              boxShadow: currentIndex === total - 1 ? 'none' : '0 4px 16px rgba(31, 111, 235, 0.35)',
+              boxShadow:
+                currentIndex === total - 1 ? 'none' : '0 4px 16px rgba(31, 111, 235, 0.35)',
               transition: 'transform 0.15s, box-shadow 0.15s'
             }}
             onMouseEnter={(e) => {
